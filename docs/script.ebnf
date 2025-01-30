@@ -1,0 +1,10 @@
+
+stmt = node_decl | edge_decl | expr_stmt;
+
+node_decl = "node" identifier "{" node_body "}";
+edge_decl = "edge" identifier "{" edge_body "}";
+
+node_body = node_meta_decl? (prop_decl*);
+edge_body = edge_meta_decl? (prop_decl*);
+
+prop_decl = identifier (":" (type | identifier))? "=" (expr | literal);
