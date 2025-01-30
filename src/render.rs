@@ -1,7 +1,6 @@
 use svg::{
     node::element::Path,
     node::element::path::Data,
-    node::element::Rectangle,
     Document,
 };
 
@@ -44,18 +43,13 @@ pub fn test() {
 
 
     let path = Path::new()
-        .set("fill", "none")
-        .set("stroke", "white")
+        .set("fill",         "none")
+        .set("stroke",       "white")
         .set("stroke-width", 0.1)
-        .set("d", data)
+        .set("d",            data)
     ;
     
-    let rect_data = Rectangle::new()
-        .set("width",  rect2.size.width)
-        .set("height", rect2.size.height)
-        .set("x",      rect2.location.x)
-        .set("y",      rect2.location.y)
-        
+    let rect_data = rect2.to_svg_rect()
         .set("fill",         "none")
         .set("stroke",       "white")
         .set("stroke-width", 1)

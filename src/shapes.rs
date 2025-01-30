@@ -1,4 +1,5 @@
 
+use svg::node::element::Rectangle as svg_Rect;
 
 pub struct Rect {
     pub location: Location,
@@ -21,6 +22,14 @@ impl Rect {
             (w,  0),
             (0, -h),
         ]
+    }
+
+    pub fn to_svg_rect(&self) -> svg_Rect {
+        svg_Rect::new()
+            .set("width",  self.size.width)
+            .set("height", self.size.height)
+            .set("x",      self.location.x)
+            .set("y",      self.location.y)
     }
 }
 
