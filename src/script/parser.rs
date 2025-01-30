@@ -1,6 +1,5 @@
-use crate::ScriptRuntime;
 
-use super::{ast::Stmt, token::Token};
+use super::{runtime::ScriptRuntime, ast::Stmt, token::Token};
 
 
 pub struct Parser <'a> {

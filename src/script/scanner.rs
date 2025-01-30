@@ -1,7 +1,5 @@
 
-use crate::ScriptRuntime;
-
-use super::token::{Token, TokenType::{self, *}};
+use super::{runtime::ScriptRuntime, token::{Token, TokenType::{self, *}}};
 
 pub struct Scanner <'a> {
 
