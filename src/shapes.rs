@@ -1,55 +1,54 @@
 
-pub struct Shape {
-    location:     Location,
-    bounding_box: Size,
-
-}
 
 pub struct Rect {
-    location: Location,
+    pub location: Location,
+    pub size:     Size,
+}
 
+impl Rect {
+    pub fn new(location: Location, size: Size) -> Rect {
+        Rect {
+            location,
+            size,
+        }
+    }
+
+    pub fn to_path(&self) -> Vec<(i32, i32)> {
+        let w = self.size.width  as i32;
+        let h = self.size.height as i32;
+        vec![
+            (0,  h),
+            (w,  0),
+            (0, -h),
+        ]
+    }
 }
 
 pub struct Location {
-    x: f64,
-    y: f64,
-    z: f64,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
 }
 
-// This is a scale factor, relative to other elements
+impl Location {
+    pub fn to_parameters(&self) -> (u32, u32) {
+        (self.x, self.y)
+    }
+}
+
 pub struct Size {
-    width:  f64,
-    height: f64,
+    pub width:  u32,
+    pub height: u32,
 }
 
-pub enum SizeErr {
-    WidthNegative,
-    HeightNegative,
-}
-
-pub type SizeResult = Result<Size, SizeErr>;
 
 impl Size {
-    pub fn new(width: f64, height: f64) -> SizeResult {
+    pub fn new(width: u32, height: u32) -> Size {
         
-        Size::validate(width, height)?;
-
-        Ok(Size {
+        Size {
             width,
             height,
-        })
+        }
     }
 
-    fn validate(width: f64, height: f64) -> Result<(), SizeErr> {
-        if width < 0.0 {
-            Err(SizeErr::WidthNegative)
-        }
-        else if height < 0.0 {
-            Err(SizeErr::HeightNegative)
-        }
-        else {
-            Ok(())
-        }
-    }
-    
 }

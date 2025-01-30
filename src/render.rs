@@ -1,29 +1,74 @@
 use svg::{
     node::element::Path,
     node::element::path::Data,
+    node::element::Rectangle,
     Document,
 };
 
+use crate::shapes::{Location, Rect, Size};
+
 pub fn test() {
-    let data = Data::new()
-        .move_to((10, 10))
-        .line_by((0, 50))
-        .line_by((50, 0))
-        .line_by((0, -50))
-        .close()
+
+    let rect = Rect::new(
+        Location {
+            x: 10,
+            y: 10,
+            z: 1,
+        },
+        Size {
+            width:  50,
+            height: 50,
+        }
+    );
+
+    let rect2 = Rect::new(
+        Location {
+            x: 70,
+            y: 10,
+            z: 1,
+        },
+        Size {
+            width:  10,
+            height: 50,
+        }
+    );
+
+    let mut data = Data::new()
+        .move_to(rect.location.to_parameters())
     ;
+
+    for tuple in rect.to_path() {
+        data = data.line_by(tuple);
+    }
+    data = data.close();
+
 
     let path = Path::new()
         .set("fill", "none")
-        .set("stroke", "black")
-        .set("stroke-width", 3)
+        .set("stroke", "white")
+        .set("stroke-width", 0.1)
         .set("d", data)
+    ;
+    
+    let rect_data = Rectangle::new()
+        .set("width",  rect2.size.width)
+        .set("height", rect2.size.height)
+        .set("x",      rect2.location.x)
+        .set("y",      rect2.location.y)
+        
+        .set("fill",         "none")
+        .set("stroke",       "white")
+        .set("stroke-width", 1)
     ;
 
     let document = Document::new()
-        .set("viewbox", (0, 0, 70, 70))
+        .set("viewbox", (0, 0, 40, 40))
         .add(path)
+        .add(rect_data)
     ;
 
-    svg::save("test.svg", &document).unwrap();
+    // TODO: not hardcode out path
+    svg::save("out/test.svg", &document).unwrap();
+
+
 }
