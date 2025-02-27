@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-svg = "0.18.0"
+png = "0.17.16"
