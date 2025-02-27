@@ -87,11 +87,11 @@ impl DataBuff {
         let line_start   = PixelLoc::from_udc(&line.start,             0.0,    self.width, self.height);
         let line_end     = PixelLoc::from_udc(&line.end,               0.0,    self.width, self.height);
 
-        let start_y = top_left.y     as usize;
-        let end_y   = bottom_right.y as usize +1;
+        let start_y = (top_left.y     as usize)   .clamp(0, self.height);
+        let end_y   = (bottom_right.y as usize +1).clamp(0, self.height);
         
-        let start_x = top_left.x     as usize;
-        let end_x   = bottom_right.x as usize +1;
+        let start_x = (top_left.x     as usize)   .clamp(0, self.width);
+        let end_x   = (bottom_right.x as usize +1).clamp(0, self.width);
 
         for y in start_y..end_y {
 
