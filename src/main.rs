@@ -11,7 +11,7 @@ pub fn main() {
     let width  = 1000;
     let height = 1000;
 
-    let square = Rect::from_box(
+    let square = Rect::from(
         &BoundingBox {
             top_left:     Location::new(-0.75,  0.75),
             bottom_right: Location::new(-0.25, -0.75),

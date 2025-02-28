@@ -1,4 +1,4 @@
-use crate::shapes::{Line, Location, Rect};
+use crate::shapes::{GetBounding, Line, Location, Rect};
 
 
 pub struct Pixel {

@@ -35,20 +35,15 @@ pub struct Triangle {
     pub vertices: Vertices,
 }
 
+pub trait GetBounding {
+    fn bounding_box(&self) -> BoundingBox;
+}
+
+
+// -----
+
 
 impl BoundingBox {
-
-    pub fn from_vecs(x_list: &Vec<f64>, y_list: &Vec<f64>) -> BoundingBox {
-        let min_x = x_list.iter().reduce(|acc, x| if acc < x {acc} else {x}).unwrap();
-        let min_y = y_list.iter().reduce(|acc, y| if acc < y {acc} else {y}).unwrap();
-        let max_x = x_list.iter().reduce(|acc, x| if acc > x {acc} else {x}).unwrap();
-        let max_y = y_list.iter().reduce(|acc, y| if acc > y {acc} else {y}).unwrap();
-
-        BoundingBox {
-            top_left:     Location::new(min_x.clone(), max_y.clone()),
-            bottom_right: Location::new(max_x.clone(), min_y.clone()),
-        }
-    }
 
     pub fn left(&self) -> f64 {
         self.top_left.x
@@ -81,6 +76,26 @@ impl BoundingBox {
     }
 }
 
+type Points<'a> = (&'a Vec<f64>, &'a Vec<f64>);
+
+impl From<Points<'_>> for BoundingBox {
+    fn from(points: Points) -> BoundingBox {
+
+        let x_list = points.0;
+        let y_list = points.1;
+
+        let min_x = x_list.iter().reduce(|acc, x| if acc < x {acc} else {x}).unwrap();
+        let min_y = y_list.iter().reduce(|acc, y| if acc < y {acc} else {y}).unwrap();
+        let max_x = x_list.iter().reduce(|acc, x| if acc > x {acc} else {x}).unwrap();
+        let max_y = y_list.iter().reduce(|acc, y| if acc > y {acc} else {y}).unwrap();
+
+        BoundingBox {
+            top_left:     Location::new(*min_x, *max_y),
+            bottom_right: Location::new(*max_x, *min_y),
+        }
+    }
+}
+
 // TODO: add in bounds checking for [-1, 1]
 
 impl Dimensions {
@@ -110,7 +125,10 @@ impl Rect {
         }
     }
 
-    pub fn from_box(bounding_box: &BoundingBox) -> Rect {
+}
+
+impl From<&BoundingBox> for Rect {
+    fn from(bounding_box: &BoundingBox) -> Rect {
 
         let dim = Dimensions::new(
             bounding_box.right() - bounding_box.left(),
@@ -123,14 +141,15 @@ impl Rect {
 
         );
 
-        Rect {
+        Rect::new(
             center,
             dim,
-        }
-
+        )
     }
+}
 
-    pub fn bounding_box(&self) -> BoundingBox {
+impl GetBounding for Rect {
+    fn bounding_box(&self) -> BoundingBox {
 
         let half_width  = &self.dim.width  / 2.0;
         let half_height = &self.dim.height / 2.0;
@@ -156,11 +175,14 @@ impl Line {
         }
     }
 
-    pub fn bounding_box(&self) -> BoundingBox {
+}
+
+impl GetBounding for Line {
+    fn bounding_box(&self) -> BoundingBox {
         let x = vec![self.start.x, self.end.x];
         let y = vec![self.start.y, self.end.y];
 
-        BoundingBox::from_vecs(&x, &y)
+        BoundingBox::from((&x, &y))
     }
 }
 
@@ -170,12 +192,14 @@ impl Triangle {
             vertices,
         }
     }
+}
 
-    pub fn bounding_box(&self) -> BoundingBox {
+impl GetBounding for Triangle {
+    fn bounding_box(&self) -> BoundingBox {
 
         let x = vec![self.vertices.0.x, self.vertices.1.x, self.vertices.2.x];
         let y = vec![self.vertices.0.y, self.vertices.1.y, self.vertices.2.y];
 
-        BoundingBox::from_vecs(&x, &y)
+        BoundingBox::from((&x, &y))
     }
 }
