@@ -22,7 +22,10 @@ struct PixelLoc {
 
 impl PixelLoc {
 
-    pub fn new(x: f64, y: f64, radius: f64, width: usize, height: usize) -> PixelLoc {
+    /**
+       Converts UDC coordinates into pixel space coordinates
+     */
+    pub fn new(x: f64, y: f64, width: usize, height: usize) -> PixelLoc {
 
         let half_width  = width  as f64 / 2.0;
         let half_height = height as f64 / 2.0;
@@ -30,13 +33,16 @@ impl PixelLoc {
         let y = -y;
 
         PixelLoc {
-            x: (x * half_width  as f64) + half_width  + radius,
-            y: (y * half_height as f64) + half_height + radius,
+            x: (x * half_width ) + half_width,
+            y: (y * half_height) + half_height,
         }
     }
 
-    pub fn from_udc(loc: &Location, radius: f64, width: usize, height: usize) -> PixelLoc {
-        Self::new(loc.x, loc.y, radius, width, height)
+    /**
+       Converts UDC coordinates into pixel space coordinates
+     */
+    pub fn from_udc(loc: &Location, width: usize, height: usize) -> PixelLoc {
+        Self::new(loc.x, loc.y, width, height)
     }
 }
 
@@ -78,20 +84,20 @@ impl DataBuff {
 
     pub fn render_line(&mut self, line: &Line) {
         
-        let radius   = 2.0;
-        let bounding = line.bounding_box();
+        let thickness = 2.0;
+        let bounding  = line.bounding_box();
 
-        let top_left     = PixelLoc::from_udc(&bounding.top_left,     -radius, self.width, self.height);
-        let bottom_right = PixelLoc::from_udc(&bounding.bottom_right,  radius, self.width, self.height);
+        let top_left     = PixelLoc::from_udc(&bounding.top_left,     self.width, self.height);
+        let bottom_right = PixelLoc::from_udc(&bounding.bottom_right, self.width, self.height);
 
-        let line_start   = PixelLoc::from_udc(&line.start,             0.0,    self.width, self.height);
-        let line_end     = PixelLoc::from_udc(&line.end,               0.0,    self.width, self.height);
+        let line_start   = PixelLoc::from_udc(&line.start,            self.width, self.height);
+        let line_end     = PixelLoc::from_udc(&line.end,              self.width, self.height);
 
-        let start_y = (top_left.y     as usize)   .clamp(0, self.height);
-        let end_y   = (bottom_right.y as usize +1).clamp(0, self.height);
+        let start_y = ((top_left.y     + 0.0      ) as usize).clamp(0, self.height);
+        let end_y   = ((bottom_right.y + thickness) as usize).clamp(0, self.height);
         
-        let start_x = (top_left.x     as usize)   .clamp(0, self.width);
-        let end_x   = (bottom_right.x as usize +1).clamp(0, self.width);
+        let start_x = ((top_left.x     + 0.0      ) as usize).clamp(0, self.width);
+        let end_x   = ((bottom_right.x + thickness) as usize).clamp(0, self.width);
 
         for y in start_y..end_y {
 
@@ -100,11 +106,11 @@ impl DataBuff {
                 let pixel = PixelLoc { x: x as f64, y: y as f64, };
                 let dist  = distance(&pixel, &line_start, &line_end);
 
-                if dist > radius {
+                if dist > thickness {
                     continue;
                 }
 
-                let val = dist / radius;
+                let val = dist / thickness;
                 let ind = self.index(x, y);
 
                 self.data[ind].set_white_alpha(val);

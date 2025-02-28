@@ -51,19 +51,19 @@ impl BoundingBox {
     }
 
     pub fn left(&self) -> f64 {
-        self.top_left.x.clone()
+        self.top_left.x
     }
 
     pub fn right(&self) -> f64 {
-        self.bottom_right.x.clone()
+        self.bottom_right.x
     }
 
     pub fn top(&self) -> f64 {
-        self.top_left.y.clone()
+        self.top_left.y
     }
 
     pub fn bottom(&self) -> f64 {
-        self.bottom_right.y.clone()
+        self.bottom_right.y
     }
 
     pub fn top_right(&self) -> Location {
