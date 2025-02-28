@@ -1,18 +1,11 @@
-use crate::shapes::{GetBounding, Line, Location, Rect};
+use crate::{color::Color, shapes::{GetBounding, Line, Location, Rect}};
 
-
-pub struct Pixel {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: u8,
-}
 
 pub struct DataBuff {
     pub width:  usize,
     pub height: usize,
 
-    pub data: Vec<Pixel>,
+    pub data:   Vec<Color>,
 }
 
 struct PixelLoc {
@@ -52,7 +45,7 @@ impl DataBuff {
         let mut data = Vec::with_capacity(size);
 
         for _ in 0..size {
-            data.push(Pixel::new());
+            data.push(Color::new());
         }
 
         DataBuff {
@@ -133,50 +126,4 @@ fn distance(pixel: &PixelLoc, line_start: &PixelLoc, line_end: &PixelLoc) -> f64
     let denominator = ( y_diff_sq + x_diff_sq ).powf(0.5);
 
     numerator / denominator
-}
-
-impl Pixel {
-    pub fn new() -> Pixel {
-        Pixel {r: 0, g: 0, b: 0, a: 0}
-    }
-
-    pub fn set_black(&mut self) {
-        self.r = 0;
-        self.g = 0;
-        self.b = 0;
-        self.a = 255;
-    }
-
-    pub fn set_white(&mut self) {
-        self.r = 255;
-        self.g = 255;
-        self.b = 255;
-        self.a = 255;
-    }
-
-    pub fn set_white_alpha(&mut self, alpha: f64) {
-
-
-        let alpha = alpha.clamp(0.0, 1.0);
-        let alpha = 1.0 - alpha;
-
-        let val = (alpha * 255.0) as u8;
-
-        self.r = 255;
-        self.g = 255;
-        self.b = 255;
-        self.a = val;
-    }
-
-    pub fn set_gray(&mut self, brightness: f64) {
-
-        let brightness = brightness.clamp(0.0, 1.0);
-
-        let val = (brightness * 255.0) as u8;
-        
-        self.r = val;
-        self.g = val;
-        self.b = val;
-        self.a = 255;
-    }
 }
