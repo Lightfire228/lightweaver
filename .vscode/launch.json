@@ -8,7 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/target/debug/my_rusty_graph_script",
+            "program": "${workspaceFolder}/target/debug/lightweaver",
             "args": [],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "rust: cargo build"
