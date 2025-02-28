@@ -49,6 +49,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightweaver"
+version = "0.1.0"
+dependencies = [
+ "png",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -56,13 +63,6 @@ checksum = "8e3e04debbb59698c15bacbb6d93584a8c0ca9cc3213cb423d31f760d8843ce5"
 dependencies = [
  "adler2",
  "simd-adler32",
-]
-
-[[package]]
-name = "my_rusty_graph_script"
-version = "0.1.0"
-dependencies = [
- "png",
 ]
 
 [[package]]

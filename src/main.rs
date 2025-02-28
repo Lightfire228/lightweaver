@@ -5,7 +5,10 @@ use std::{fs::File, path::Path, io::BufWriter};
 mod shapes;
 mod render;
 mod color;
+mod shape_tree;
 
+// TODO: make two rects, and join them with a connector
+// then render that
 
 pub fn main() {
     
