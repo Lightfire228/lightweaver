@@ -11,6 +11,8 @@ This is mainly focused as a tool for software development.  For use in generatin
 # Resources
 
 - [Crafting Interpreters](https://craftinginterpreters.com/contents.html)
+- [Vulkan](https://www.vulkan.org/learn)
+- https://www.youtube.com/@Acerola_t
 
 # related projects
 
@@ -24,3 +26,5 @@ This is mainly focused as a tool for software development.  For use in generatin
 # the name?
 
 https://www.brandonsanderson.com/pages/the-stormlight-archive-series
+
+![image](https://uploads.coppermind.net/Shash_glyph.svg)
