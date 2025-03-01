@@ -5,6 +5,7 @@ mod bounding_box;
 
 pub use rect::Rect;
 pub use line::Line;
+#[allow(unused_imports)]
 pub use triangle::Triangle;
 pub use bounding_box::{{BoundingBox, GetBounding}};
 
