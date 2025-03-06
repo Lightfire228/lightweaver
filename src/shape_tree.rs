@@ -1,76 +1,75 @@
-use crate::shapes;
+use std::rc::{Rc, Weak};
 
-pub struct ShapeTreeCoordinates {
-    x: f64,
-    y: f64,
-}
-
-
-pub trait ShapeElement {
-
-    fn location(&self) -> &mut ShapeTreeCoordinates;
-}
-
-pub type ShapeList = Vec<NodeElement>;
-
-
-pub struct NodeElement {
-    pub location: ShapeTreeCoordinates,
-    pub element:  Box<dyn ShapeElement>,
-}
+use crate::shapes::ShapeType;
 
 pub enum Direction {
     HORT,
     VERT,
 }
 
+pub enum NodeOrShape {
+    Node (Rc<ShapeTreeNode>),
+    Shape(ShapeType),
+}
 
-pub struct ShapeTreeNode<'a> {
-    pub parent:    Option<&'a ShapeTreeNode<'a>>,
+pub struct ShapeTreeNode {
+    pub parent:    Option<Rc<ShapeTreeNode>>,
     pub direction: Direction,
 
-    pub shapes:    ShapeList,
-    pub children:  Vec<ShapeTreeNode<'a>>,
+    pub children:  Vec<NodeOrShape>,
+
+    me: Weak<ShapeTreeNode>
 }
 
-impl ShapeTreeNode<'_> {
-    pub fn new<'a>(direction: Direction) -> ShapeTreeNode<'a> {
+impl ShapeTreeNode {
+    pub fn new(direction: Direction) -> Rc<ShapeTreeNode> {
 
-        ShapeTreeNode {
-            parent: None,
-            direction,
+        Rc::new_cyclic(|new_| 
+            ShapeTreeNode {
+                parent: None,
+                direction,
 
-            shapes:   vec![],
-            children: vec![],
-        }
+                children: vec![],
+                me: new_.clone(),
+            }
+        )
     }
 
-    pub fn with_parent<'a>(parent: &'a ShapeTreeNode<'_>, direction: Direction) -> ShapeTreeNode<'a> {
-        ShapeTreeNode {
-            parent: Some(parent),
-            direction,
-    
-            shapes:   vec![],
-            children: vec![],
-        }
+    fn with_parent(parent: &Rc<ShapeTreeNode>, direction: Direction) -> Rc<ShapeTreeNode> {
+
+        Rc::new_cyclic(|new_| 
+            ShapeTreeNode {
+                parent: Some(parent.clone()),
+                direction,
+
+                children: vec![],
+                me: new_.clone(),
+            }
+        )
     }
 
-    pub fn calculate_verticies(&mut self, scale: f64) {
-        let size = self.size();
-
-        let x = 0.0;
-        let y = 0.0;
-
-        // for this to work, "children" and "shapes" need to be the same iter
-        // (or their ordinals need set)
-        for el in self.children.iter() {
-        }
-        
+    pub fn me(&self) -> Rc<Self> {
+        self.me.upgrade().unwrap()
     }
 
-    pub fn size(&self) -> usize {
-        self.shapes.len() + self.children.iter().map(|x| x.size()).sum::<usize>()
-    
+    pub fn add(&mut self, shape: ShapeType) {
+        let shape = NodeOrShape::Shape(shape);
+        self.children.push(shape);
 
+    }
 
+    pub fn add_group(&mut self) {
+
+        use self::Direction::*;
+
+        let dir = match self.direction {
+            HORT => VERT,
+            VERT => HORT,
+        };
+
+        let node = NodeOrShape::Node(Self::with_parent(&self.me(), dir));
+
+        self.children.push(node);
+    }
 }
+

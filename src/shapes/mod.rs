@@ -43,3 +43,8 @@ impl Location {
     }
 }
 
+pub enum ShapeType {
+    Rect    (Rect),
+    Line    (Line),
+    Triangle(Triangle),
+}
