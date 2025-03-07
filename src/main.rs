@@ -7,6 +7,7 @@ mod shapes;
 mod render;
 mod color;
 mod shape_tree;
+mod script;
 
 
 pub fn main() {
