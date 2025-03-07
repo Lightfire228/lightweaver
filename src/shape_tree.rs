@@ -1,4 +1,4 @@
-use std::rc::{Rc, Weak};
+use std::{cell::{Ref, RefCell}, rc::{Rc, Weak}};
 
 use crate::shapes::ShapeType;
 
@@ -7,49 +7,54 @@ pub enum Direction {
     VERT,
 }
 
-pub enum NodeOrShape {
-    Node (Rc<ShapeTreeNode>),
+pub enum NodeOrShape<'a> {
+    Node (RefCell<ShapeTreeNode<'a>>),
     Shape(ShapeType),
 }
 
-pub struct ShapeTreeNode {
-    pub parent:    Option<Rc<ShapeTreeNode>>,
+pub struct ShapeTreeNode<'a> {
+    pub parent:    Option<Ref<'a, ShapeTreeNode<'a>>>,
     pub direction: Direction,
 
-    pub children:  Vec<NodeOrShape>,
-
-    me: Weak<ShapeTreeNode>
+    pub children:  Vec<NodeOrShape<'a>>,
 }
 
-impl ShapeTreeNode {
-    pub fn new(direction: Direction) -> Rc<ShapeTreeNode> {
+impl ShapeTreeNode<'_> {
+    pub fn new<'a>(direction: Direction) -> RefCell<ShapeTreeNode<'a>> {
 
-        Rc::new_cyclic(|new_| 
+        RefCell::new(
             ShapeTreeNode {
                 parent: None,
                 direction,
 
                 children: vec![],
-                me: new_.clone(),
             }
         )
     }
 
-    fn with_parent(parent: &Rc<ShapeTreeNode>, direction: Direction) -> Rc<ShapeTreeNode> {
+    fn add_group<'a>(parent: &RefCell<ShapeTreeNode>, direction: Direction) -> Ref<'a, ShapeTreeNode<'a>> {
 
-        Rc::new_cyclic(|new_| 
+        use self::Direction::*;
+
+        let mut p = parent.borrow_mut();
+
+        let dir = match p.direction {
+            HORT => VERT,
+            VERT => HORT,
+        };
+
+        let node = RefCell::new(
             ShapeTreeNode {
-                parent: Some(parent.clone()),
+                parent: Some(parent.borrow()),
                 direction,
 
                 children: vec![],
-                me: new_.clone(),
             }
-        )
-    }
+        );
 
-    pub fn me(&self) -> Rc<Self> {
-        self.me.upgrade().unwrap()
+        p.children.push(NodeOrShape::Node(node));
+
+        node.borrow()
     }
 
     pub fn add(&mut self, shape: ShapeType) {
@@ -58,18 +63,5 @@ impl ShapeTreeNode {
 
     }
 
-    pub fn add_group(&mut self) {
-
-        use self::Direction::*;
-
-        let dir = match self.direction {
-            HORT => VERT,
-            VERT => HORT,
-        };
-
-        let node = NodeOrShape::Node(Self::with_parent(&self.me(), dir));
-
-        self.children.push(node);
-    }
 }
 

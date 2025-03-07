@@ -1,5 +1,6 @@
 use render::DataBuff;
-use shapes::{BoundingBox, Line, Location, Rect};
+use shape_tree::{Direction, ShapeTreeNode};
+use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::File, path::Path, io::BufWriter};
 
 mod shapes;
@@ -33,6 +34,10 @@ pub fn main() {
     buff.render_line(&line);
 
     write_png(&buff);
+
+    let mut root = ShapeTreeNode::new(Direction::HORT);
+
+    root.add(ShapeType::Rect(square))
 
 }
 
