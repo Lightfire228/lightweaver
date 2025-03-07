@@ -1,5 +1,5 @@
 use render::DataBuff;
-use shape_tree::{Direction, ShapeTreeNode};
+use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::File, path::Path, io::BufWriter};
 
@@ -8,8 +8,6 @@ mod render;
 mod color;
 mod shape_tree;
 
-// TODO: make two rects, and join them with a connector
-// then render that
 
 pub fn main() {
     
@@ -35,9 +33,11 @@ pub fn main() {
 
     write_png(&buff);
 
-    let mut root = ShapeTreeNode::new(Direction::HORT);
+    let mut shape_tree = ShapeTree::new();
 
-    root.add(ShapeType::Rect(square))
+    shape_tree.add_shape(ShapeType::Rect(square));
+
+
 
 }
 
