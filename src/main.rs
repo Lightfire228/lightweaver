@@ -1,7 +1,8 @@
 use render::DataBuff;
+use script::scanner::Scanner;
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
-use std::{fs::File, path::Path, io::BufWriter};
+use std::{fs::{self, File}, io::{BufWriter, Read}, path::{Path, PathBuf}};
 
 mod shapes;
 mod render;
@@ -38,6 +39,8 @@ pub fn main() {
 
     shape_tree.add_shape(ShapeType::Rect(square));
 
+    test_script();
+
 
 
 }
@@ -69,4 +72,15 @@ fn write_png(buff: &DataBuff) {
     writer.write_image_data(&data).unwrap();
 
 
+}
+
+fn test_script() {
+    let path = Path::new("./test_scripts/test.lw");
+    let file = fs::read_to_string(path).expect("could not read test file");
+
+    let tokens = Scanner::scan_tokens(&file);
+
+    for t in tokens {
+        println!("{}", t);
+    }
 }

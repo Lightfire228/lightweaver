@@ -55,10 +55,14 @@ impl Scanner {
 
     fn scan_token(&mut self) {
         let ch     = self.advance();
-        let as_str = ch.to_string();
 
         match ch {
+
+            ' '  => (),
+            '\t' => (),
+
             '='  => self.add_token("=", Equals),
+            ':'  => self.add_token(":", Colon),
             '{'  => self.add_token("{", LeftCurly),
             '}'  => self.add_token("}", RightCurly),
             '"'  => self.scan_string(),
@@ -86,7 +90,7 @@ impl Scanner {
                     self.scan_identifier();
                 }
                 else {
-                    self.error(&format!("Unknown character {}", ch));
+                    self.error(&format!("Unknown character '{}'", ch));
                 }
 
             },
@@ -201,11 +205,11 @@ impl Scanner {
     }
 
     fn peek(&self) -> char {
-        self.seek(1)
+        self.seek(0)
     }
 
     fn peek_next(&self) -> char {
-        self.seek(2)
+        self.seek(1)
     }
 
     fn match_(&self, ch: char) -> bool {
