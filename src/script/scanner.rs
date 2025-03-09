@@ -63,6 +63,7 @@ impl Scanner {
 
             '='  => self.add_token("=", Equals),
             ':'  => self.add_token(":", Colon),
+            ';'  => self.add_token(";", SemiColon),
             '{'  => self.add_token("{", LeftCurly),
             '}'  => self.add_token("}", RightCurly),
             '"'  => self.scan_string(),

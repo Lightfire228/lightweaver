@@ -5,7 +5,7 @@ use std::fmt::Formatter;
 #[derive(Clone, Copy)]
 pub enum TokenType {
     // 1 character tokens
-    Equals, Colon,
+    Equals, Colon, SemiColon,
     LeftCurly, RightCurly,
 
     // 2 Character tokens

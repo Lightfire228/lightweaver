@@ -1,0 +1,37 @@
+program             = declaration* EOF ;
+
+declaration         = varDecl
+                    | statement ;
+
+varDecl             = "let" IDENTIFIER ( "=" expression )? ";" ;
+
+// Statements
+statement           = exprStmt 
+                    | block ;
+
+exprStmt            = expression ";" ;
+block               = "{" declaration* "}" ;
+
+// Expressions
+expression          = assignment ;
+assignment          = IDENTIFIER "=" assignment
+                    | connection 
+                    | primary ;
+
+// Logical operators
+connection          = instantiation ( "->" instantiation )* ;
+instantiation       = rectInst
+                    | primary ;
+
+primary             = NUMBER | STRING
+                    | "(" expression ")"
+                    | IDENTIFIER;
+
+
+// Instantiation
+
+rectInst            = "Rect" instantBody ;
+instantBody         = "{" propertyList? "}" ;
+
+propertyList        = ( property ("," property)* ) ;
+property            = IDENTIFIER ":" expression ;

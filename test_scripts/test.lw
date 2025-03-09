@@ -1,12 +1,10 @@
 
 let r1 = Rect {
     name: "Rect 1"
-}
+};
 
 let r2 = Rect {
     name: "Rect 2"
-}
+};
 
-let c1 = r1 -> r2 {
-    
-}
+r1 -> r2;
