@@ -128,7 +128,8 @@ impl Scanner {
 
             else if self.peek() == '\\' && self.has_next() {
                 self.advance();
-                self.scan_escape();
+                
+                bytes.push(self.scan_escape());
             }
 
             bytes.push(self.advance());
@@ -145,19 +146,20 @@ impl Scanner {
 
     }
 
-    fn scan_escape(&mut self) {
-        let ch = self.peek();
+    fn scan_escape(&mut self) -> char {
+        let ch = self.advance();
 
         match ch {
-            '"'  |
+            '\"' |
             '\'' |
-            '\\' |
-            '\n' |
-            '\t' => (),
+            '\\' => ch,
+            'n'  => '\n',
+            't'  => '\t',
 
             _   => {
                 self.error(&format!("Unknown escape character: '{}'", ch));
-            },
+                '\0'
+            }
         }
     }
 

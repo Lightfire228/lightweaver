@@ -1,6 +1,6 @@
 
 let r1 = Rect {
-    name: "Rect 1"
+    name: "Rect \n1"
 };
 
 let r2 = Rect {
