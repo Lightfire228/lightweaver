@@ -59,6 +59,7 @@ impl Scanner {
         match ch {
 
             ' '  => (),
+            '\r' => (),
             '\t' => (),
 
             '='  => self.add_token("=", Equals),
