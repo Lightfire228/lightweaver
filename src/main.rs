@@ -13,32 +13,8 @@ mod script;
 
 pub fn main() {
     
-    let width  = 1000;
-    let height = 1000;
-
-    let square = Rect::from(
-        &BoundingBox {
-            top_left:     Location::new(-0.75,  0.75),
-            bottom_right: Location::new(-0.25, -0.75),
-        }
-    );
-
-    let line = Line::new(
-        Location::new(0.25, -0.75),
-        Location::new(0.75,  0.75),
-    );
-
-    let mut buff = DataBuff::new(width as usize, height as usize);
-
-    buff.render_rect(&square);
-    buff.render_line(&line);
-
-    write_png(&buff);
-
-    let mut shape_tree = ShapeTree::new();
-
-    shape_tree.add_shape(ShapeType::Rect(square));
-
+    test_png();
+    // test_shape_tree();
     test_script();
 
 
@@ -74,6 +50,44 @@ fn write_png(buff: &DataBuff) {
 
 }
 
+fn test_png() {
+    let width  = 1000;
+    let height = 1000;
+
+    let square = Rect::from(
+        &BoundingBox {
+            top_left:     Location::new(-0.75,  0.75),
+            bottom_right: Location::new(-0.25, -0.75),
+        }
+    );
+
+    let line = Line::new(
+        Location::new(0.25, -0.75),
+        Location::new(0.75,  0.75),
+    );
+
+    let mut buff = DataBuff::new(width as usize, height as usize);
+
+    buff.render_rect(&square);
+    buff.render_line(&line);
+
+    write_png(&buff);
+}
+
+fn test_shape_tree() {
+
+    let square = Rect::from(
+        &BoundingBox {
+            top_left:     Location::new(-0.75,  0.75),
+            bottom_right: Location::new(-0.25, -0.75),
+        }
+    );
+
+    let mut shape_tree = ShapeTree::new();
+
+    shape_tree.add_shape(ShapeType::Rect(square));
+}
+
 fn test_script() {
     let path = Path::new("./test_scripts/test.lw");
     let file = fs::read_to_string(path).expect("could not read test file");
@@ -84,3 +98,4 @@ fn test_script() {
         println!("{}", t);
     }
 }
+
