@@ -1,20 +1,27 @@
-This is (going to be) a tool to generate diagrams and flowcharts from DSL (diagrams-as-code)
+# Lightweaver
 
-This is mainly focused as a tool for software development.  For use in generating visuals for 
-- modelling systems
+Better graph visualizatoin
+
+## Usage
+
+Lightbringer is a tool to generate diagrams and flowcharts from DSL (diagrams-as-code).
+
+This is mainly focused as a tool for software development.  For use in generating visuals for:
+
+- modeling systems
 - reverse engineering
 - ER diagrams
 - Data flow diagrams
 - State flow diagrams
 - SQL query visualizers
 
-# Resources
+## Resources
 
 - [Crafting Interpreters](https://craftinginterpreters.com/contents.html)
 - [Vulkan](https://www.vulkan.org/learn)
 - https://www.youtube.com/@Acerola_t
 
-# related projects
+## Related Projects
 
 - [Mermaid](https://github.com/mermaid-js/mermaid)
 - [GraphViz](https://gitlab.com/graphviz/graphviz)
@@ -22,8 +29,7 @@ This is mainly focused as a tool for software development.  For use in generatin
 - [Manim](https://github.com/ManimCommunity/manim)
 - [MinGrammer](https://github.com/mingrammer/diagrams)
 
-
-# the name?
+## The Name?
 
 https://www.brandonsanderson.com/pages/the-stormlight-archive-series
 
