@@ -1,8 +1,8 @@
 use render::DataBuff;
-use script::scanner::Scanner;
+use script::scanner::{Scanner, ScannerError};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
-use std::{fs::{self, File}, io::{BufWriter, Read}, path::{Path, PathBuf}};
+use std::{fs::{self, File}, io::BufWriter, path::Path};
 
 mod shapes;
 mod render;
@@ -94,8 +94,23 @@ fn test_script() {
 
     let tokens = Scanner::scan_tokens(&file);
 
+    let tokens = match tokens {
+        Ok(t)  => t,
+        Err(e) => {
+            display_scanner_errors(e);
+            return;
+        }
+    };
+
     for t in tokens {
         println!("{}", t);
     }
 }
 
+
+fn display_scanner_errors(errs: Vec<ScannerError>) {
+
+    for e in errs {
+        eprintln!("[Scanner Error, Line: {}, Col: {}] {}", e.line, e.col, e.msg);
+    }
+}

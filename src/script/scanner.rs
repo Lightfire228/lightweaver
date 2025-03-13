@@ -2,22 +2,35 @@
 use super::tokens::{Token, TokenType::{self, *}};
 use std::{collections::HashMap, string::String};
 
-type Keywords = HashMap<String, TokenType>;
-
-pub struct ScannerError {}
-
-
+type Keywords   = HashMap<String, TokenType>;
+type ScanResult = Result<Vec<Token>, Vec<ScannerError>>;
 
 pub struct Scanner {
 
     start:   usize, // start of the current lexeme
     current: usize, // current character
     line:    usize,
+    col:     usize,
 
     source: Vec<char>,
     tokens: Vec<Token>,
+    errors: Vec<ScannerError>,
 
     keywords: Keywords
+}
+
+pub enum ScannerErrorType {
+    UnknownCharacter,
+    UnknownOperator,
+    UnknownEscapeSequence,
+    UnterminatedString,
+}
+
+pub struct ScannerError {
+    pub line:  usize,
+    pub col:   usize,
+    pub msg:   String,
+    pub type_: ScannerErrorType
 }
 
 impl Scanner {
@@ -29,15 +42,17 @@ impl Scanner {
             start:   0,
             current: 0,
             line:    1,
+            col:     0,
 
             source: bytes,
             tokens: Vec::new(),
+            errors: Vec::new(),
 
             keywords: get_keywords()
         }
     }
 
-    pub fn scan_tokens(source: &str) -> Vec<Token> {
+    pub fn scan_tokens(source: &str) -> ScanResult {
         let mut scanner = Scanner::new(source);
 
         while !scanner.is_eof() {
@@ -48,13 +63,19 @@ impl Scanner {
 
         scanner.finalize();
 
-        scanner.tokens
+        if scanner.errors.len() == 0 {
+            Ok(scanner.tokens)
+        }
+        else {
+            Err(scanner.errors)
+        }
     }
 
     // #region Tokenizing functions
 
     fn scan_token(&mut self) {
         let ch     = self.advance();
+        self.col  += 1;
 
         match ch {
 
@@ -75,12 +96,13 @@ impl Scanner {
                     self.add_token("->", RightThinArrow);
                 }
                 else {
-                    self.error(&format!("Unknown character {}", ch));
+                    self.error(format!("Unknown operator '-'"), ScannerErrorType::UnknownOperator);
                 }
             }
 
             '\n' => {
                 self.line += 1;
+                self.col   = 0;
             }
 
             _ => {
@@ -92,10 +114,11 @@ impl Scanner {
                     self.scan_identifier();
                 }
                 else {
-                    self.error(&format!("Unknown character '{}'", ch));
+                    self.error(format!("Unknown character '{}'", format_ch(ch)), ScannerErrorType::UnknownCharacter);
                 }
 
             },
+
         }
     }
 
@@ -137,7 +160,7 @@ impl Scanner {
         }
 
         if self.is_eof() {
-            self.error("Unterminated string");
+            self.error(format!("Unterminated string"), ScannerErrorType::UnterminatedString);
         }
 
         // the closing "
@@ -155,10 +178,11 @@ impl Scanner {
             '\'' |
             '\\' => ch,
             'n'  => '\n',
+            'r'  => '\r',
             't'  => '\t',
 
             _   => {
-                self.error(&format!("Unknown escape character: '{}'", ch));
+                self.error(format!("Unknown escape sequence '\\{}'", format_ch(ch)), ScannerErrorType::UnknownEscapeSequence);
                 '\0'
             }
         }
@@ -234,8 +258,13 @@ impl Scanner {
         self.tokens.push(Token::new(EOF, "", self.line));
     }
 
-    fn error(&mut self, msg: &str) {
-        panic!("{}", msg)
+    fn error(&mut self, msg: String, err_type: ScannerErrorType) {
+        self.errors.push(ScannerError {
+            line:  self.line,
+            col:   self.col,
+            msg,
+            type_: err_type,
+        });
     }
 
     // #endregion
@@ -273,4 +302,13 @@ pub fn get_keywords() -> HashMap<String, TokenType> {
     add("Rect", Rect);
 
     dict
+}
+
+fn format_ch(ch: char) -> String {
+    if ch < ' ' {
+        format!("\\0x{:X}", ch as u8)
+    }
+    else {
+        return String::from(ch)
+    }
 }
