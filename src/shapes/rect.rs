@@ -55,3 +55,45 @@ impl GetBounding for Rect {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Ensure the bounding box of a rect holds expected values
+    #[test]
+    fn bounding_box() {
+        let top = 5.0;
+        let bottom = -2.0;
+        let left = 1.0;
+        let right = 3.5;
+
+        let center_x = (left + right) / 2.0;
+        let center_y = (top + bottom) / 2.0;
+        let width = right - left;
+        let height = top - bottom;
+
+        let rect = Rect::new(
+            Location::new(center_x, center_y),
+            Dimensions::new(width, height)
+        );
+        let bounding_box = rect.bounding_box();
+
+        // Note: float compare, may not yield stable results
+        assert_eq!(bounding_box.bottom(), bottom);
+        assert_eq!(bounding_box.top(), top);
+        assert_eq!(bounding_box.left(), left);
+        assert_eq!(bounding_box.right(), right);
+
+        let top_left = bounding_box.top_left;
+
+        assert_eq!(top_left.y, top);
+        assert_eq!(top_left.x, left);
+
+        let bottom_right = bounding_box.bottom_right;
+
+        assert_eq!(bottom_right.y, bottom);
+        assert_eq!(bottom_right.x, right);
+    }
+}

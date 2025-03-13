@@ -52,6 +52,7 @@ impl From<Points<'_>> for BoundingBox {
         let x_list = points.0;
         let y_list = points.1;
 
+        // max(f64, f64) requires this formulation to accomplish
         let min_x = x_list.iter().reduce(|acc, x| if acc < x {acc} else {x}).unwrap();
         let min_y = y_list.iter().reduce(|acc, y| if acc < y {acc} else {y}).unwrap();
         let max_x = x_list.iter().reduce(|acc, x| if acc > x {acc} else {x}).unwrap();
