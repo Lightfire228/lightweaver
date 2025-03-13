@@ -61,6 +61,7 @@ impl GetBounding for Rect {
 mod tests {
     use super::*;
 
+    // Ensure the bounding box of a rect holds expected values
     #[test]
     fn bounding_box() {
         let top = 5.0;

@@ -47,6 +47,7 @@ mod tests {
 
         let bounding_box = line.bounding_box();
 
+        // Note: float compare, may not yield stable results
         assert_eq!(bounding_box.bottom(), start_y);
         assert_eq!(bounding_box.top(), end_y);
         assert_eq!(bounding_box.left(), start_x);
