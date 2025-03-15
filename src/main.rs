@@ -1,5 +1,5 @@
 use render::DataBuff;
-use script::scanner::{Scanner, ScannerError};
+use script::{runner, scanner::{Scanner, ScannerError}};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::{self, File}, io::BufWriter, path::Path};
@@ -90,27 +90,6 @@ fn test_shape_tree() {
 
 fn test_script() {
     let path = Path::new("./test_scripts/test.lw");
-    let file = fs::read_to_string(path).expect("could not read test file");
 
-    let tokens = Scanner::scan_tokens(&file);
-
-    let tokens = match tokens {
-        Ok(t)  => t,
-        Err(e) => {
-            display_scanner_errors(e);
-            return;
-        }
-    };
-
-    for t in tokens {
-        println!("{}", t);
-    }
-}
-
-
-fn display_scanner_errors(errs: Vec<ScannerError>) {
-
-    for e in errs {
-        eprintln!("[Scanner Error, Line: {}, Col: {}] {}", e.line, e.col, e.msg);
-    }
+    runner::run_file(path.as_ref());
 }
