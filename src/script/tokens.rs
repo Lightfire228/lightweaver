@@ -2,7 +2,7 @@ use core::fmt;
 use std::fmt::Formatter;
 
 #[derive(Debug)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     // 1 character tokens
     Equals, Colon, SemiColon,

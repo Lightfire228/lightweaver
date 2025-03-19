@@ -34,7 +34,7 @@ pub struct ScannerError {
 }
 
 impl Scanner {
-    pub fn new(source: &str) -> Self {
+    fn new(source: &str) -> Self {
 
         let bytes = source.chars().collect();
 
