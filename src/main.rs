@@ -9,6 +9,7 @@ mod render;
 mod color;
 mod shape_tree;
 mod script;
+mod graph;
 
 
 pub fn main() {
@@ -17,8 +18,7 @@ pub fn main() {
     // test_shape_tree();
     test_script();
 
-
-
+    
 }
 
 

@@ -12,6 +12,25 @@
             "args": [],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "rust: cargo build"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Tests",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=lightweaver",
+                    "--package=lightweaver"
+                ],
+                "filter": {
+                    "name": "lightweaver",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
         }
     ]
 }
