@@ -110,7 +110,7 @@ impl<T> GraphTree<T> {
 
 #[cfg(test)]
 mod test {
-    use super::{GraphTree, Child};
+    use super::{GraphTree, Child::*};
 
     #[test]
     fn base() {
@@ -120,18 +120,18 @@ mod test {
         root.push(2);
         root.push(3);
 
-        assert_eq!(root.peek(),          Some(&    Child::LeafNode(3)));
-        assert_eq!(root.peek_mut(),      Some(&mut Child::LeafNode(3)));
+        assert_eq!(root.peek(),          Some(&    LeafNode(3)));
+        assert_eq!(root.peek_mut(),      Some(&mut LeafNode(3)));
         assert_eq!(root.peek_deep(),     Some(&    3));
         assert_eq!(root.peek_deep_mut(), Some(&mut 3));
         
         // test peek mutability
         let a = root.peek_mut();
         match a.unwrap() {
-            Child::LeafNode(node) => { *node = 4 },
-            Child::SubTree(_)     => assert!(false)
+            LeafNode(node) => { *node = 4 },
+            SubTree(_)     => assert!(false)
         }
-        assert_eq!(root.peek_mut(), Some(&mut Child::LeafNode(4)));
+        assert_eq!(root.peek_mut(), Some(&mut LeafNode(4)));
         
         // test deep peek mutability
         let a = root.peek_deep_mut();
@@ -157,12 +157,12 @@ mod test {
         let n = node.clone();
         root.push_tree(node);
 
-        assert_eq!(root.peek(),      Some(&Child::SubTree(n)));
+        assert_eq!(root.peek(),      Some(&SubTree(n)));
         assert_eq!(root.peek_deep(), Some(&5));
         
         root.push(3);
 
-        assert_eq!(root.peek(),      Some(&Child::LeafNode(3)));
+        assert_eq!(root.peek(),      Some(&LeafNode(3)));
         assert_eq!(root.peek_deep(), Some(&3));
     }
 
