@@ -120,17 +120,9 @@ mod test {
         root.push(2);
         root.push(3);
 
-        
-        assert_ne!(root.peek(), None);
-        assert_eq!(root.peek(), Some(&Child::LeafNode(3)));
-
-        assert_ne!(root.peek_mut(), None);
-        assert_eq!(root.peek_mut(), Some(&mut Child::LeafNode(3)));
-        
-        assert_ne!(root.peek_deep(), None);
-        assert_eq!(root.peek_deep(), Some(&3));
-
-        assert_ne!(root.peek_deep_mut(), None);
+        assert_eq!(root.peek(),          Some(&    Child::LeafNode(3)));
+        assert_eq!(root.peek_mut(),      Some(&mut Child::LeafNode(3)));
+        assert_eq!(root.peek_deep(),     Some(&    3));
         assert_eq!(root.peek_deep_mut(), Some(&mut 3));
         
         let a = root.peek_deep_mut();
