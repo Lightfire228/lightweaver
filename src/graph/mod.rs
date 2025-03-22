@@ -125,10 +125,19 @@ mod test {
         assert_eq!(root.peek_deep(),     Some(&    3));
         assert_eq!(root.peek_deep_mut(), Some(&mut 3));
         
-        let a = root.peek_deep_mut();
-        *a.unwrap() = 4;
+        // test peek mutability
+        let a = root.peek_mut();
+        match a.unwrap() {
+            Child::LeafNode(node) => { *node = 4 },
+            Child::SubTree(_)     => assert!(false)
+        }
+        assert_eq!(root.peek_mut(), Some(&mut Child::LeafNode(4)));
         
-        assert_eq!(root.peek_deep_mut(), Some(&mut 4));
+        // test deep peek mutability
+        let a = root.peek_deep_mut();
+        *a.unwrap() = 5;
+        
+        assert_eq!(root.peek_deep_mut(), Some(&mut 5));
 
 
         dbg!("{}", root);
