@@ -312,3 +312,51 @@ fn format_ch(ch: char) -> String {
         return String::from(ch)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{multi_line, script::scanner::Scanner};
+    use super::super::tokens::{Token, TokenType::*};
+
+    
+    #[test]
+    fn base() {
+        let str = multi_line!(
+            "let a = Rect {};",
+            "let b = Rect {};",
+            "a -> b;",
+        );
+
+        let tokens = Scanner::scan_tokens(&str);
+
+        match tokens {
+            Err(_)     => assert!(false),
+            Ok(tokens) => {
+                assert_eq!(tokens, vec![
+                    Token::new(Let,            "let",  1),
+                    Token::new(Identifier,     "a",    1),
+                    Token::new(Equals,         "=",    1),
+                    Token::new(Rect,           "Rect", 1),
+                    Token::new(LeftCurly,      "{",    1),
+                    Token::new(RightCurly,     "}",    1),
+                    Token::new(SemiColon,      ";",    1),
+                    
+                    Token::new(Let,            "let",  2),
+                    Token::new(Identifier,     "b",    2),
+                    Token::new(Equals,         "=",    2),
+                    Token::new(Rect,           "Rect", 2),
+                    Token::new(LeftCurly,      "{",    2),
+                    Token::new(RightCurly,     "}",    2),
+                    Token::new(SemiColon,      ";",    2),
+
+                    Token::new(Identifier,     "a",    3),
+                    Token::new(RightThinArrow, "->",   3),
+                    Token::new(Identifier,     "b",    3),
+                    Token::new(SemiColon,      ";",    3),
+
+                    Token::new(EOF,            "",     3),
+                ])
+            }
+        }
+    }
+}

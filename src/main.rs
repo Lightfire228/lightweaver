@@ -10,6 +10,7 @@ mod color;
 mod shape_tree;
 mod script;
 mod graph;
+mod macros;
 
 
 pub fn main() {

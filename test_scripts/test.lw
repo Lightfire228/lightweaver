@@ -1,10 +1,6 @@
 
-let r1 = Rect {
-    name: "Rect \n1"
-};
+let r1 = Rect {};
 
-let r2 = Rect {
-    name: "Rect 2"
-};
+let r2 = Rect {};
 
 r1 -> r2;
