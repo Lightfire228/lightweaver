@@ -26,6 +26,7 @@ This is mainly focused as a tool for software development.  For use in generatin
 - [Crafting Interpreters](https://craftinginterpreters.com/contents.html)
 - [Vulkan](https://www.vulkan.org/learn)
 - https://www.youtube.com/@Acerola_t
+- [Learn Rust With Entirely Too Many Linked Lists](https://rust-unofficial.github.io/too-many-lists/index.html)
 
 ## Related Projects
 
@@ -34,6 +35,7 @@ This is mainly focused as a tool for software development.  For use in generatin
 - [PlantUml](https://github.com/plantuml/plantuml)
 - [Manim](https://github.com/ManimCommunity/manim)
 - [MinGrammer](https://github.com/mingrammer/diagrams)
+- [D2 Lang](https://github.com/terrastruct/d2)
 
 ## The Name?
 
