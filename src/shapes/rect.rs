@@ -64,27 +64,27 @@ mod tests {
     // Ensure the bounding box of a rect holds expected values
     #[test]
     fn bounding_box() {
-        let top = 5.0;
+        let top    = 5.0;
         let bottom = -2.0;
-        let left = 1.0;
-        let right = 3.5;
+        let left   = 1.0;
+        let right  = 3.5;
 
-        let center_x = (left + right) / 2.0;
-        let center_y = (top + bottom) / 2.0;
-        let width = right - left;
-        let height = top - bottom;
+        let center_x = (left  + right)  / 2.0;
+        let center_y = (top   + bottom) / 2.0;
+        let width    =  right - left;
+        let height   =  top   - bottom;
 
         let rect = Rect::new(
-            Location::new(center_x, center_y),
-            Dimensions::new(width, height)
+            Location  ::new(center_x, center_y),
+            Dimensions::new(width,    height)
         );
         let bounding_box = rect.bounding_box();
 
         // Note: float compare, may not yield stable results
         assert_eq!(bounding_box.bottom(), bottom);
-        assert_eq!(bounding_box.top(), top);
-        assert_eq!(bounding_box.left(), left);
-        assert_eq!(bounding_box.right(), right);
+        assert_eq!(bounding_box.top(),    top);
+        assert_eq!(bounding_box.left(),   left);
+        assert_eq!(bounding_box.right(),  right);
 
         let top_left = bounding_box.top_left;
 

@@ -38,20 +38,20 @@ mod tests {
         // If these values change such that that isn't true, it will break the test
         let start_x = 1.0;
         let start_y = 2.0;
-        let end_x = 3.0;
-        let end_y = 4.0;
-        let line = Line::new(
+        let end_x   = 3.0;
+        let end_y   = 4.0;
+        let line    = Line::new(
             Location::new(start_x, start_y),
-            Location::new(end_x, end_y),
+            Location::new(end_x,   end_y),
         );
 
         let bounding_box = line.bounding_box();
 
         // Note: float compare, may not yield stable results
         assert_eq!(bounding_box.bottom(), start_y);
-        assert_eq!(bounding_box.top(), end_y);
-        assert_eq!(bounding_box.left(), start_x);
-        assert_eq!(bounding_box.right(), end_x);
+        assert_eq!(bounding_box.top(),    end_y);
+        assert_eq!(bounding_box.left(),   start_x);
+        assert_eq!(bounding_box.right(),  end_x);
 
         let top_left = bounding_box.top_left;
 
