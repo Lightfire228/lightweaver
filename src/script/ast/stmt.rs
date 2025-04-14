@@ -33,9 +33,9 @@ impl Expression {
 }
 
 impl Let {
-    pub fn new(name: &Token, initializer: Option<Expr>) -> Stmt {
+    pub fn new(name: Token, initializer: Option<Expr>) -> Stmt {
         Stmt::Let(Self {
-            name:        name.clone(),
+            name,
             initializer: initializer.map(|x| Box::new(x))
         })
     }

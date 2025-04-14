@@ -72,8 +72,6 @@ impl<'a> Parser<'a> {
         use super::ast::Let;
         let name   = self.consume(Identifier, "Missing identifier after 'let'")?;
 
-        dbg!(&name);
-
         let initializer = match self.cursor()?.current.type_ {
             Equals => {
                 self.next();
@@ -84,7 +82,7 @@ impl<'a> Parser<'a> {
 
         self.consume(SemiColon, "Missing semicolon")?;
 
-        Ok(Let::new(&name, initializer))
+        Ok(Let::new(name, initializer))
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
@@ -303,14 +301,14 @@ mod test {
 
         // TODO: is this right?
         let first_line = Let::new(
-            &Token::new(Identifier, "a", 1), 
+            Token::new(Identifier, "a", 1),
             Some(Instantiation::new(
                 Token::new(RectToken, "Rect", 1)
             ))
         );
 
         let second_line = Let::new(
-            &Token::new(Identifier, "b", 2), 
+            Token::new(Identifier, "b", 2),
             Some(Instantiation::new(
                 Token::new(RectToken, "Rect", 2)
             ))
@@ -318,9 +316,9 @@ mod test {
 
         let third_line = Expression::new(
             Connection::new(
-                Variable::new(Token::new(Identifier, "a", 3)),
-                Token::new(RightThinArrow, "->", 3),
-                Variable::new(Token::new(Identifier, "b", 3)),
+                Variable::new(Token::new(Identifier,     "a",  3)),
+                Token              ::new(RightThinArrow, "->", 3),
+                Variable::new(Token::new(Identifier,     "b",  3)),
             )
         );
 
