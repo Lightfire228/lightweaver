@@ -3,7 +3,6 @@ use super::{ast::*, tokens::{Token, TokenType::{self, *}}};
 use super::ast::Stmt;
 
 
-
 use ParseErrorType::*;
 
 
@@ -15,7 +14,7 @@ pub struct Parser<'a> {
 #[derive(Debug)]
 pub enum ParseErrorType {
     InvalidAssignmentTarget(Token),
-    UnexpectedToken        (Token, TokenType),
+    UnexpectedToken        (Token, TokenType, String),
 
     AtBeginning,
     EOF,
@@ -54,22 +53,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn next(&mut self) -> Option<&ParserCursor> {
-        self.cursor = self.iter.next();
-        self.cursor.as_ref()
-    }
-
-    fn has_next(&self) -> bool {
-        self.iter.has_next()
-    }
-
 
     fn declaration(&mut self) -> ParseResult<Stmt> {
 
         let cursor = self.cursor()?;
 
         match cursor.current.type_ {
-            Let => {
+            LetToken => {
                 self.next();
                 self.varDeclaration()
             },
@@ -79,7 +69,7 @@ impl<'a> Parser<'a> {
 
     fn varDeclaration(&mut self) -> ParseResult<Stmt> {
         use super::ast::Let;
-        let name   = self.consume(Identifier, "")?;
+        let name   = self.consume(Identifier, "Missing identifier after 'let'")?;
 
         dbg!(&name);
 
@@ -91,7 +81,7 @@ impl<'a> Parser<'a> {
             _      => None,
         };
 
-        self.consume(SemiColon, "")?;
+        self.consume(SemiColon, "Missing semicolon")?;
 
         Ok(Let::new(&name, initializer))
     }
@@ -103,7 +93,7 @@ impl<'a> Parser<'a> {
     fn expression_statement(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
 
-        self.consume(SemiColon, "")?;
+        self.consume(SemiColon, "Missing semicolon")?;
 
         Ok(Expression::new(expr))
     }
@@ -116,8 +106,6 @@ impl<'a> Parser<'a> {
         let expr   = self.instantiation()?;
 
         let cursor = self.cursor()?;
-
-        // dbg!(&expr);
 
         if cursor.match_token(Equals) {
 
@@ -142,12 +130,12 @@ impl<'a> Parser<'a> {
         let cursor = self.cursor()?;
 
         match cursor.current.type_ {
-            Rect => {
+            RectToken => {
                 let token = cursor.current.clone();
                 self.next();
 
-                self.consume(LeftCurly,  "")?;
-                self.consume(RightCurly, "")?;
+                self.consume(LeftCurly,  "Missing '{'")?;
+                self.consume(RightCurly, "Missing '}'")?;
         
                 Ok(Instantiation::new(&token))
             }
@@ -158,9 +146,10 @@ impl<'a> Parser<'a> {
     }
 
     fn connection(&mut self) -> ParseResult<Expr> {
-        let left  = self.consume(Identifier, "")?;
-        let op    = self.consume(RightThinArrow, "")?;
-        let right = self.consume(Identifier, "")?;
+        // TODO: these should be expressions, not identifiers
+        let left  = self.consume(Identifier,     "Missing operand") ?;
+        let op    = self.consume(RightThinArrow, "Missing operator")?;
+        let right = self.consume(Identifier,     "Missing operand") ?;
 
         Ok(Connection::new(Variable::new(&left), &op, Variable::new(&right)))
     }
@@ -173,7 +162,7 @@ impl<'a> Parser<'a> {
         
         if !cursor.match_token(token_type) {
             let token = cursor.current.clone();
-            return Err(UnexpectedToken(token, token_type))
+            return Err(UnexpectedToken(token, token_type, msg.to_owned()))
         }
 
         let token = self.cursor()?.current.clone();
@@ -182,13 +171,21 @@ impl<'a> Parser<'a> {
         Ok(token)
     }
 
-    fn match_token(&mut self, token_type: TokenType) -> ParseResult<bool> {
-        Ok(self.cursor()?.current.type_ == token_type)
-    }
 
     fn cursor(&self) -> ParseResult<&ParserCursor> {
         self.cursor.as_ref().ok_or(ParseErrorType::EOF)
     }
+
+    fn next(&mut self) -> Option<&ParserCursor> {
+        self.cursor = self.iter.next();
+        self.cursor.as_ref()
+    }
+
+    fn has_next(&self) -> bool {
+        self.iter.has_next()
+    }
+
+
 }
 
 
@@ -246,11 +243,12 @@ impl<'a> ParserCursor<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::{multi_line, script::{ast::{self, Ast, Connection, Expression, Instantiation, Let, Stmt, Variable}, parser::Parser, scanner::Scanner, tokens::{self, Token, TokenType}}};
+    use crate::{multi_line, script::{parser::Parser, scanner::Scanner, tokens::{Token, TokenType}}};
+
 
     #[test]
     fn test_token_iter() {
-        use tokens::TokenType::*;
+        use TokenType::*;
 
         let str = multi_line!(
             "let a = Rect {};",
@@ -264,17 +262,17 @@ mod test {
 
         let mut get = || iter.next().map(|x| x.current);
 
-        assert_eq!(get(), Some(&Token::new(Let,             "let",  1)));
+        assert_eq!(get(), Some(&Token::new(LetToken,        "let",  1)));
         assert_eq!(get(), Some(&Token::new(Identifier,      "a",    1)));
         assert_eq!(get(), Some(&Token::new(Equals,          "=",    1)));
-        assert_eq!(get(), Some(&Token::new(Rect,            "Rect", 1)));
+        assert_eq!(get(), Some(&Token::new(RectToken,       "Rect", 1)));
         assert_eq!(get(), Some(&Token::new(LeftCurly,       "{",    1)));
         assert_eq!(get(), Some(&Token::new(RightCurly,      "}",    1)));
         assert_eq!(get(), Some(&Token::new(SemiColon,       ";",    1)));
-        assert_eq!(get(), Some(&Token::new(Let,             "let",  2)));
+        assert_eq!(get(), Some(&Token::new(LetToken,        "let",  2)));
         assert_eq!(get(), Some(&Token::new(Identifier,      "b",    2)));
         assert_eq!(get(), Some(&Token::new(Equals,          "=",    2)));
-        assert_eq!(get(), Some(&Token::new(Rect,            "Rect", 2)));
+        assert_eq!(get(), Some(&Token::new(RectToken,       "Rect", 2)));
         assert_eq!(get(), Some(&Token::new(LeftCurly,       "{",    2)));
         assert_eq!(get(), Some(&Token::new(RightCurly,      "}",    2)));
         assert_eq!(get(), Some(&Token::new(SemiColon,       ";",    2)));
@@ -282,15 +280,15 @@ mod test {
         assert_eq!(get(), Some(&Token::new(RightThinArrow,  "->",   3)));
         assert_eq!(get(), Some(&Token::new(Identifier,      "b",    3)));
         assert_eq!(get(), Some(&Token::new(SemiColon,       ";",    3)));
-        assert_eq!(get(), Some(&Token::new(EOF,             "",     3)));
+        assert_eq!(get(), Some(&Token::new(EOFToken,        "",     3)));
         assert_eq!(get(), None);
 
     }
     
     #[test]
     fn base() {
-        use tokens::TokenType::*;
-        use crate::script::ast::Let;
+        use TokenType::*;
+        use crate::script::ast::*;
 
         let str = multi_line!(
             "let a = Rect {};",
@@ -306,14 +304,14 @@ mod test {
         let first_line = Let::new(
             &Token::new(Identifier, "a", 1), 
             Some(Instantiation::new(
-                &Token::new(Rect, "Rect", 1)
+                &Token::new(RectToken, "Rect", 1)
             ))
         );
 
         let second_line = Let::new(
             &Token::new(Identifier, "b", 2), 
             Some(Instantiation::new(
-                &Token::new(Rect, "Rect", 2)
+                &Token::new(RectToken, "Rect", 2)
             ))
         );
 

@@ -168,7 +168,7 @@ impl Scanner {
         // the closing "
         self.advance();
 
-        self.add_token(&chars_to_str(&bytes), TokenType::String);
+        self.add_token(&chars_to_str(&bytes), TokenType::StringToken);
 
     }
 
@@ -257,7 +257,7 @@ impl Scanner {
     }
     
     fn finalize(&mut self) {
-        self.tokens.push(Token::new(EOF, "", self.line));
+        self.tokens.push(Token::new(EOFToken, "", self.line));
     }
 
     fn error(&mut self, msg: String, err_type: ScannerErrorType) {
@@ -300,8 +300,8 @@ pub fn get_keywords() -> HashMap<String, TokenType> {
         dict.insert(String::from(k), v);
     };
 
-    add("let",  Let);
-    add("Rect", Rect);
+    add("let",  LetToken);
+    add("Rect", RectToken);
 
     dict
 }
@@ -335,18 +335,18 @@ mod test {
             Err(_)     => assert!(false),
             Ok(tokens) => {
                 assert_eq!(tokens, vec![
-                    Token::new(Let,            "let",  1),
+                    Token::new(LetToken,       "let",  1),
                     Token::new(Identifier,     "a",    1),
                     Token::new(Equals,         "=",    1),
-                    Token::new(Rect,           "Rect", 1),
+                    Token::new(RectToken,      "Rect", 1),
                     Token::new(LeftCurly,      "{",    1),
                     Token::new(RightCurly,     "}",    1),
                     Token::new(SemiColon,      ";",    1),
                     
-                    Token::new(Let,            "let",  2),
+                    Token::new(LetToken,       "let",  2),
                     Token::new(Identifier,     "b",    2),
                     Token::new(Equals,         "=",    2),
-                    Token::new(Rect,           "Rect", 2),
+                    Token::new(RectToken,      "Rect", 2),
                     Token::new(LeftCurly,      "{",    2),
                     Token::new(RightCurly,     "}",    2),
                     Token::new(SemiColon,      ";",    2),
@@ -356,7 +356,7 @@ mod test {
                     Token::new(Identifier,     "b",    3),
                     Token::new(SemiColon,      ";",    3),
 
-                    Token::new(EOF,            "",     3),
+                    Token::new(EOFToken,       "",     3),
                 ])
             }
         }

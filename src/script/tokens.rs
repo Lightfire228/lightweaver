@@ -12,12 +12,12 @@ pub enum TokenType {
     RightThinArrow,
 
     // Literals
-    Identifier, String, Number,
+    Identifier, StringToken, Number,
 
     // Keywords
-    Let, Rect,
+    LetToken, RectToken,
 
-    EOF
+    EOFToken
 }
 
 
