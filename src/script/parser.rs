@@ -116,7 +116,7 @@ impl<'a> Parser<'a> {
             return match expr {
                 Expr::Variable(ref var) => {
                     self.next();
-                    Ok(Assign::new(&var.name, value))
+                    Ok(Assign::new(var.name.clone(), value))
                 },
 
                 _ => Err(InvalidAssignmentTarget(equals.clone()))
@@ -138,7 +138,7 @@ impl<'a> Parser<'a> {
                 self.consume(LeftCurly,  "Missing '{'")?;
                 self.consume(RightCurly, "Missing '}'")?;
         
-                Ok(Instantiation::new(&token))
+                Ok(Instantiation::new(token))
             }
             _ => self.connection()
         }
@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
         let op    = self.consume(RightThinArrow, "Missing operator")?;
         let right = self.consume(Identifier,     "Missing operand") ?;
 
-        Ok(Connection::new(Variable::new(&left), &op, Variable::new(&right)))
+        Ok(Connection::new(Variable::new(left), op, Variable::new(right)))
     }
 
     // ----
@@ -305,22 +305,22 @@ mod test {
         let first_line = Let::new(
             &Token::new(Identifier, "a", 1), 
             Some(Instantiation::new(
-                &Token::new(RectToken, "Rect", 1)
+                Token::new(RectToken, "Rect", 1)
             ))
         );
 
         let second_line = Let::new(
             &Token::new(Identifier, "b", 2), 
             Some(Instantiation::new(
-                &Token::new(RectToken, "Rect", 2)
+                Token::new(RectToken, "Rect", 2)
             ))
         );
 
         let third_line = Expression::new(
             Connection::new(
-                Variable::new(&Token::new(Identifier, "a", 3)),
-                &Token::new(RightThinArrow, "->", 3),
-                Variable::new(&Token::new(Identifier, "b", 3)),
+                Variable::new(Token::new(Identifier, "a", 3)),
+                Token::new(RightThinArrow, "->", 3),
+                Variable::new(Token::new(Identifier, "b", 3)),
             )
         );
 

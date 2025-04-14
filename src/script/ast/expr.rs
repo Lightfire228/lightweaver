@@ -49,9 +49,9 @@ pub struct Variable {
 
 
 impl Assign {
-    pub fn new(name: &Token, expr: Expr) -> Expr {
+    pub fn new(name: Token, expr: Expr) -> Expr {
         Expr::Assign(Self { 
-            name:  name.clone(),
+            name,
             value: Box::new(expr),
         })
     }
@@ -59,28 +59,28 @@ impl Assign {
 
 
 impl Instantiation {
-    pub fn new(type_: &Token) -> Expr {
+    pub fn new(type_: Token) -> Expr {
         Expr::Instantiation(Self { 
-            type_:  type_.clone(),
+            type_,
             // expr: Box::new(expr),
         })
     }
 }
 
 impl Variable {
-    pub fn new(name: &Token) -> Expr {
+    pub fn new(name: Token) -> Expr {
         Expr::Variable(Self {
-            name: name.clone(),
+            name,
         })
     }
 }
 
 
 impl Connection {
-    pub fn new(left: Expr, operator: &Token, right: Expr) -> Expr {
+    pub fn new(left: Expr, operator: Token, right: Expr) -> Expr {
         Expr::Connection(Self {
             left:     Box::new(left),
-            operator: operator.clone(),
+            operator,
             right:    Box::new(right),
         })
     }
