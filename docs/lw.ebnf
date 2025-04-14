@@ -16,10 +16,9 @@ block               = "{" declaration* "}" ;
 expression          = assignment ;
 assignment          = IDENTIFIER "=" assignment
                     | connection 
-                    | primary ;
 
 // Logical operators
-connection          = instantiation ( "->" instantiation )* ;
+connection          = instantiation ( "->" instantiation )*;
 instantiation       = rectInst
                     | primary ;
 

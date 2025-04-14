@@ -19,6 +19,7 @@ pub struct Scanner {
     keywords: Keywords
 }
 
+#[derive(Debug)]
 pub enum ScannerErrorType {
     UnknownCharacter,
     UnknownOperator,
@@ -26,6 +27,7 @@ pub enum ScannerErrorType {
     UnterminatedString,
 }
 
+#[derive(Debug)]
 pub struct ScannerError {
     pub line:  usize,
     pub col:   usize,

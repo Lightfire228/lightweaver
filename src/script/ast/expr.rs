@@ -1,62 +1,76 @@
-// Auto generated code. Edit scripts/generate_ast.py instead
-
 use crate::script::tokens::Token;
 
+#[derive(Debug)]
 pub enum Expr {
     Assign       (Assign),
-    Grouping     (Grouping),
     Instantiation(Instantiation),
-    Body         (Body),
-    Property     (Property),
-    Literal      (Literal),
-    Logical      (Logical),
+    Connection   (Connection),
     Variable     (Variable),
 }
 
+#[derive(Debug)]
 pub struct Assign {
-    name:  Token,
-    value: Box<Expr>,
+    pub name:  Token,
+    pub value: Box<Expr>,
 }
 
-pub struct Grouping {
-    expression: Box<Expr>,
-}
-
+#[derive(Debug)]
 pub struct Instantiation {
-    type_: Token,
-    body:  Box<Body>,
+    pub type_: Token,
+    // pub body:  Box<Body>,
 }
 
-pub struct Body {
-    properties: Vec<Property>,
-}
+// #[derive(Debug)]
+// pub struct Body {
+//     pub properties: Vec<Property>,
+// }
 
-pub struct Property {
-    name:        Token,
-    initializer: Box<Expr>,
-}
+// #[derive(Debug)]
+// pub struct Property {
+//     pub name:        Token,
+//     pub initializer: Box<Expr>,
+// }
 
+#[derive(Debug)]
 pub struct Literal {
 }
 
-pub struct Logical {
-    left:     Box<Expr>,
-    operator: Token,
-    right:    Box<Expr>,
+#[derive(Debug)]
+pub struct Connection {
+    pub left:     Box<Expr>,
+    pub operator: Token,
+    pub right:    Box<Expr>,
 }
 
+#[derive(Debug)]
 pub struct Variable {
-    name: Token,
+    pub name: Token,
 }
 
 
-pub trait Visitor<T> {
-    fn visit_assign       (&mut self, x: &Assign)        -> T;
-    fn visit_grouping     (&mut self, x: &Grouping)      -> T;
-    fn visit_instantiation(&mut self, x: &Instantiation) -> T;
-    fn visit_body         (&mut self, x: &Body)          -> T;
-    fn visit_property     (&mut self, x: &Property)      -> T;
-    fn visit_literal      (&mut self, x: &Literal)       -> T;
-    fn visit_logical      (&mut self, x: &Logical)       -> T;
-    fn visit_variable     (&mut self, x: &Variable)      -> T;
+impl Assign {
+    pub fn new(name: &Token, expr: Expr) -> Expr {
+        Expr::Assign(Self { 
+            name:  name.clone(),
+            value: Box::new(expr),
+        })
+    }
+}
+
+
+impl Instantiation {
+    pub fn new(type_: &Token) -> Expr {
+        Expr::Instantiation(Self { 
+            type_:  type_.clone(),
+            // expr: Box::new(expr),
+        })
+    }
+}
+
+impl Variable {
+    pub fn new(name: &Token) -> Expr {
+        Expr::Variable(Self {
+            name: name.clone(),
+        })
+    }
 }

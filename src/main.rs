@@ -1,5 +1,5 @@
 use render::DataBuff;
-use script::{runner, scanner::{Scanner, ScannerError}};
+use script::{parser::Parser, runner, scanner::{Scanner, ScannerError}};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::{self, File}, io::BufWriter, path::Path};
@@ -91,6 +91,12 @@ fn test_shape_tree() {
 
 fn test_script() {
     let path = Path::new("./test_scripts/test.lw");
+
+    let source = fs::read_to_string(path).expect("Couldn't find the file specified");
+
+    let tokens = Scanner::scan_tokens(&source).unwrap();
+
+    let ast = Parser::parse_tokens(&tokens).unwrap();
 
     runner::run_file(path.as_ref());
 }
