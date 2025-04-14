@@ -3,7 +3,7 @@ use crate::script::tokens::Token;
 
 #[derive(Debug)]
 pub enum Stmt {
-    Block     (Block),
+    _Block     (Block),
     Expression(Expression),
     Let       (Let),
 }

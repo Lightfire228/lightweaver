@@ -4,6 +4,9 @@
 // https://blog.logrocket.com/guide-using-arenas-rust/
 // https://rust-unofficial.github.io/too-many-lists/
 
+// TODO:
+#![allow(unused)]
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct GraphTree<T> {
     children: Vec<Link<T>>

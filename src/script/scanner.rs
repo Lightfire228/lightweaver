@@ -29,10 +29,10 @@ pub enum ScannerErrorType {
 
 #[derive(Debug)]
 pub struct ScannerError {
-    pub line:  usize,
-    pub col:   usize,
-    pub msg:   String,
-    pub type_: ScannerErrorType
+    pub _line:  usize,
+    pub _col:   usize,
+    pub _msg:   String,
+    pub _type_: ScannerErrorType
 }
 
 impl Scanner {
@@ -238,7 +238,7 @@ impl Scanner {
         self.seek(0)
     }
 
-    fn peek_next(&self) -> char {
+    fn _peek_next(&self) -> char {
         self.seek(1)
     }
 
@@ -246,7 +246,7 @@ impl Scanner {
         ch == self.peek()
     }
 
-    fn match_number(&self) -> bool {
+    fn _match_number(&self) -> bool {
         let ch = self.peek();
 
         is_digit(ch)
@@ -262,10 +262,10 @@ impl Scanner {
 
     fn error(&mut self, msg: String, err_type: ScannerErrorType) {
         self.errors.push(ScannerError {
-            line:  self.line,
-            col:   self.col,
-            msg,
-            type_: err_type,
+            _line:  self.line,
+            _col:   self.col,
+            _msg:   msg,
+            _type_: err_type,
         });
     }
 

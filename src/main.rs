@@ -1,5 +1,5 @@
 use render::DataBuff;
-use script::{parser::Parser, runner, scanner::{Scanner, ScannerError}};
+use script::{parser::Parser, scanner::Scanner};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::{self, File}, io::BufWriter, path::Path};
@@ -75,7 +75,7 @@ fn test_png() {
     write_png(&buff);
 }
 
-fn test_shape_tree() {
+fn _test_shape_tree() {
 
     let square = Rect::from(
         &BoundingBox {
@@ -101,5 +101,4 @@ fn test_script() {
     // TODO: make a prettier ast dump
     dbg!(ast);
 
-    runner::run_file(path.as_ref());
 }

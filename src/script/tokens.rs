@@ -1,5 +1,4 @@
 use core::fmt;
-use std::fmt::Formatter;
 
 #[derive(Debug)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -37,7 +36,7 @@ impl Token {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn _to_string(&self) -> String {
         format!("{} {} {}", self.type_, self.lexeme, self.line)
     }
 }

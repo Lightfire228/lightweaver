@@ -12,6 +12,7 @@ pub struct Parser<'a> {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub enum ParseErrorType {
     InvalidAssignmentTarget(Token),
     UnexpectedToken        (Token, TokenType, String),
@@ -61,13 +62,13 @@ impl<'a> Parser<'a> {
         match cursor.current.type_ {
             LetToken => {
                 self.next();
-                self.varDeclaration()
+                self.var_declaration()
             },
             _   => self.statement(),
         }
     }
 
-    fn varDeclaration(&mut self) -> ParseResult<Stmt> {
+    fn var_declaration(&mut self) -> ParseResult<Stmt> {
         use super::ast::Let;
         let name   = self.consume(Identifier, "Missing identifier after 'let'")?;
 
@@ -201,7 +202,7 @@ struct TokenIter<'a> {
 struct ParserCursor<'a> {
     current:  &'a Token,
     previous: Option<&'a Token>,
-    next:     Option<&'a Token>,
+    _next:     Option<&'a Token>,
 }
 
 impl<'a> Iterator for TokenIter<'a> {
@@ -217,7 +218,7 @@ impl<'a> Iterator for TokenIter<'a> {
         let result = Some(ParserCursor {
             previous: self.current,
             current,
-            next,
+            _next: next,
         });
 
         self.current = Some(current);
