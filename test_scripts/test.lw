@@ -1,6 +1,3 @@
-
-let r1 = Rect {};
-
-let r2 = Rect {};
-
-r1 -> r2;
+let a = Rect {};
+let b = Rect {};
+a -> b;

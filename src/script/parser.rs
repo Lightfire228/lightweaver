@@ -30,6 +30,8 @@ impl<'a> Parser<'a> {
         let mut parser     = Parser::new(tokens);
         let mut statements = Vec::new();
 
+        parser.next();
+
         while parser.has_next() {
             statements.push(parser.declaration()?);
         }
@@ -41,24 +43,19 @@ impl<'a> Parser<'a> {
 
     fn new(tokens: &'a [Token]) -> Self {
 
-        let mut iter = TokenIter { 
-            tokens,
-            index:   0,
-            current: None,
-            next:    tokens.first()
-        };
-
         Self {
-            cursor: iter.next(),
-            iter,
+            cursor: None,
+            iter: TokenIter { 
+                tokens,
+                index:   0,
+                current: None,
+                next:    tokens.first()
+            },
         }
     }
 
     fn next(&mut self) -> Option<&ParserCursor> {
         self.cursor = self.iter.next();
-        if self.cursor.is_some() {
-            dbg!(self.cursor.as_ref().unwrap().current);
-        }
         self.cursor.as_ref()
     }
 
@@ -83,6 +80,8 @@ impl<'a> Parser<'a> {
     fn varDeclaration(&mut self) -> ParseResult<Stmt> {
         use super::ast::Let;
         let name   = self.consume(Identifier, "")?;
+
+        dbg!(&name);
 
         let initializer = match self.cursor()?.current.type_ {
             Equals => {
@@ -118,6 +117,8 @@ impl<'a> Parser<'a> {
 
         let cursor = self.cursor()?;
 
+        // dbg!(&expr);
+
         if cursor.match_token(Equals) {
 
             let equals = cursor.previous.ok_or(AtBeginning)?.clone();
@@ -143,7 +144,6 @@ impl<'a> Parser<'a> {
         match cursor.current.type_ {
             Rect => {
                 let token = cursor.current.clone();
-                
                 self.next();
 
                 self.consume(LeftCurly,  "")?;
@@ -158,7 +158,11 @@ impl<'a> Parser<'a> {
     }
 
     fn connection(&mut self) -> ParseResult<Expr> {
-        todo!()
+        let left  = self.consume(Identifier, "")?;
+        let op    = self.consume(RightThinArrow, "")?;
+        let right = self.consume(Identifier, "")?;
+
+        Ok(Connection::new(Variable::new(&left), &op, Variable::new(&right)))
     }
 
     // ----
@@ -172,9 +176,9 @@ impl<'a> Parser<'a> {
             return Err(UnexpectedToken(token, token_type))
         }
 
+        let token = self.cursor()?.current.clone();
         self.next();
 
-        let token = self.cursor()?.current.clone();
         Ok(token)
     }
 
@@ -228,7 +232,7 @@ impl<'a> Iterator for TokenIter<'a> {
 
 impl<'a> TokenIter<'a> {
     fn has_next(&self) -> bool {
-        self.index <= self.tokens.len()
+        self.index < self.tokens.len()
     }
 }
 
@@ -242,7 +246,7 @@ impl<'a> ParserCursor<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::{multi_line, script::{parser::Parser, scanner::Scanner, tokens::{self, Token}}};
+    use crate::{multi_line, script::{ast::{self, Ast, Connection, Expression, Instantiation, Let, Stmt, Variable}, parser::Parser, scanner::Scanner, tokens::{self, Token, TokenType}}};
 
     #[test]
     fn test_token_iter() {
@@ -285,6 +289,9 @@ mod test {
     
     #[test]
     fn base() {
+        use tokens::TokenType::*;
+        use crate::script::ast::Let;
+
         let str = multi_line!(
             "let a = Rect {};",
             "let b = Rect {};",
@@ -295,40 +302,33 @@ mod test {
 
         let ast = Parser::parse_tokens(&tokens).unwrap();
 
-        dbg!(ast.stmts);
-        panic!()
+        // TODO: is this right?
+        let first_line = Let::new(
+            &Token::new(Identifier, "a", 1), 
+            Some(Instantiation::new(
+                &Token::new(Rect, "Rect", 1)
+            ))
+        );
 
-        // let first_line = Stmt::Let(
-        //     lt {
-        //         name:        Token::new(Identifier, "a", 1),
-        //         initializer: Box::new(Expr::Assign(Assign {
-        //             type_: Token::new(Identifier, "Rect", 1),
-        //             // body:  Box::new(Body {
-        //             //     properties: vec![],
-        //             // }),
-        //         }))
-        //     }
-        // );
+        let second_line = Let::new(
+            &Token::new(Identifier, "b", 2), 
+            Some(Instantiation::new(
+                &Token::new(Rect, "Rect", 2)
+            ))
+        );
 
-        // let second_line = Stmt::Let(
-        //     lt {
-        //         name:        Token::new(Identifier, "b", 2),
-        //         initializer: Box::new(Expr::Instantiation(Instantiation {
-        //             type_: Token::new(Identifier, "Rect", 2),
-        //             // body:  Box::new(Body {
-        //             //     properties: vec![],
-        //             // }),
-        //         }))
-        //     }
-        // );
+        let third_line = Expression::new(
+            Connection::new(
+                Variable::new(&Token::new(Identifier, "a", 3)),
+                &Token::new(RightThinArrow, "->", 3),
+                Variable::new(&Token::new(Identifier, "b", 3)),
+            )
+        );
 
-        // // let third_line = Stmt::Expression(Expr::)
+        assert_eq!(ast.stmts[0], first_line);
+        assert_eq!(ast.stmts[1], second_line);
+        assert_eq!(ast.stmts[2], third_line);
 
-        // assert_eq!(ast, Ast {
-        //     stmts: vec![
-                
-        //     ]
-        // });
 
     }
 }

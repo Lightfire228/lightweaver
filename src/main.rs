@@ -98,5 +98,8 @@ fn test_script() {
 
     let ast = Parser::parse_tokens(&tokens).unwrap();
 
+    // TODO: make a prettier ast dump
+    dbg!(ast);
+
     runner::run_file(path.as_ref());
 }

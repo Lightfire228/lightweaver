@@ -74,3 +74,14 @@ impl Variable {
         })
     }
 }
+
+
+impl Connection {
+    pub fn new(left: Expr, operator: &Token, right: Expr) -> Expr {
+        Expr::Connection(Self {
+            left:     Box::new(left),
+            operator: operator.clone(),
+            right:    Box::new(right),
+        })
+    }
+}
