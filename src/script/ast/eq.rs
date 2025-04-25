@@ -24,9 +24,9 @@ impl Eq        for Stmt {}
 impl PartialEq for Stmt {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::_Block    (l0), Self::_Block    (r0)) => l0 == r0,
+            (Self::Block     (l0), Self::Block     (r0)) => l0 == r0,
             (Self::Expression(l0), Self::Expression(r0)) => l0 == r0,
-            (Self::Let       (l0), Self::Let       (r0)) => l0 == r0,
+            (Self::VarDecl   (l0), Self::VarDecl   (r0)) => l0 == r0,
             _ => false,
         }
     }
@@ -58,13 +58,13 @@ impl PartialEq for Block {
     }
 }
 
-impl PartialEq for Expression {
+impl PartialEq for ExpressionStmt {
     fn eq(&self, other: &Self) -> bool {
         self.expression == other.expression
     }
 }
 
-impl PartialEq for Let {
+impl PartialEq for VarDecl {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.initializer == other.initializer
     }

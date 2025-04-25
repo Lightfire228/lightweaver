@@ -98,7 +98,6 @@ fn test_script() {
 
     let ast = Parser::parse_tokens(&tokens).unwrap();
 
-    // TODO: make a prettier ast dump
-    dbg!(ast);
+    println!("{}", ast.to_display_str());
 
 }

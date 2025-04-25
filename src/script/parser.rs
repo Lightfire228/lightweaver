@@ -69,7 +69,7 @@ impl<'a> Parser<'a> {
     }
 
     fn var_declaration(&mut self) -> ParseResult<Stmt> {
-        use super::ast::Let;
+        use super::ast::VarDecl;
         let name   = self.consume(Identifier, "Missing identifier after 'let'")?;
 
         let initializer = match self.cursor()?.current.type_ {
@@ -82,7 +82,7 @@ impl<'a> Parser<'a> {
 
         self.consume(SemiColon, "Missing semicolon")?;
 
-        Ok(Let::new(name, initializer))
+        Ok(VarDecl::new(name, initializer))
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
@@ -94,7 +94,7 @@ impl<'a> Parser<'a> {
 
         self.consume(SemiColon, "Missing semicolon")?;
 
-        Ok(Expression::new(expr))
+        Ok(ExpressionStmt::new(expr))
     }
 
     fn expression(&mut self) -> ParseResult<Expr> {
@@ -300,21 +300,21 @@ mod test {
         let ast = Parser::parse_tokens(&tokens).unwrap();
 
         // TODO: is this right?
-        let first_line = Let::new(
+        let first_line = VarDecl::new(
             Token::new(Identifier, "a", 1),
             Some(Instantiation::new(
                 Token::new(RectToken, "Rect", 1)
             ))
         );
 
-        let second_line = Let::new(
+        let second_line = VarDecl::new(
             Token::new(Identifier, "b", 2),
             Some(Instantiation::new(
                 Token::new(RectToken, "Rect", 2)
             ))
         );
 
-        let third_line = Expression::new(
+        let third_line = ExpressionStmt::new(
             Connection::new(
                 Variable::new(Token::new(Identifier,     "a",  3)),
                 Token              ::new(RightThinArrow, "->", 3),

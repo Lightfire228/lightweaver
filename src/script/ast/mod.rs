@@ -7,6 +7,7 @@ mod stmt;
 pub use expr::*;
 pub use stmt::*;
 pub mod eq;
+pub mod display;
 
 
 #[derive(Debug)]

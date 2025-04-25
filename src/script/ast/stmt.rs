@@ -3,9 +3,9 @@ use crate::script::tokens::Token;
 
 #[derive(Debug)]
 pub enum Stmt {
-    _Block     (Block),
-    Expression(Expression),
-    Let       (Let),
+    Block     (Block),
+    Expression(ExpressionStmt),
+    VarDecl   (VarDecl),
 }
 
 #[derive(Debug)]
@@ -14,27 +14,27 @@ pub struct Block {
 }
 
 #[derive(Debug)]
-pub struct Expression {
+pub struct ExpressionStmt {
     pub expression: Box<Expr>,
 }
 
 #[derive(Debug)]
-pub struct Let {
+pub struct VarDecl {
     pub name: Token,
     pub initializer: Option<Box<Expr>>
 }
 
-impl Expression {
+impl ExpressionStmt {
     pub fn new(expr: Expr) -> Stmt {
-        Stmt::Expression(Expression { 
+        Stmt::Expression(ExpressionStmt { 
             expression: Box::new(expr),
         })
     }
 }
 
-impl Let {
+impl VarDecl {
     pub fn new(name: Token, initializer: Option<Expr>) -> Stmt {
-        Stmt::Let(Self {
+        Stmt::VarDecl(Self {
             name,
             initializer: initializer.map(|x| Box::new(x))
         })
