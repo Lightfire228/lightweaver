@@ -98,8 +98,12 @@ fn test_script() {
 
     let ast = Parser::parse_tokens(&tokens).unwrap();
 
-    let mut opts = AstDisplayOpts::new();
-    // opts.display_expr_nodes = true;
+    let opts = AstDisplayOpts {
+        display_expr_nodes: false,
+        explicit_names:     false,
+        top_level_ast_node: true,
+        indent_size:        4,
+    };
 
     println!("{}", ast.to_display_str(&opts));
 

@@ -20,7 +20,7 @@ pub enum TokenType {
 }
 
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Eq, Debug, Clone)]
 pub struct Token {
     pub type_:  TokenType,
     pub lexeme: String,
@@ -39,6 +39,12 @@ impl Token {
     pub fn _to_string(&self) -> String {
         format!("{} {} {}", self.type_, self.lexeme, self.line)
     }
+
+    pub fn _strict_eq(&self, other: &Self) -> bool {
+           self.type_  == other.type_
+        && self.lexeme == other.lexeme
+        && self.line   == other.line
+    }
 }
 
 impl fmt::Display for TokenType {
@@ -50,5 +56,12 @@ impl fmt::Display for TokenType {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {} {}", self.type_, self.lexeme, self.line)
+    }
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+           self.type_  == other.type_ 
+        && self.lexeme == other.lexeme 
     }
 }

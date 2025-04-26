@@ -1,9 +1,10 @@
-#![allow(dead_code)]
+#![allow(unused)]
+
+use TokenType::*;
 
 use crate::{multi_line, script::{ast::{Connection, ExpressionStmt, Instantiation, VarDecl, Variable}, tokens::TokenType}};
 
-use super::{ast::Ast, tokens::Token};
-
+use super::{ast::{Assign, Ast}, tokens::Token};
 
 pub struct Example {
     pub source: String,
@@ -13,7 +14,6 @@ pub struct Example {
 
 
 pub fn get_example_001() -> Example {
-    use TokenType::*;
     Example { 
         source: multi_line!(
             "let a = Rect {};",
@@ -64,5 +64,55 @@ pub fn get_example_001() -> Example {
                 ),
             ]
         }
+    }
+}
+
+pub fn get_example_002() -> Example {
+    Example {
+        source: "a -> b;".to_owned(),
+        tokens: vec![
+            Token::new(Identifier,     "a",  1),
+            Token::new(RightThinArrow, "->", 1),
+            Token::new(Identifier,     "b",  1),
+            Token::new(SemiColon,      ";",  1),
+            Token::new(EOFToken,       "",   1),
+        ],
+        ast: Ast {
+            stmts: vec![
+                ExpressionStmt::new(
+                    Connection::new(
+                        Variable::new(Token::new(Identifier,     "a",  1)),
+                        Token              ::new(RightThinArrow, "->", 1),
+                        Variable::new(Token::new(Identifier,     "b",  1)),
+                    )
+                ),
+            ]
+        },
+    }
+}
+
+pub fn get_example_003() -> Example {
+    Example {
+        source: "let a = Rect {};".to_owned(),
+        tokens: vec![
+            Token::new(LetToken,       "let",  1),
+            Token::new(Identifier,     "a",    1),
+            Token::new(Equals,         "=",    1),
+            Token::new(RectToken,      "Rect", 1),
+            Token::new(LeftCurly,      "}",    1),
+            Token::new(RightCurly,     "{",    1),
+            Token::new(SemiColon,      ";",    1),
+            Token::new(EOFToken,       "",     1),
+        ],
+        ast: Ast {
+            stmts: vec![
+                VarDecl::new(
+                    Token::new(Identifier, "a", 1),
+                    Some(Instantiation::new(
+                        Token::new(RectToken, "Rect", 1)
+                    ))
+                ),
+            ]
+        },
     }
 }

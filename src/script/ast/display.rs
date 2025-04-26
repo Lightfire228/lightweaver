@@ -7,6 +7,8 @@ use super::Ast;
 pub struct AstDisplayOpts {
     pub display_expr_nodes: bool,
     pub explicit_names:     bool,
+    pub top_level_ast_node: bool,
+    pub indent_size:        usize,
 }
 type Opts = AstDisplayOpts;
 
@@ -19,10 +21,12 @@ type DisplayList = Vec<AstDisplay>;
 
 
 impl AstDisplayOpts {
-    pub fn new() -> Self {
+    pub fn _new() -> Self {
         Self {
             display_expr_nodes: false,
             explicit_names:     false,
+            top_level_ast_node: false,
+            indent_size:        4,
         }
     }
 }
@@ -38,6 +42,17 @@ impl AstDisplay {
     pub fn from(indent: usize, string: &str) -> Self {
         Self::new(indent, string.to_owned())
     }
+
+    pub fn to_str(segments: Vec<Self>, opts: &Opts) -> String {
+        let mut result = String::new();
+        for d in segments {
+            result.push_str(&" ".repeat(d.indent * opts.indent_size));
+            result.push_str(&d.string);
+            result.push('\n');
+        }
+
+        result
+    }
 }
 
 trait AstFormat {
@@ -49,23 +64,22 @@ impl Ast {
 
         let ind = 0;
 
-        let (prefix, suffix) = format_name(ind, "ast", "(", ")");
-
-        let segments = wrap(prefix, suffix, || {
+        let inner = |ind| {
             self.stmts.iter().flat_map(|stmt| {
-                stmt.to_display_str(ind +1, &opts)
+                stmt.to_display_str(ind, &opts)
             })
             .collect()
-        });
-        
-        let mut result = String::new();
-        for d in segments {
-            result.push_str(&" ".repeat(d.indent * 4));
-            result.push_str(&d.string);
-            result.push('\n');
-        }
+        };
 
-        result
+        let segments = if opts.top_level_ast_node {
+            let (prefix, suffix) = format_name(ind, "ast", "(", ")");
+    
+            wrap(prefix, suffix, || {inner(ind +1)})
+        } else {
+            inner(ind)
+        };
+
+        AstDisplay::to_str(segments, &opts)
     }
 }
 
@@ -218,4 +232,135 @@ fn format_name(ind: usize, name: &str, left_bracket: &str, right_bracket: &str) 
         AstDisplay::new(ind, format!("{} {}", name,          left_bracket)),
         AstDisplay::new(ind, format!("{} {}", right_bracket, name)),
     )
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{multi_line, script::test::{get_example_002, get_example_003}};
+
+    use super::AstDisplayOpts;
+
+
+    #[test]
+    fn test_display_expr_nodes() {
+
+        let mut opts = AstDisplayOpts {
+            display_expr_nodes: false,
+            explicit_names:     true,
+            top_level_ast_node: false,
+            indent_size:        4,
+        };
+
+        let ast = get_example_002().ast;
+
+        let off = multi_line!(
+            "stmt (",
+            "    exprStmt (",
+            "        a",
+            "        ->",
+            "        b",
+            "    ) exprStmt",
+            ") stmt",
+            "",
+        );
+        opts.display_expr_nodes = false;
+        assert_eq!(off, ast.to_display_str(&opts));
+
+        let on = multi_line!(
+            "stmt (",
+            "    exprStmt (",
+            "        expr (",
+            "            expr (",
+            "                a",
+            "            ) expr",
+            "            ->",
+            "            expr (",
+            "                b",
+            "            ) expr",
+            "        ) expr",
+            "    ) exprStmt",
+            ") stmt",
+            "",
+        );
+
+        opts.display_expr_nodes = true;
+        assert_eq!(on, ast.to_display_str(&opts));
+
+    }
+
+    #[test]
+    fn test_explicit_names() {
+
+        let mut opts = AstDisplayOpts {
+            display_expr_nodes: false,
+            explicit_names:     false,
+            top_level_ast_node: false,
+            indent_size:        4,
+        };
+
+        let ast = get_example_003().ast;
+
+        let off = multi_line!(
+            "stmt (",
+            "    let a = (",
+            "        instantiation (Rect)",
+            "    ) let a",
+            ") stmt",
+            "",
+        );
+        opts.explicit_names = false;
+        assert_eq!(off, ast.to_display_str(&opts));
+
+        let on = multi_line!(
+            "stmt (",
+            "    varDecl a = (",
+            "        instantiation (Rect)",
+            "    ) varDecl a",
+            ") stmt",
+            "",
+        );
+
+        opts.explicit_names = true;
+        assert_eq!(on, ast.to_display_str(&opts));
+    }
+
+    #[test]
+    fn test_top_level_ast_node() {
+
+        let mut opts = AstDisplayOpts {
+            display_expr_nodes: false,
+            explicit_names:     false,
+            top_level_ast_node: false,
+            indent_size:        4,
+        };
+
+        let ast = get_example_003().ast;
+
+        let off = multi_line!(
+            "stmt (",
+            "    let a = (",
+            "        instantiation (Rect)",
+            "    ) let a",
+            ") stmt",
+            "",
+        );
+        opts.top_level_ast_node = false;
+        assert_eq!(off, ast.to_display_str(&opts));
+
+        let on = multi_line!(
+            "ast (",
+            "    stmt (",
+            "        let a = (",
+            "            instantiation (Rect)",
+            "        ) let a",
+            "    ) stmt",
+            ") ast",
+            "",
+        );
+
+        opts.top_level_ast_node = true;
+        assert_eq!(on, ast.to_display_str(&opts));
+    }
+
 }
