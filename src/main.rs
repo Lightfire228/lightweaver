@@ -99,8 +99,8 @@ fn test_script() {
     let ast = Parser::parse_tokens(&tokens).unwrap();
 
     let opts = AstDisplayOpts {
-        display_expr_nodes: false,
-        explicit_names:     false,
+        display_expr_nodes: true,
+        explicit_names:     true,
         top_level_ast_node: true,
         indent_size:        4,
     };

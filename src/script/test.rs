@@ -1,17 +1,16 @@
-#![allow(unused)]
 
+#![allow(dead_code)]
 use TokenType::*;
 
 use crate::{multi_line, script::{ast::{Connection, ExpressionStmt, Instantiation, VarDecl, Variable}, tokens::TokenType}};
 
-use super::{ast::{Assign, Ast}, tokens::Token};
+use super::{ast::Ast, tokens::Token};
 
 pub struct Example {
     pub source: String,
     pub tokens: Vec<Token>,
     pub ast:    Ast,
 }
-
 
 pub fn get_example_001() -> Example {
     Example { 
