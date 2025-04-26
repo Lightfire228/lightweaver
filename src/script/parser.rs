@@ -242,89 +242,32 @@ impl<'a> ParserCursor<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::{multi_line, script::{parser::Parser, scanner::Scanner, tokens::{Token, TokenType}}};
+    use crate::script::{parser::Parser, scanner::Scanner, test::get_example_001};
 
 
     #[test]
     fn test_token_iter() {
-        use TokenType::*;
+        let example = get_example_001();
 
-        let str = multi_line!(
-            "let a = Rect {};",
-            "let b = Rect {};",
-            "a -> b;",
-        );
+        let str = example.source;
 
         let tokens = Scanner::scan_tokens(&str).unwrap();
+        let iter   = Parser::new(&tokens).iter.into_iter();
 
-        let mut iter = Parser::new(&tokens).iter;
-
-        let mut get = || iter.next().map(|x| x.current);
-
-        assert_eq!(get(), Some(&Token::new(LetToken,        "let",  1)));
-        assert_eq!(get(), Some(&Token::new(Identifier,      "a",    1)));
-        assert_eq!(get(), Some(&Token::new(Equals,          "=",    1)));
-        assert_eq!(get(), Some(&Token::new(RectToken,       "Rect", 1)));
-        assert_eq!(get(), Some(&Token::new(LeftCurly,       "{",    1)));
-        assert_eq!(get(), Some(&Token::new(RightCurly,      "}",    1)));
-        assert_eq!(get(), Some(&Token::new(SemiColon,       ";",    1)));
-        assert_eq!(get(), Some(&Token::new(LetToken,        "let",  2)));
-        assert_eq!(get(), Some(&Token::new(Identifier,      "b",    2)));
-        assert_eq!(get(), Some(&Token::new(Equals,          "=",    2)));
-        assert_eq!(get(), Some(&Token::new(RectToken,       "Rect", 2)));
-        assert_eq!(get(), Some(&Token::new(LeftCurly,       "{",    2)));
-        assert_eq!(get(), Some(&Token::new(RightCurly,      "}",    2)));
-        assert_eq!(get(), Some(&Token::new(SemiColon,       ";",    2)));
-        assert_eq!(get(), Some(&Token::new(Identifier,      "a",    3)));
-        assert_eq!(get(), Some(&Token::new(RightThinArrow,  "->",   3)));
-        assert_eq!(get(), Some(&Token::new(Identifier,      "b",    3)));
-        assert_eq!(get(), Some(&Token::new(SemiColon,       ";",    3)));
-        assert_eq!(get(), Some(&Token::new(EOFToken,        "",     3)));
-        assert_eq!(get(), None);
-
+        assert!(iter.zip(example.tokens).all(|x| {
+            x.0.current == &x.1
+        }));
     }
     
     #[test]
     fn base() {
-        use TokenType::*;
-        use crate::script::ast::*;
+        let example = get_example_001();
 
-        let str = multi_line!(
-            "let a = Rect {};",
-            "let b = Rect {};",
-            "a -> b;",
-        );
+        let str    = example.source;
+        let tokens = Scanner::scan_tokens (&str)   .unwrap();
+        let ast    = Parser ::parse_tokens(&tokens).unwrap();
 
-        let tokens = Scanner::scan_tokens(&str).unwrap();
-
-        let ast = Parser::parse_tokens(&tokens).unwrap();
-
-        // TODO: is this right?
-        let first_line = VarDecl::new(
-            Token::new(Identifier, "a", 1),
-            Some(Instantiation::new(
-                Token::new(RectToken, "Rect", 1)
-            ))
-        );
-
-        let second_line = VarDecl::new(
-            Token::new(Identifier, "b", 2),
-            Some(Instantiation::new(
-                Token::new(RectToken, "Rect", 2)
-            ))
-        );
-
-        let third_line = ExpressionStmt::new(
-            Connection::new(
-                Variable::new(Token::new(Identifier,     "a",  3)),
-                Token              ::new(RightThinArrow, "->", 3),
-                Variable::new(Token::new(Identifier,     "b",  3)),
-            )
-        );
-
-        assert_eq!(ast.stmts[0], first_line);
-        assert_eq!(ast.stmts[1], second_line);
-        assert_eq!(ast.stmts[2], third_line);
+        assert_eq!(ast, example.ast);
 
 
     }
