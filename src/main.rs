@@ -1,5 +1,5 @@
 use render::DataBuff;
-use script::{parser::Parser, scanner::Scanner};
+use script::{ast::display::AstDisplayOpts, parser::Parser, scanner::Scanner};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::{self, File}, io::BufWriter, path::Path};
@@ -98,6 +98,6 @@ fn test_script() {
 
     let ast = Parser::parse_tokens(&tokens).unwrap();
 
-    println!("{}", ast.to_display_str());
+    println!("{}", ast.to_display_str(&AstDisplayOpts::new()));
 
 }
