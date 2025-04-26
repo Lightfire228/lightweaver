@@ -83,11 +83,6 @@ impl AstFormat for Stmt {
         })
     }
 }
-impl Stmt {
-    fn name(_opts: Opts) -> &'static str {
-        "stmt"
-    }
-}
 
 impl AstFormat for Block {
     fn to_display_str(&self, ind: usize, opts: &Opts) -> DisplayList {
@@ -118,13 +113,19 @@ impl AstFormat for ExpressionStmt {
 impl AstFormat for VarDecl {
     fn to_display_str(&self, ind: usize, opts: &Opts) -> DisplayList {
 
+        let name = if opts.explicit_names {
+            "varDecl"
+        } else {
+            "let"
+        };
+
         match &self.initializer {
-            None              => vec![AstDisplay::new(ind, format!("varDecl {}", self.name.lexeme))],
+            None              => vec![AstDisplay::new(ind, format!("{} {}", name, self.name.lexeme))],
             Some(initializer) => {
 
-                let name = format!("varDecl {}", self.name.lexeme);
+                let name = format!("{} {}", name, self.name.lexeme);
                 let (prefix, suffix) = format_name(ind, &name, "= (", ")");
-                
+
                 wrap(prefix, suffix, || {
                     initializer.to_display_str(ind +1, opts)
                 })
@@ -137,11 +138,20 @@ impl AstFormat for VarDecl {
 
 impl AstFormat for Expr {
     fn to_display_str(&self, ind: usize, opts: &Opts) -> DisplayList {
-        match self {
+
+        let inner = |ind| { match self {
             Expr::Assign       (assign)        => assign       .to_display_str(ind, opts),
             Expr::Instantiation(instantiation) => instantiation.to_display_str(ind, opts),
             Expr::Connection   (connection)    => connection   .to_display_str(ind, opts),
             Expr::Variable     (variable)      => variable     .to_display_str(ind, opts),
+        }};
+
+        if opts.display_expr_nodes {
+            let (prefix, suffix) = format_name(ind, "expr", "(", ")");
+            wrap(prefix, suffix, || { inner(ind +1) })
+        }
+        else {
+            inner(ind)
         }
     }
 }
