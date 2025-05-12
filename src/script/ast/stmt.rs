@@ -3,6 +3,7 @@ use crate::script::tokens::Token;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stmt {
+    None,
     Block     (Block),
     Class     (Class),
     Expression(ExpressionStmt),
@@ -23,7 +24,7 @@ pub struct Block {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Class {
     name:       Token,
-    superclass: expr::Variable,
+    superclass: Option<expr::Variable>,
     methods:    Box<Vec<FunctionStmt>>
 }
 
@@ -67,4 +68,18 @@ pub struct VarStmt {
 pub struct WhileStmt {
     condition: Expr,
     body:      Box<Stmt>,
+}
+
+impl Class {
+    pub fn new(
+        name:       Token, 
+        superclass: Option<expr::Variable>, 
+        methods:    Vec<FunctionStmt>
+    ) -> Stmt {
+        Stmt::Class(Self { 
+            name,
+            superclass,
+            methods: Box::new(methods)
+        })
+    }
 }

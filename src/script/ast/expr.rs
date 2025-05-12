@@ -19,73 +19,90 @@ pub enum Expr {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Assign {
-    name:  Token,
-    value: Box::<Expr>,
+    pub name:  Token,
+    pub value: Box::<Expr>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Binary {
-    left:     Box<Expr>,
-    operator: Token,
-    right:    Box<Expr>,
+    pub left:     Box<Expr>,
+    pub operator: Token,
+    pub right:    Box<Expr>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Call {
-    callee: Box<Expr>,
-    paren:  Token,
-    args:   Box<Vec<Expr>>,
+    pub callee: Box<Expr>,
+    pub paren:  Token,
+    pub args:   Box<Vec<Expr>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Get {
-    expr: Box<Expr>,
-    name: Token,
+    pub expr: Box<Expr>,
+    pub name: Token,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Grouping {
-    expr: Box<Expr>
+    pub expr: Box<Expr>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Literal {
-    value: Token,
+    pub value: Token,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Logical {
-    left:     Box<Expr>,
-    operator: Token,
-    right:    Box<Expr>,
+    pub left:     Box<Expr>,
+    pub operator: Token,
+    pub right:    Box<Expr>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Set {
-    target: Box<Expr>,
-    name:   Token,
-    value:  Box<Expr>
+    pub target: Box<Expr>,
+    pub name:   Token,
+    pub value:  Box<Expr>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Super {
-    keyword: Token,
-    method:  Token,
+    pub keyword: Token,
+    pub method:  Token,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct This {
-    keyword: Token,
+    pub keyword: Token,
 }
 
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Unary {
-    operator: Token,
-    right:    Box<Expr>,
+    pub operator: Token,
+    pub right:    Box<Expr>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Variable {
-    name: Token,
+    pub name: Token,
+}
+
+
+impl Binary {
+    pub fn new(left: Expr, operator: Token, right: Expr) -> Expr {
+        Expr::Binary(Self {
+            left:     Box::new(left),
+            operator,
+            right:    Box::new(right),
+        })
+    }
+}
+
+impl Variable {
+    pub fn new(name: Token) -> Expr {
+        Expr::Variable(Self { name })
+    }
 }

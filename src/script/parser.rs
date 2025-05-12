@@ -1,274 +1,278 @@
-// use super::{ast::*, tokens::{Token, TokenType::{self, *}}};
+use crate::script::ast::{Binary, Class};
 
-// use super::ast::Stmt;
+use super::{ast::{Ast, Expr, FunctionStmt, Stmt, Variable}, tokens::{Token, TokenType::{self, *}}};
 
+type ParseResult<T> = Result<T, ParseError>;
 
-// use ParseErrorType::*;
+pub fn parse_ast(tokens: Vec<Token>) -> ParseResult<Ast> {
 
+    let mut parser = Parser::new(tokens);
 
-// pub struct Parser<'a> {
-//     iter:   TokenIter<'a>,
-//     cursor: Option<ParserCursor<'a>>,
-// }
-
-// #[derive(Debug)]
-// #[allow(unused)]
-// pub enum ParseErrorType {
-//     InvalidAssignmentTarget(Token),
-//     UnexpectedToken        (Token, TokenType, String),
-
-//     AtBeginning,
-//     EOF,
-// }
-
-// pub type ParseResult<T> = Result<T, ParseErrorType>;
-
-// impl<'a> Parser<'a> {
-
-//     pub fn parse_tokens(tokens: &'a [Token]) -> ParseResult<Ast> {
-
-//         let mut parser     = Parser::new(tokens);
-//         let mut statements = Vec::new();
-
-//         parser.next();
-
-//         while parser.has_next() {
-//             statements.push(parser.declaration()?);
-//         }
-
-//         Ok(Ast {
-//             stmts: statements,
-//         })
-//     }
-
-//     fn new(tokens: &'a [Token]) -> Self {
-
-//         Self {
-//             cursor: None,
-//             iter: TokenIter { 
-//                 tokens,
-//                 index:   0,
-//                 current: None,
-//                 next:    tokens.first()
-//             },
-//         }
-//     }
-
-
-//     fn declaration(&mut self) -> ParseResult<Stmt> {
-
-//         let cursor = self.cursor()?;
-
-//         match cursor.current.type_ {
-//             LetToken => {
-//                 self.next();
-//                 self.var_declaration()
-//             },
-//             _   => self.statement(),
-//         }
-//     }
-
-//     fn var_declaration(&mut self) -> ParseResult<Stmt> {
-//         use super::ast::VarDecl;
-//         let name   = self.consume(Identifier, "Missing identifier after 'let'")?;
-
-//         let initializer = match self.cursor()?.current.type_ {
-//             Equals => {
-//                 self.next();
-//                 Some(self.expression()?)
-//             },
-//             _      => None,
-//         };
-
-//         self.consume(SemiColon, "Missing semicolon")?;
-
-//         Ok(VarDecl::new(name, initializer))
-//     }
-
-//     fn statement(&mut self) -> ParseResult<Stmt> {
-//         self.expression_statement()
-//     }
-
-//     fn expression_statement(&mut self) -> ParseResult<Stmt> {
-//         let expr = self.expression()?;
-
-//         self.consume(SemiColon, "Missing semicolon")?;
-
-//         Ok(ExpressionStmt::new(expr))
-//     }
-
-//     fn expression(&mut self) -> ParseResult<Expr> {
-//         self.assignment()
-//     }
-
-//     fn assignment(&mut self) -> ParseResult<Expr> {
-//         let expr   = self.instantiation()?;
-
-//         let cursor = self.cursor()?;
-
-//         if cursor.match_token(Equals) {
-
-//             let equals = cursor.previous.ok_or(AtBeginning)?.clone();
-//             let value  = self.assignment()?;
-
-//             return match expr {
-//                 Expr::Variable(ref var) => {
-//                     self.next();
-//                     Ok(Assign::new(var.name.clone(), value))
-//                 },
-
-//                 _ => Err(InvalidAssignmentTarget(equals.clone()))
-//             }
-//         }
-
-//         Ok(expr)
-//     }
-
-//     fn instantiation(&mut self) -> ParseResult<Expr> {
-
-//         let cursor = self.cursor()?;
-
-//         match cursor.current.type_ {
-//             RectToken => {
-//                 let token = cursor.current.clone();
-//                 self.next();
-
-//                 self.consume(LeftCurly,  "Missing '{'")?;
-//                 self.consume(RightCurly, "Missing '}'")?;
-        
-//                 Ok(Instantiation::new(token))
-//             }
-//             _ => self.connection()
-//         }
-
-        
-//     }
-
-//     fn connection(&mut self) -> ParseResult<Expr> {
-//         // TODO: these should be expressions, not identifiers
-//         let left  = self.consume(Identifier,     "Missing operand") ?;
-//         let op    = self.consume(RightThinArrow, "Missing operator")?;
-//         let right = self.consume(Identifier,     "Missing operand") ?;
-
-//         Ok(Connection::new(Variable::new(left), op, Variable::new(right)))
-//     }
-
-//     // ----
-
-//     fn consume(&mut self, token_type: TokenType, msg: &str) -> ParseResult<Token> {
-
-//         let cursor = self.cursor()?;
-        
-//         if !cursor.match_token(token_type) {
-//             let token = cursor.current.clone();
-//             return Err(UnexpectedToken(token, token_type, msg.to_owned()))
-//         }
-
-//         let token = self.cursor()?.current.clone();
-//         self.next();
-
-//         Ok(token)
-//     }
-
-
-//     fn cursor(&self) -> ParseResult<&ParserCursor> {
-//         self.cursor.as_ref().ok_or(ParseErrorType::EOF)
-//     }
-
-//     fn next(&mut self) -> Option<&ParserCursor> {
-//         self.cursor = self.iter.next();
-//         self.cursor.as_ref()
-//     }
-
-//     fn has_next(&self) -> bool {
-//         self.iter.has_next()
-//     }
-
-
-// }
-
-
-// struct TokenIter<'a> {
-//     tokens: &'a[Token],
-//     index:  usize,
-
-//     current: Option<&'a Token>,
-//     next:    Option<&'a Token>,
-
-// }
-
-// struct ParserCursor<'a> {
-//     current:  &'a Token,
-//     previous: Option<&'a Token>,
-//     _next:     Option<&'a Token>,
-// }
-
-// impl<'a> Iterator for TokenIter<'a> {
-//     type Item = ParserCursor<'a>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let current = self.next?;
-
-//         let next = self.tokens.get(self.index +1);
-
-//         self.index += 1;
-
-//         let result = Some(ParserCursor {
-//             previous: self.current,
-//             current,
-//             _next: next,
-//         });
-
-//         self.current = Some(current);
-//         self.next    = next;
-
-//         result
-//     }
-// }
-
-// impl<'a> TokenIter<'a> {
-//     fn has_next(&self) -> bool {
-//         self.index < self.tokens.len()
-//     }
-// }
-
-// impl<'a> ParserCursor<'a> {
-//     fn match_token(&self, token_type: TokenType) -> bool {
-//         self.current.type_ == token_type
-//     }
-// }
-
-
-
-// #[cfg(test)]
-// mod test {
-//     use crate::script::{parser::Parser, scanner::Scanner, test::get_example_001};
-
-
-//     #[test]
-//     fn test_token_iter() {
-//         let example = get_example_001();
-
-//         let str = example.source;
-
-//         let tokens = Scanner::scan_tokens(&str).unwrap();
-//         let iter   = Parser::new(&tokens).iter.into_iter();
-
-//         assert!(iter.zip(example.tokens).all(|x| {
-//             x.0.current == &x.1
-//         }));
-//     }
+    let mut statements = vec![];
+    let mut errors     = vec![];
     
-//     #[test]
-//     fn base() {
-//         let example = get_example_001();
+    while !parser.is_eof() {
+        match parser.parse_declaration() {
+            Ok (stmt) => statements.push(stmt),
+            Err(err)  => errors    .push(err),
+        }
+    }
 
-//         let str    = example.source;
-//         let tokens = Scanner::scan_tokens (&str)   .unwrap();
-//         let ast    = Parser ::parse_tokens(&tokens).unwrap();
+    if errors.len() > 0 {
+        Err(errors)
+    }
+    else {
+        Ok(Ast { stmts: statements })
+    }
+}
 
-//         assert_eq!(ast, example.ast);
+struct Parser {
+    tokens:  Vec<Token>,
+    current: usize,
+}
 
 
-//     }
-// }
+pub struct ParseError {
+    type_: ParseErrorType,
+    token: Token,
+
+}
+
+pub enum ParseErrorType {
+    MissingClassName,
+    MissingSuperclassName,
+    MissingClassOpenCurly,
+    MissingClassCloseCurly,
+}
+
+use ParseErrorType::*;
+
+pub enum FunctionType {
+    Function,
+    Method,
+}
+
+impl Parser {
+
+    fn new(tokens: Vec<Token>) -> Self {
+        Self {
+            tokens,
+            current: 0,
+        }
+    }
+
+    fn parse_declaration(&mut self) -> ParseResult<Stmt> {
+        let result: ParseResult<Stmt> = match self.peek().type_ {
+
+            TokenClass => { self.advance(); self.parse_class_declaration() },
+            TokenFun   => { self.advance(); self.parse_function(FunctionType::Function).map(|x| Ok(Stmt::Function(x)))?},
+            TokenVar   => { self.advance(); self.parse_var_declaration() },
+
+            _ => self.parse_statement(),
+        };
+
+        if result.is_err() {
+            self.synchronize();
+        }
+
+        result
+
+    }
+
+    fn parse_class_declaration(&mut self) -> ParseResult<Stmt> {
+        let name = self.consume(TokenIdentifier, MissingClassName)?.to_owned();
+
+        let mut superclass = None;
+        if self.match_(vec![TokenLess]) {
+
+            self.consume(TokenIdentifier, MissingSuperclassName)?;
+            let name = self.previous().to_owned();
+            superclass = Some(Variable { name, });
+        }
+
+        self.consume(TokenLeftBrace, MissingClassOpenCurly)?;
+
+        let mut methods = vec![];
+        while !self.check(TokenRightBrace) && !self.is_eof() {
+            methods.push(self.parse_function(FunctionType::Method)?);
+        }
+
+        self.consume(TokenRightBrace, MissingClassCloseCurly)?;
+
+        Ok(Class::new(name, superclass, methods))
+    }
+
+    fn parse_function(&mut self, type_: FunctionType) -> ParseResult<FunctionStmt> {
+        todo!()
+    }
+
+    fn parse_var_declaration(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+
+
+
+    fn parse_statement(&mut self) -> ParseResult<Stmt> {
+
+        match self.peek().type_ {
+            TokenFor       => { self.advance(); self.parse_for_statement() },
+            TokenIf        => { self.advance(); self.parse_if_statement() },
+            TokenPrint     => { self.advance(); self.parse_print_statement() },
+            TokenReturn    => { self.advance(); self.parse_return_statement() },
+            TokenWhile     => { self.advance(); self.parse_while_statement() },
+            TokenLeftBrace => { self.advance(); self.parse_block_statement() },
+
+            _ => self.parse_expression_statement(),
+        }
+    }
+
+    fn parse_for_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+    fn parse_if_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+    fn parse_print_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+    fn parse_return_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+    fn parse_while_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+    fn parse_block_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+    fn parse_expression_statement(&mut self) -> ParseResult<Stmt> {
+        todo!()
+    }
+
+
+    fn parse_expression(&mut self) -> ParseResult<Expr> {
+        self.parse_assignment()
+    }
+
+    fn parse_assignment(&mut self) -> ParseResult<Expr> {
+        todo!()
+    }
+
+    fn parse_equality(&mut self) -> ParseResult<Expr> {
+        let mut expr = self.parse_comparison()?;
+
+        while self.match_(vec![TokenBang, TokenBangEqual]) {
+            let operator = self.previous().to_owned();
+            let right    = self.parse_comparison()?;
+
+            expr = Binary::new(expr, operator, right);
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_comparison(&mut self) -> ParseResult<Expr> {
+        let mut expr = self.parse_term()?;
+
+        while self.match_(vec![TokenGreater, TokenGreaterEqual, TokenLess, TokenLessEqual]) {
+            let operator = self.previous().to_owned();
+            let right    = self.parse_term()?;
+
+            expr = Binary::new(expr, operator, right);
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_term(&mut self) -> ParseResult<Expr> {
+        todo!()
+    }
+
+    fn parse_factor(&mut self) -> ParseResult<Expr> {
+        todo!()
+    }
+
+    // Utility functions
+
+    // todo: try to rustify this
+
+    fn match_(&mut self, types: Vec<TokenType>) -> bool {
+        for t in types {
+            if self.check(t) {
+                self.advance();
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn advance(&mut self) -> &Token {
+        if !self.is_eof() {
+            self.current += 1;
+        }
+
+        self.previous()
+    }
+
+    fn check(&self, type_: TokenType) -> bool {
+        if self.is_eof() {
+            return false;
+        }
+        self.peek().type_ == type_
+    }
+
+    fn is_eof(&self) -> bool {
+        self.peek().type_ == TokenEOF || self.current >= self.tokens.len()
+    }
+
+    fn peek(&self) -> &Token {
+        &self.tokens[self.current]
+    }
+
+    fn previous(&self) -> &Token {
+        &self.tokens[self.current -1]
+    }
+
+    fn consume(&mut self, token_type: TokenType, error_type: ParseErrorType) -> ParseResult<&Token> {
+        if self.check(token_type) {
+            return Ok(self.advance());
+        }
+
+        self.error(error_type)
+    }
+
+    fn error<T>(&mut self, type_: ParseErrorType) -> ParseResult<T> {
+        Err(ParseError { 
+            type_,
+            token: self.previous().to_owned(),
+        })
+
+    }
+
+    fn synchronize(&mut self) {
+
+        while !self.is_eof() {
+            if self.previous().type_ == TokenSemicolon {
+                return;
+            }
+
+            match self.peek().type_ {
+                  TokenClass
+                | TokenFun
+                | TokenVar
+                | TokenFor
+                | TokenIf
+                | TokenWhile
+                | TokenPrint
+                | TokenReturn => {
+                    return;
+                }
+
+                _ => {}
+            }
+
+            self.advance();
+        }
+
+    }
+}

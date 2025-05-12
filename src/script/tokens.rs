@@ -1,7 +1,7 @@
 use core::fmt;
 
 #[derive(Debug)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenType {
 
   // Single-character tokens.
@@ -25,7 +25,7 @@ pub enum TokenType {
   TokenPrint, TokenReturn, TokenSuper, TokenThis,
   TokenTrue,  TokenVar,    TokenWhile,
 
-  TokenEOF
+  TokenError, TokenEOF
 }
 
 
