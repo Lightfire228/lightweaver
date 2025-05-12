@@ -3,20 +3,29 @@ use core::fmt;
 #[derive(Debug)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
-    // 1 character tokens
-    Equals, Colon, SemiColon,
-    LeftCurly, RightCurly,
 
-    // 2 Character tokens
-    RightThinArrow,
+  // Single-character tokens.
+  TokenLeftParen,  TokenRightParen,
+  TokenLeftBrace,  TokenRightBrace,
+  TokenComma,      TokenDot,        TokenMinus, TokenPlus,
+  TokenSemicolon,  TokenSlash,      TokenStar,
 
-    // Literals
-    Identifier, StringToken, Number,
+  // One or two character tokens.
+  TokenBang,    TokenBangEqual,
+  TokenEqual,   TokenEqualEqual,
+  TokenGreater, TokenGreaterEqual,
+  TokenLess,    TokenLessEqual,
 
-    // Keywords
-    LetToken, RectToken,
+  // Literals.
+  TokenIdentifier, TokenString, TokenNumber,
 
-    EOFToken
+  // Keywords.
+  TokenAnd,   TokenClass,  TokenElse,  TokenFalse,
+  TokenFor,   TokenFun,    TokenIf,    TokenNil,   TokenOr,
+  TokenPrint, TokenReturn, TokenSuper, TokenThis,
+  TokenTrue,  TokenVar,    TokenWhile,
+
+  TokenEOF
 }
 
 

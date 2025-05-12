@@ -1,87 +1,87 @@
-use crate::script::tokens::Token;
-
-#[derive(Debug)]
-pub enum Expr {
-    Assign       (Assign),
-    Instantiation(Instantiation),
-    Connection   (Connection),
-    Variable     (Variable),
-}
-
-#[derive(Debug)]
-pub struct Assign {
-    pub name:  Token,
-    pub value: Box<Expr>,
-}
-
-#[derive(Debug)]
-pub struct Instantiation {
-    pub type_: Token,
-    // pub body:  Box<Body>,
-}
+// use crate::script::tokens::Token;
 
 // #[derive(Debug)]
-// pub struct Body {
-//     pub properties: Vec<Property>,
+// pub enum Expr {
+//     Assign       (Assign),
+//     Instantiation(Instantiation),
+//     Connection   (Connection),
+//     Variable     (Variable),
 // }
 
 // #[derive(Debug)]
-// pub struct Property {
-//     pub name:        Token,
-//     pub initializer: Box<Expr>,
+// pub struct Assign {
+//     pub name:  Token,
+//     pub value: Box<Expr>,
 // }
 
-#[derive(Debug)]
-pub struct Literal {
-}
+// #[derive(Debug)]
+// pub struct Instantiation {
+//     pub type_: Token,
+//     // pub body:  Box<Body>,
+// }
 
-#[derive(Debug)]
-pub struct Connection {
-    pub left:     Box<Expr>,
-    pub operator: Token,
-    pub right:    Box<Expr>,
-}
+// // #[derive(Debug)]
+// // pub struct Body {
+// //     pub properties: Vec<Property>,
+// // }
 
-#[derive(Debug)]
-pub struct Variable {
-    pub name: Token,
-}
+// // #[derive(Debug)]
+// // pub struct Property {
+// //     pub name:        Token,
+// //     pub initializer: Box<Expr>,
+// // }
 
+// #[derive(Debug)]
+// pub struct Literal {
+// }
 
-impl Assign {
-    pub fn new(name: Token, expr: Expr) -> Expr {
-        Expr::Assign(Self { 
-            name,
-            value: Box::new(expr),
-        })
-    }
-}
+// #[derive(Debug)]
+// pub struct Connection {
+//     pub left:     Box<Expr>,
+//     pub operator: Token,
+//     pub right:    Box<Expr>,
+// }
 
-
-impl Instantiation {
-    pub fn new(type_: Token) -> Expr {
-        Expr::Instantiation(Self { 
-            type_,
-            // expr: Box::new(expr),
-        })
-    }
-}
-
-impl Variable {
-    pub fn new(name: Token) -> Expr {
-        Expr::Variable(Self {
-            name,
-        })
-    }
-}
+// #[derive(Debug)]
+// pub struct Variable {
+//     pub name: Token,
+// }
 
 
-impl Connection {
-    pub fn new(left: Expr, operator: Token, right: Expr) -> Expr {
-        Expr::Connection(Self {
-            left:     Box::new(left),
-            operator,
-            right:    Box::new(right),
-        })
-    }
-}
+// impl Assign {
+//     pub fn new(name: Token, expr: Expr) -> Expr {
+//         Expr::Assign(Self { 
+//             name,
+//             value: Box::new(expr),
+//         })
+//     }
+// }
+
+
+// impl Instantiation {
+//     pub fn new(type_: Token) -> Expr {
+//         Expr::Instantiation(Self { 
+//             type_,
+//             // expr: Box::new(expr),
+//         })
+//     }
+// }
+
+// impl Variable {
+//     pub fn new(name: Token) -> Expr {
+//         Expr::Variable(Self {
+//             name,
+//         })
+//     }
+// }
+
+
+// impl Connection {
+//     pub fn new(left: Expr, operator: Token, right: Expr) -> Expr {
+//         Expr::Connection(Self {
+//             left:     Box::new(left),
+//             operator,
+//             right:    Box::new(right),
+//         })
+//     }
+// }

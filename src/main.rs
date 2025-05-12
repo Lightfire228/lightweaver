@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use render::DataBuff;
-use script::{ast::display::AstDisplayOpts, parser::Parser, scanner::Scanner};
+// use script::{ast::display::AstDisplayOpts, parser::Parser, scanner::Scanner};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
 use std::{fs::{self, File}, io::BufWriter, path::Path};
@@ -11,13 +13,16 @@ mod shape_tree;
 mod script;
 mod graph;
 mod macros;
+mod utils;
 
 
 pub fn main() {
+
+    lox();
     
-    test_png();
+    // test_png();
     // test_shape_tree();
-    test_script();
+    // test_script();
 
     
 }
@@ -75,7 +80,7 @@ fn test_png() {
     write_png(&buff);
 }
 
-fn _test_shape_tree() {
+fn test_shape_tree() {
 
     let square = Rect::from(
         &BoundingBox {
@@ -89,22 +94,28 @@ fn _test_shape_tree() {
     shape_tree.add_shape(ShapeType::Rect(square));
 }
 
-fn test_script() {
-    let path = Path::new("./test_scripts/test.lw");
+// fn test_script() {
+//     let path = Path::new("./test_scripts/test.lw");
 
-    let source = fs::read_to_string(path).expect("Couldn't find the file specified");
+//     let source = fs::read_to_string(path).expect("Couldn't find the file specified");
 
-    let tokens = Scanner::scan_tokens(&source).unwrap();
+//     let tokens = Scanner::scan_tokens(&source).unwrap();
 
-    let ast = Parser::parse_tokens(&tokens).unwrap();
+//     let ast = Parser::parse_tokens(&tokens).unwrap();
 
-    let opts = AstDisplayOpts {
-        display_expr_nodes: true,
-        explicit_names:     true,
-        top_level_ast_node: true,
-        indent_size:        4,
-    };
+//     let opts = AstDisplayOpts {
+//         display_expr_nodes: true,
+//         explicit_names:     true,
+//         top_level_ast_node: true,
+//         indent_size:        4,
+//     };
 
-    println!("{}", ast.to_display_str(&opts));
+//     println!("{}", ast.to_display_str(&opts));
 
+// }
+
+
+fn lox() {
+    let path = Path::new("./test_scripts/test.lox");
+    script::run_file(path);
 }
