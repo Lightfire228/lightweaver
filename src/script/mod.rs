@@ -2,7 +2,6 @@ use std::{fs, path::Path};
 
 use scanner::{scan_tokens, ScannerErrorType};
 
-use crate::utils;
 
 pub mod tokens;
 pub mod scanner;

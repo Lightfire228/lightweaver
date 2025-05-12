@@ -1,87 +1,91 @@
-// use crate::script::tokens::Token;
-
-// #[derive(Debug)]
-// pub enum Expr {
-//     Assign       (Assign),
-//     Instantiation(Instantiation),
-//     Connection   (Connection),
-//     Variable     (Variable),
-// }
-
-// #[derive(Debug)]
-// pub struct Assign {
-//     pub name:  Token,
-//     pub value: Box<Expr>,
-// }
-
-// #[derive(Debug)]
-// pub struct Instantiation {
-//     pub type_: Token,
-//     // pub body:  Box<Body>,
-// }
-
-// // #[derive(Debug)]
-// // pub struct Body {
-// //     pub properties: Vec<Property>,
-// // }
-
-// // #[derive(Debug)]
-// // pub struct Property {
-// //     pub name:        Token,
-// //     pub initializer: Box<Expr>,
-// // }
-
-// #[derive(Debug)]
-// pub struct Literal {
-// }
-
-// #[derive(Debug)]
-// pub struct Connection {
-//     pub left:     Box<Expr>,
-//     pub operator: Token,
-//     pub right:    Box<Expr>,
-// }
-
-// #[derive(Debug)]
-// pub struct Variable {
-//     pub name: Token,
-// }
+use crate::script::tokens::Token;
 
 
-// impl Assign {
-//     pub fn new(name: Token, expr: Expr) -> Expr {
-//         Expr::Assign(Self { 
-//             name,
-//             value: Box::new(expr),
-//         })
-//     }
-// }
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Expr {
+    Assign   (Assign),
+    Binary   (Binary),
+    Call     (Call),
+    Get      (Get),
+    Grouping (Grouping),
+    Literal  (Literal),
+    Logical  (Logical),
+    Set      (Set),
+    Super    (Super),
+    This     (This),
+    Unary    (Unary),
+    Variable (Variable),
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Assign {
+    name:  Token,
+    value: Box::<Expr>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Binary {
+    left:     Box<Expr>,
+    operator: Token,
+    right:    Box<Expr>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Call {
+    callee: Box<Expr>,
+    paren:  Token,
+    args:   Box<Vec<Expr>>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Get {
+    expr: Box<Expr>,
+    name: Token,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Grouping {
+    expr: Box<Expr>
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Literal {
+    value: Token,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Logical {
+    left:     Box<Expr>,
+    operator: Token,
+    right:    Box<Expr>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Set {
+    target: Box<Expr>,
+    name:   Token,
+    value:  Box<Expr>
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Super {
+    keyword: Token,
+    method:  Token,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct This {
+    keyword: Token,
+}
 
 
-// impl Instantiation {
-//     pub fn new(type_: Token) -> Expr {
-//         Expr::Instantiation(Self { 
-//             type_,
-//             // expr: Box::new(expr),
-//         })
-//     }
-// }
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Unary {
+    operator: Token,
+    right:    Box<Expr>,
+}
 
-// impl Variable {
-//     pub fn new(name: Token) -> Expr {
-//         Expr::Variable(Self {
-//             name,
-//         })
-//     }
-// }
-
-
-// impl Connection {
-//     pub fn new(left: Expr, operator: Token, right: Expr) -> Expr {
-//         Expr::Connection(Self {
-//             left:     Box::new(left),
-//             operator,
-//             right:    Box::new(right),
-//         })
-//     }
-// }
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Variable {
+    name: Token,
+}

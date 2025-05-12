@@ -1,43 +1,70 @@
-// use super::expr::Expr;
-// use crate::script::tokens::Token;
+use super::expr::{self, Expr};
+use crate::script::tokens::Token;
 
-// #[derive(Debug)]
-// pub enum Stmt {
-//     #[allow(dead_code)]
-//     Block     (Block),
-//     Expression(ExpressionStmt),
-//     VarDecl   (VarDecl),
-// }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Stmt {
+    Block     (Block),
+    Class     (Class),
+    Expression(ExpressionStmt),
+    Function  (FunctionStmt),
+    If        (IfStmt),
+    Print     (PrintStmt),
+    Return    (ReturnStmt),
+    Var       (VarStmt),
+    While     (WhileStmt),
+}
 
-// #[derive(Debug)]
-// pub struct Block {
-//     pub statements: Vec<Stmt>,
-// }
 
-// #[derive(Debug)]
-// pub struct ExpressionStmt {
-//     pub expression: Box<Expr>,
-// }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Block {
+    stmts: Box::<Vec<Stmt>>,
+}
 
-// #[derive(Debug)]
-// pub struct VarDecl {
-//     pub name: Token,
-//     pub initializer: Option<Box<Expr>>
-// }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Class {
+    name:       Token,
+    superclass: expr::Variable,
+    methods:    Box<Vec<FunctionStmt>>
+}
 
-// impl ExpressionStmt {
-//     pub fn new(expr: Expr) -> Stmt {
-//         Stmt::Expression(ExpressionStmt { 
-//             expression: Box::new(expr),
-//         })
-//     }
-// }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ExpressionStmt {
+    expr: Expr,
+}
 
-// impl VarDecl {
-//     pub fn new(name: Token, initializer: Option<Expr>) -> Stmt {
-//         Stmt::VarDecl(Self {
-//             name,
-//             initializer: initializer.map(|x| Box::new(x))
-//         })
-//     }
-// }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FunctionStmt {
+    name:   Token,
+    params: Vec<Token>,
+    body:   Box<Vec<Stmt>>
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct IfStmt {
+    condition:   Expr,
+    then_branch: Box<Stmt>,
+    else_branch: Box<Stmt>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PrintStmt {
+    expr: Expr,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ReturnStmt {
+    keyword: Token,
+    value:   Expr,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct VarStmt {
+    name:        Token,
+    initializer: Expr,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct WhileStmt {
+    condition: Expr,
+    body:      Box<Stmt>,
+}
