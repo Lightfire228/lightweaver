@@ -124,12 +124,12 @@ impl Scanner {
         loop {
             let ch = self.peek();
             match ch {
-                  ' ' 
-                | '\r' 
+                  ' '
+                | '\r'
                 | '\t' => {
                     self.advance();
                 }
-                
+
                 '\n' => {
                     self.line();
                     self.advance();
@@ -217,7 +217,7 @@ impl Scanner {
 
     fn add_token(&mut self, type_: TokenType) {
         let lexeme = self.get_lexeme();
-        self.tokens.push(Token::new(type_, &lexeme, self.line));
+        self.tokens.push(Token::new(type_, &lexeme, self.line, self.col));
 
         self.start = self.current;
     }
@@ -274,9 +274,9 @@ impl Scanner {
     fn get_lexeme(&self) -> String {
         chars_to_str(&self.source[self.start..self.current])
     }
-    
+
     fn finalize(&mut self) {
-        self.tokens.push(Token::new(TokenEOF, "", self.line));
+        self.tokens.push(Token::new(TokenEOF, "", self.line, self.col));
     }
 
     fn add_error(&mut self, err_type: ScannerErrorType) {
@@ -288,7 +288,7 @@ impl Scanner {
     }
 
     // #endregion
-    
+
 }
 
 
@@ -300,7 +300,7 @@ fn is_alpha(ch: char) -> bool {
        ('a' <= ch && ch <= 'z')
     || ('A' <= ch && ch <= 'Z')
     ||  ch == '_'
-    
+
 }
 
 fn is_alpha_numeric(ch: char) -> bool {
@@ -351,6 +351,7 @@ mod tests {
     use super::scan_tokens;
 
 
+
     #[test]
     fn base() {
         let example = get_example_001();
@@ -361,7 +362,7 @@ mod tests {
         let tokens = tokens.unwrap();
 
         dbg!(&tokens);
-    
+
         assert_eq!(tokens, example.tokens);
     }
 

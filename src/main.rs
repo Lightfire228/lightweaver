@@ -19,12 +19,12 @@ mod utils;
 pub fn main() {
 
     lox();
-    
+
     // test_png();
     // test_shape_tree();
     // test_script();
 
-    
+
 }
 
 
@@ -46,7 +46,7 @@ fn write_png(buff: &DataBuff) {
         (0.30000, 0.60000),
         (0.15000, 0.06000)
     ));
-    
+
     let mut writer = encoder.write_header().unwrap();
 
     let data: Vec<u8> = buff.data.iter().flat_map(|x| x.into_vec()).collect();

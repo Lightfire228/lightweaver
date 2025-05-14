@@ -3,7 +3,7 @@ class Circle {
     this.radius = radius;
   }
 
-  area {
+  area() {
     return 3.141592653 * this.radius * this.radius;
   }
 }

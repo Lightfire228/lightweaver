@@ -34,15 +34,35 @@ pub struct Token {
     pub type_:  TokenType,
     pub lexeme: String,
     pub line:   usize,
+    pub col:    usize,
 }
 
 impl Token {
-    pub fn new(type_: TokenType, lexeme: &str, line: usize) -> Self {
+    pub fn new(type_: TokenType, lexeme: &str, line: usize, col: usize) -> Self {
         Self {
             type_,
             lexeme: String::from(lexeme),
             line,
+            col,
         }
+    }
+
+    pub fn new_true() -> Self {
+        Self::new(
+            TokenType::TokenTrue,
+            "true",
+            0,
+            0,
+        )
+    }
+
+    pub fn new_false() -> Self {
+        Self::new(
+            TokenType::TokenFalse,
+            "false",
+            0,
+            0,
+        )
     }
 
     pub fn _to_string(&self) -> String {
@@ -70,7 +90,7 @@ impl fmt::Display for Token {
 
 impl PartialEq for Token {
     fn eq(&self, other: &Self) -> bool {
-           self.type_  == other.type_ 
-        && self.lexeme == other.lexeme 
+           self.type_  == other.type_
+        && self.lexeme == other.lexeme
     }
 }
