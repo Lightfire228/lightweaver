@@ -1,4 +1,4 @@
-use super::{expr::{self, Expr}, Literal};
+use super::expr::{self, Expr};
 use crate::script::tokens::Token;
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -4,7 +4,7 @@ use render::DataBuff;
 // use script::{ast::display::AstDisplayOpts, parser::Parser, scanner::Scanner};
 use shape_tree::ShapeTree;
 use shapes::{BoundingBox, Line, Location, Rect, ShapeType};
-use std::{fs::{self, File}, io::BufWriter, path::Path};
+use std::{fs::File, io::BufWriter, path::Path};
 
 mod shapes;
 mod render;
