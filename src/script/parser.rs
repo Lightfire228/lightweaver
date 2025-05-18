@@ -545,11 +545,7 @@ impl Parser {
 
 
         let callee = rule_args.target.ok_or_else(|| self.panic("Missing Callee for call expression"))?;
-
-        let callee = match callee {
-            Expr::Get(get) => *get.expr,
-            _              => callee,
-        };
+        let callee = collapse_get(callee);
 
         let (paren, arguments) = self.parse_argument_list()?;
 
@@ -843,4 +839,16 @@ impl Parser {
 
 fn print_ind(ind: usize, msg: &str) {
     println!("{}{}", " ".repeat(ind * 4), msg);
+}
+
+
+fn collapse_get(mut expr: Expr) -> Expr {
+
+    loop {
+        expr = match expr {
+            Expr::Get(get) => *get.expr,
+            _              => return expr,
+        }
+
+    }
 }
