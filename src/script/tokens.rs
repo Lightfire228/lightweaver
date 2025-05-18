@@ -65,8 +65,8 @@ impl Token {
         )
     }
 
-    pub fn _to_string(&self) -> String {
-        format!("{} {} {}", self.type_, self.lexeme, self.line)
+    pub fn to_string(&self) -> String {
+        format!("{} {} {} {}", self.type_, self.lexeme, self.line, self.col)
     }
 
     pub fn _strict_eq(&self, other: &Self) -> bool {
@@ -84,7 +84,7 @@ impl fmt::Display for TokenType {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {}", self.type_, self.lexeme, self.line)
+        write!(f, "{}", self.to_string())
     }
 }
 

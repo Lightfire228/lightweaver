@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 
 pub fn try_or<Res, ReturnVal, E, EVal>(r_func: Res, e_func: E) -> ReturnVal
-    where 
+    where
         Res: FnOnce()     -> Result<ReturnVal, EVal>,
         E:   FnOnce(EVal) -> Infallible
 {

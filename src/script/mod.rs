@@ -35,6 +35,7 @@ pub fn run_file(path: &Path) -> &str {
 
         let ast    = parse_ast(tokens)       .map_err(|err| ParserError(err))?;
 
+
         dbg!(ast);
 
         Ok("test")
@@ -94,18 +95,18 @@ fn display_parser_err(err: ParseErrorList) -> ! {
             MissingForConditionDelimiter            => eprintln!("Expect ';' after loop condition"),
             MissingIfOpenParen                      => eprintln!("Expect '(' after 'if'"),
             MissingIfCloseParen                     => eprintln!("Expect ')' after if contition"),
-            MissingPrintSemicolon                   => eprintln!("Expect ';' after value"),
+            MissingPrintSemicolon                   => eprintln!("Expect ';' after print"),
             MissingReturnSemicolon                  => eprintln!("Expect ';' after return value"),
             MissingWhileOpenParen                   => eprintln!("Expect '(' after while"),
             MissingWhileCloseParen                  => eprintln!("Expect ')' after condition"),
-            MissingExpressionStmtSemicolon          => eprintln!("Expect ';' after value"),
+            MissingExpressionStmtSemicolon          => eprintln!("Expect ';' after expression"),
             MissingBlockCloseBrace                  => eprintln!("Expect '}}' after block"),
             InvalidAssignmentTarget                 => eprintln!("Invalid assignment target"),
             MissingPropertyIdentifier               => eprintln!("Expect property name after '.'"),
             MissingSuperDot                         => eprintln!("Expect '.' after super"),
             MissingSuperPropertyIdentifier          => eprintln!("Expect superclass method name"),
             MissingGroupingCloseParen               => eprintln!("Expect ')' after expression"),
-            MissingExpression                       => eprintln!("Expect expression"),
+            MissingExpression(token)                => eprintln!("Expect expression ({})", token),
         }
     }
 
