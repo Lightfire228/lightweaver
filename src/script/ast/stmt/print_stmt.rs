@@ -22,7 +22,7 @@ impl AstNode for PrintStmt {
         AstDisplay {
             depth:   args.depth,
             primary: "Print Stmt".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 

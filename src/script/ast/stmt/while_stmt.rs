@@ -24,7 +24,7 @@ impl AstNode for WhileStmt {
         AstDisplay {
             depth:   args.depth,
             primary: "While Stmt".to_owned(),
-            fields:  Some(vec![
+            labels:  Some(vec![
                 "Condition: ".to_owned(),
                 "Body:      ".to_owned(),
             ]),

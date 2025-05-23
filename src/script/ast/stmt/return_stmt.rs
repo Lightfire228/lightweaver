@@ -24,7 +24,7 @@ impl AstNode for ReturnStmt {
         AstDisplay {
             depth:   args.depth,
             primary: "Return Stmt".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 

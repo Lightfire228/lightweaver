@@ -53,7 +53,7 @@ impl AstNode for Ast {
         AstDisplay {
             depth:   args.depth,
             primary: "Ast".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 
@@ -70,5 +70,5 @@ impl AstNode for Ast {
 pub struct AstDisplay {
     pub depth:   usize,
     pub primary: String,
-    pub fields:  Option<Vec<String>>,
+    pub labels:  Option<Vec<String>>,
 }

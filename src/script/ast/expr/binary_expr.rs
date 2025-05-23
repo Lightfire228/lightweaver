@@ -27,7 +27,7 @@ impl AstNode for Binary {
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  Some(vec![
+            labels:  Some(vec![
                 "Left:  ".to_owned(),
                 "Right: ".to_owned(),
             ]),

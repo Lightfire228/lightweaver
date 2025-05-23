@@ -40,7 +40,7 @@ impl AstNode for IfStmt {
         AstDisplay {
             depth:   args.depth,
             primary: "If Stmt".to_owned(),
-            fields:  Some(fields),
+            labels:  Some(fields),
         }
     }
 

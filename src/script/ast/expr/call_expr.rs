@@ -36,7 +36,7 @@ impl AstNode for Call {
         AstDisplay {
             depth:   args.depth,
             primary: "Call".to_owned(),
-            fields:  Some(fields),
+            labels:  Some(fields),
         }
     }
 

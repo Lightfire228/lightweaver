@@ -21,7 +21,7 @@ impl AstNode for ExpressionStmt {
         AstDisplay {
             depth:   args.depth,
             primary: "Expr Stmt".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 

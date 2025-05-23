@@ -21,11 +21,11 @@ impl Get {
 impl AstNode for Get {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Get {}", self.name.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  None,
+            labels:  None,
         }
     }
 

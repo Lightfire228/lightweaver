@@ -25,7 +25,7 @@ impl AstNode for VarStmt {
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  self.initializer.as_ref().map(|_| vec!["Initializer: ".to_owned()])
+            labels:  self.initializer.as_ref().map(|_| vec!["Initializer: ".to_owned()])
         }
     }
 

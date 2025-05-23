@@ -24,11 +24,11 @@ impl Super {
 impl AstNode for Super {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Supper.{}", self.method.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  None,
+            labels:  None,
         }
     }
 

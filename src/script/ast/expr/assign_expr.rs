@@ -25,7 +25,7 @@ impl AstNode for Assign {
         AstDisplay {
             depth:   args.depth,
             primary: "Assign".to_owned(),
-            fields:  Some(vec![
+            labels:  Some(vec![
                 "= ".to_owned()
             ]),
         }

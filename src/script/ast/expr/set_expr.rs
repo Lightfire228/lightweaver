@@ -24,7 +24,7 @@ impl AstNode for Set {
         AstDisplay {
             depth:   args.depth,
             primary: "Set".to_owned(),
-            fields:  Some(vec![
+            labels:  Some(vec![
                 "Target: ".to_owned(),
                 "Value:  ".to_owned(),
             ]),

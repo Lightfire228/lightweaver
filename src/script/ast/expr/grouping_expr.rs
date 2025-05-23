@@ -22,7 +22,7 @@ impl AstNode for Grouping {
         AstDisplay {
             depth:   args.depth,
             primary: "Grouping".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 

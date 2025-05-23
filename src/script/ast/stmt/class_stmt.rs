@@ -27,11 +27,11 @@ impl Class {
 impl AstNode for Class {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Class ({})", self.name.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  Some(
+            labels:  Some(
                 self.methods.iter().map(|_| "Method: ".to_owned()).collect()
             ),
         }

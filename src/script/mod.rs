@@ -152,10 +152,10 @@ fn display(node: Box<&dyn AstNode>, depth: usize, prefix: Option<String>) {
 
     let depth = depth +1;
 
-    match disp.fields {
+    match disp.labels {
         Some(fields) => {
-            assert_eq!(children.len(), fields.len(), "The number of display field prefixes must match the number of node children");
-            
+            assert_eq!(children.len(), fields.len(), "The number of display field labels must match the number of node children");
+
             for (child, prefix) in children.into_iter().zip(fields) {
                 display(child, depth, Some(prefix));
             }

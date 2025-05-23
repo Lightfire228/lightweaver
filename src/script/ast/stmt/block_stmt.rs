@@ -20,7 +20,7 @@ impl AstNode for Block {
         AstDisplay {
             depth:   args.depth,
             primary: "Block".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 

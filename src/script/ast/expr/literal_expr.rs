@@ -17,11 +17,11 @@ impl Literal {
 impl AstNode for Literal {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Literal ({})", self.value.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  None,
+            labels:  None,
         }
     }
 

@@ -22,7 +22,7 @@ impl AstNode for This {
         AstDisplay {
             depth:   args.depth,
             primary: "This".to_owned(),
-            fields:  None,
+            labels:  None,
         }
     }
 

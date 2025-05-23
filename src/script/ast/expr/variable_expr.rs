@@ -16,11 +16,11 @@ impl Variable {
 impl AstNode for Variable {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Variable ({})", self.name.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  None,
+            labels:  None,
         }
     }
 

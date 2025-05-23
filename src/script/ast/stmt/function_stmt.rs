@@ -29,11 +29,11 @@ impl FunctionStmt {
 impl AstNode for FunctionStmt {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Function ({})", self.name.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  None,
+            labels:  None,
         }
     }
 

@@ -22,11 +22,11 @@ impl Logical {
 impl AstNode for Logical {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
         let msg = format!("Logical op ({})", self.operator.lexeme);
-        
+
         AstDisplay {
             depth:   args.depth,
             primary: msg,
-            fields:  Some(vec![
+            labels:  Some(vec![
                 "Left:  ".to_owned(),
                 "Right: ".to_owned(),
             ]),
