@@ -1,5 +1,6 @@
 use std::{fs, path::Path};
 
+use ast::{Ast, AstNode, DisplayArgs, WalkArgs};
 use parser::{parse_ast, ParseErrorType};
 use scanner::{scan_tokens, ScannerErrorType};
 
@@ -36,7 +37,7 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| ParserError(err))?;
 
 
-        dbg!(ast);
+        display_ast(ast);
 
         Ok("test")
     })() {
@@ -111,4 +112,27 @@ fn display_parser_err(err: ParseErrorList) -> ! {
     }
 
     panic!()
+}
+
+
+fn display_ast(ast: Ast) {
+
+    let args = WalkArgs;
+    for node in ast.walk(args) {
+        display(node);
+    }
+
+}
+
+
+fn display(node: Box<&dyn AstNode>) {
+    let args = DisplayArgs {
+        depth: 0
+    };
+    node.display(args);
+
+    let args = WalkArgs;
+    for child in node.walk(args) {
+        display(child);
+    }
 }

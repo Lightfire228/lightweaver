@@ -1,4 +1,4 @@
-use crate::script::tokens::Token;
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Stmt;
 
@@ -23,5 +23,19 @@ impl FunctionStmt {
             params,
             body: Box::new(body),
         }
+    }
+}
+
+impl AstNode for FunctionStmt {
+    fn display(&self, _: DisplayArgs) {
+        println!("Function ({})", self.name.lexeme)
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        self.body.iter().map(Stmt::as_ast).collect()
     }
 }

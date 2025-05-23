@@ -1,3 +1,4 @@
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
 use crate::script::ast::Expr;
 
 use super::Stmt;
@@ -21,5 +22,28 @@ impl IfStmt {
             else_branch: else_branch.map(|x| Box::new(x)),
         })
 
+    }
+}
+
+impl AstNode for IfStmt {
+    fn display(&self, _: DisplayArgs) {
+        println!("If Stmt")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        let mut results = vec![
+            self.condition  .as_ast(),
+            self.then_branch.as_ast(),
+        ];
+
+        if let Some(else_branch) = &self.else_branch {
+            results.push(else_branch.as_ast());
+        }
+
+        results
     }
 }

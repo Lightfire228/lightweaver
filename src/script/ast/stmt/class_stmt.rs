@@ -1,4 +1,5 @@
-use crate::script::{ast::Variable, tokens::Token};
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::Variable};
 
 use super::{FunctionStmt, Stmt};
 
@@ -20,5 +21,27 @@ impl Class {
             superclass,
             methods: Box::new(methods)
         })
+    }
+}
+
+impl AstNode for Class {
+    fn display(&self, _: DisplayArgs) {
+        println!("Class ({})", self.name.lexeme)
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        let mut results: AstNodeList = vec![];
+
+        if let Some(superclass) = &self.superclass {
+            results.push(Box::new(superclass));
+        }
+
+        results.extend(self.methods.iter().map(|f| Box::new(f as &dyn AstNode)));
+
+        results
     }
 }

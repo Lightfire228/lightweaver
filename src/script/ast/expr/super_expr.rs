@@ -1,5 +1,4 @@
-use crate::script::tokens::Token;
-
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -19,5 +18,19 @@ impl Super {
             keyword,
             method,
         })
+    }
+}
+
+impl AstNode for Super {
+    fn display(&self, _: DisplayArgs) {
+        println!("Super")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        vec![]
     }
 }

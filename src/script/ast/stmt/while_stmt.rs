@@ -1,3 +1,4 @@
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
 use crate::script::ast::Expr;
 
 use super::Stmt;
@@ -14,5 +15,23 @@ impl WhileStmt {
             condition,
             body: Box::new(body),
         })
+    }
+}
+
+
+impl AstNode for WhileStmt {
+    fn display(&self, _: DisplayArgs) {
+        println!("While Stmt")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        vec![
+            self.condition.as_ast(),
+            self.body     .as_ast(),
+        ]
     }
 }

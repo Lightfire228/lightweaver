@@ -1,3 +1,4 @@
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
 use crate::script::ast::Expr;
 
 use super::Stmt;
@@ -13,5 +14,19 @@ impl PrintStmt {
         Stmt::Print(Self {
             expr,
         })
+    }
+}
+
+impl AstNode for PrintStmt {
+    fn display(&self, _: DisplayArgs) {
+        println!("Print Stmt")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        vec![self.expr.as_ast()]
     }
 }

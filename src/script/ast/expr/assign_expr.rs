@@ -1,4 +1,4 @@
-use crate::script::tokens::Token;
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
@@ -16,5 +16,20 @@ impl Assign {
             name,
             value: Box::new(value),
         })
+    }
+}
+
+
+impl AstNode for Assign {
+    fn display(&self, _: DisplayArgs) {
+        println!("Assign")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        vec![self.value.as_ast()]
     }
 }

@@ -1,3 +1,5 @@
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
+use super::ByteCode;
 
 mod expr_stmt;
 mod function_stmt;
@@ -23,7 +25,6 @@ pub use while_stmt    ::*;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stmt {
-    None,
     Block     (Block),
     Class     (Class),
     Expression(ExpressionStmt),
@@ -33,4 +34,34 @@ pub enum Stmt {
     Return    (ReturnStmt),
     Var       (VarStmt),
     While     (WhileStmt),
+}
+
+impl AstNode for Stmt {
+    fn display(&self, args: DisplayArgs) {
+        self.as_ast().display(args);
+    }
+
+    fn compile(&self, args: CompileArgs) -> ByteCode {
+        self.as_ast().compile(args)
+    }
+
+    fn walk   (&self, args: WalkArgs)    -> AstNodeList {
+        self.as_ast().walk(args)
+    }
+}
+
+impl Stmt {
+    pub fn as_ast(&self) -> Box<&dyn AstNode> {
+        match self {
+            Stmt::Block      (stmt) => Box::new(stmt),
+            Stmt::Class      (stmt) => Box::new(stmt),
+            Stmt::Expression (stmt) => Box::new(stmt),
+            Stmt::Function   (stmt) => Box::new(stmt),
+            Stmt::If         (stmt) => Box::new(stmt),
+            Stmt::Print      (stmt) => Box::new(stmt),
+            Stmt::Return     (stmt) => Box::new(stmt),
+            Stmt::Var        (stmt) => Box::new(stmt),
+            Stmt::While      (stmt) => Box::new(stmt),
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
 use super::*;
 
 
@@ -11,5 +12,19 @@ impl Block {
         Stmt::Block(Block {
             stmts: Box::new(stmts),
         })
+    }
+}
+
+impl AstNode for Block {
+    fn display(&self, _: DisplayArgs) {
+        println!("Block")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        self.stmts.iter().map(Stmt::as_ast).collect()
     }
 }

@@ -1,4 +1,4 @@
-use crate::script::tokens::Token;
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
@@ -15,5 +15,19 @@ impl Unary {
             operator,
             right: Box::new(right),
         })
+    }
+}
+
+impl AstNode for Unary {
+    fn display(&self, _: DisplayArgs) {
+        println!("Unary op ({})", self.operator.lexeme)
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        vec![self.right.as_ast()]
     }
 }

@@ -1,4 +1,4 @@
-use crate::script::tokens::Token;
+use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
@@ -21,5 +21,24 @@ impl Call {
             paren,
             args:   Box::new(args),
         })
+    }
+}
+
+impl AstNode for Call {
+    fn display(&self, _: DisplayArgs) {
+        println!("Call")
+    }
+
+    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
+        todo!()
+    }
+
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+        let mut results = vec![];
+
+        results.push(self.callee.as_ast());
+        results.extend(self.args.iter().map(Expr::as_ast));
+
+        results
     }
 }

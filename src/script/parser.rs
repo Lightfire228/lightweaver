@@ -817,6 +817,8 @@ impl Parser {
     }
 
 
+    // TODO: this doesn't display properly if an Err()? route is taken
+    //       such as a compile error
     fn debug_parse_start(&mut self, name: &str) {
         let ind = self.parse_stack.len();
 
