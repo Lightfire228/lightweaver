@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
@@ -20,8 +20,15 @@ impl Set {
 }
 
 impl AstNode for Set {
-    fn display(&self, _: DisplayArgs) {
-        println!("Set")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "Set".to_owned(),
+            fields:  Some(vec![
+                "Target: ".to_owned(),
+                "Value:  ".to_owned(),
+            ]),
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

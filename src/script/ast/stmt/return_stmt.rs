@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 use crate::script::{ast::Expr};
 
 use super::Stmt;
@@ -20,8 +20,12 @@ impl ReturnStmt {
 }
 
 impl AstNode for ReturnStmt {
-    fn display(&self, _: DisplayArgs) {
-        println!("Return Stmt")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "Return Stmt".to_owned(),
+            fields:  None,
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

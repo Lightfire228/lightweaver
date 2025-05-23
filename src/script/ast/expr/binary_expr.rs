@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
@@ -21,8 +21,17 @@ impl Binary {
 }
 
 impl AstNode for Binary {
-    fn display(&self, _: DisplayArgs) {
-        println!("Binary op ({})", self.operator.lexeme)
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        let msg = format!("Binary op ({})", self.operator.lexeme);
+
+        AstDisplay {
+            depth:   args.depth,
+            primary: msg,
+            fields:  Some(vec![
+                "Left:  ".to_owned(),
+                "Right: ".to_owned(),
+            ]),
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

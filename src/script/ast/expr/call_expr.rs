@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
@@ -25,8 +25,19 @@ impl Call {
 }
 
 impl AstNode for Call {
-    fn display(&self, _: DisplayArgs) {
-        println!("Call")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+
+        let mut fields = vec![
+            "Callee: ".to_owned(),
+        ];
+
+        fields.extend(self.args.iter().map(|_| "Arg:    ".to_owned()));
+
+        AstDisplay {
+            depth:   args.depth,
+            primary: "Call".to_owned(),
+            fields:  Some(fields),
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

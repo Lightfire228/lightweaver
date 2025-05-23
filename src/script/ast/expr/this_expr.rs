@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -18,8 +18,12 @@ impl This {
 }
 
 impl AstNode for This {
-    fn display(&self, _: DisplayArgs) {
-        println!("This")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "This".to_owned(),
+            fields:  None,
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

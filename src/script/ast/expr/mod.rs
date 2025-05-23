@@ -26,6 +26,8 @@ pub use this_expr     ::*;
 pub use unary_expr    ::*;
 pub use variable_expr ::*;
 
+use super::AstDisplay;
+
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expr {
@@ -44,7 +46,7 @@ pub enum Expr {
 }
 
 impl AstNode for Expr {
-    fn display(&self, args: DisplayArgs) {
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
         self.as_ast().display(args)
     }
 

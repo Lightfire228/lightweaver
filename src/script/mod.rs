@@ -117,22 +117,57 @@ fn display_parser_err(err: ParseErrorList) -> ! {
 
 fn display_ast(ast: Ast) {
 
+    let args = DisplayArgs { depth: 0 };
+
+    let disp = ast.display(args);
+    println!("{}", disp.primary);
+
     let args = WalkArgs;
     for node in ast.walk(args) {
-        display(node);
+        display(node, 1, None);
     }
 
 }
 
 
-fn display(node: Box<&dyn AstNode>) {
+// This is a little kludgey.
+// The idea is to walk the AST and display each node at a particular indent level
+// while also allowing for the previous node to optionally label it's children
+fn display(node: Box<&dyn AstNode>, depth: usize, prefix: Option<String>) {
     let args = DisplayArgs {
-        depth: 0
+        depth,
     };
-    node.display(args);
+    let disp   = node.display(args);
+    let spaces = spaces(disp.depth);
 
-    let args = WalkArgs;
-    for child in node.walk(args) {
-        display(child);
+    println!(
+        "{}{}{}",
+        spaces,
+        prefix.unwrap_or("".to_owned()),
+        disp.primary,
+    );
+
+    let args     = WalkArgs;
+    let children = node.walk(args);
+
+    let depth = depth +1;
+
+    match disp.fields {
+        Some(fields) => {
+            assert_eq!(children.len(), fields.len(), "The number of display field prefixes must match the number of node children");
+            
+            for (child, prefix) in children.into_iter().zip(fields) {
+                display(child, depth, Some(prefix));
+            }
+        }
+        None => {
+            for child in children {
+                display(child, depth, None);
+            }
+        }
     }
+}
+
+fn spaces(depth: usize) -> String {
+    " ".repeat(depth * 4)
 }

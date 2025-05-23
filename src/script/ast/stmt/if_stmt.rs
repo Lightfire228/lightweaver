@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
+use crate::script::ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs};
 use crate::script::ast::Expr;
 
 use super::Stmt;
@@ -26,8 +26,22 @@ impl IfStmt {
 }
 
 impl AstNode for IfStmt {
-    fn display(&self, _: DisplayArgs) {
-        println!("If Stmt")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+
+        let mut fields = vec![
+            "Condition: ".to_owned(),
+            "Then:      ".to_owned(),
+        ];
+
+        if self.else_branch.is_some() {
+            fields.push("Else:      ".to_owned());
+        }
+
+        AstDisplay {
+            depth:   args.depth,
+            primary: "If Stmt".to_owned(),
+            fields:  Some(fields),
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

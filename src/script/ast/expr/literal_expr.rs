@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -15,8 +15,14 @@ impl Literal {
 }
 
 impl AstNode for Literal {
-    fn display(&self, _: DisplayArgs) {
-        println!("Literal ({})", self.value.lexeme)
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        let msg = format!("Literal ({})", self.value.lexeme);
+        
+        AstDisplay {
+            depth:   args.depth,
+            primary: msg,
+            fields:  None,
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

@@ -36,26 +36,25 @@ pub type AstNodeList<'a> = Vec<Box<&'a dyn AstNode>>;
 
 pub trait AstNode {
 
-    fn display(&self, args: DisplayArgs);
+    fn display(&self, args: DisplayArgs) -> AstDisplay;
 
     fn compile(&self, args: CompileArgs) -> ByteCode;
 
     fn walk   (&self, args: WalkArgs)    -> AstNodeList;
-}
 
-struct AstIterItem {
-    next: Option<AstItem>
-}
-
-pub enum AstItem {
-    Expr(Expr, usize),
-    Stmt(Stmt, usize),
+    fn display_spaces(&self, msg: &str, args: DisplayArgs) {
+        println!("{}{}", " ".repeat(args.depth * 4), msg)
+    }
 }
 
 
 impl AstNode for Ast {
-    fn display(&self, _: DisplayArgs) {
-        println!("Ast")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "Ast".to_owned(),
+            fields:  None,
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> ByteCode {
@@ -65,4 +64,11 @@ impl AstNode for Ast {
     fn walk   (&self, _: WalkArgs)    -> AstNodeList {
         self.stmts.iter().map(Stmt::as_ast).collect()
     }
+}
+
+
+pub struct AstDisplay {
+    pub depth:   usize,
+    pub primary: String,
+    pub fields:  Option<Vec<String>>,
 }

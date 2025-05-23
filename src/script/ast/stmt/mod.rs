@@ -1,5 +1,5 @@
 use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
-use super::ByteCode;
+use super::{AstDisplay, ByteCode};
 
 mod expr_stmt;
 mod function_stmt;
@@ -37,8 +37,8 @@ pub enum Stmt {
 }
 
 impl AstNode for Stmt {
-    fn display(&self, args: DisplayArgs) {
-        self.as_ast().display(args);
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        self.as_ast().display(args)
     }
 
     fn compile(&self, args: CompileArgs) -> ByteCode {

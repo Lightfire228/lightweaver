@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
+use crate::script::ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -18,8 +18,12 @@ impl Grouping {
 }
 
 impl AstNode for Grouping {
-    fn display(&self, _: DisplayArgs) {
-        println!("Grouping")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "Grouping".to_owned(),
+            fields:  None,
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

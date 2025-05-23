@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 use crate::script::{ast::Variable};
 
 use super::{FunctionStmt, Stmt};
@@ -25,8 +25,16 @@ impl Class {
 }
 
 impl AstNode for Class {
-    fn display(&self, _: DisplayArgs) {
-        println!("Class ({})", self.name.lexeme)
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        let msg = format!("Class ({})", self.name.lexeme);
+        
+        AstDisplay {
+            depth:   args.depth,
+            primary: msg,
+            fields:  Some(
+                self.methods.iter().map(|_| "Method: ".to_owned()).collect()
+            ),
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

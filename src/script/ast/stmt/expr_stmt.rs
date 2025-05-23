@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
+use crate::script::ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs};
 use crate::script::ast::Expr;
 
 use super::Stmt;
@@ -17,8 +17,12 @@ impl ExpressionStmt {
 }
 
 impl AstNode for ExpressionStmt {
-    fn display(&self, _: DisplayArgs) {
-        println!("Expr Stmt")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "Expr Stmt".to_owned(),
+            fields:  None,
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

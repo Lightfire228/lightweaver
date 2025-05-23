@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
 use crate::script::{ast::Expr};
 
 use super::Stmt;
@@ -19,8 +19,14 @@ impl VarStmt {
 }
 
 impl AstNode for VarStmt {
-    fn display(&self, _: DisplayArgs) {
-        println!("Variable ({})", self.name.lexeme)
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        let msg = format!("Variable ({})", self.name.lexeme);
+
+        AstDisplay {
+            depth:   args.depth,
+            primary: msg,
+            fields:  self.initializer.as_ref().map(|_| vec!["Initializer: ".to_owned()])
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {

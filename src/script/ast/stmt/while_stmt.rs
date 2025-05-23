@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
+use crate::script::ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs};
 use crate::script::ast::Expr;
 
 use super::Stmt;
@@ -20,8 +20,15 @@ impl WhileStmt {
 
 
 impl AstNode for WhileStmt {
-    fn display(&self, _: DisplayArgs) {
-        println!("While Stmt")
+    fn display(&self, args: DisplayArgs) -> AstDisplay {
+        AstDisplay {
+            depth:   args.depth,
+            primary: "While Stmt".to_owned(),
+            fields:  Some(vec![
+                "Condition: ".to_owned(),
+                "Body:      ".to_owned(),
+            ]),
+        }
     }
 
     fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
