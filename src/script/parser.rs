@@ -36,7 +36,7 @@ pub struct Parser {
     // debug
     parse_stack: Vec<String>,
     depth:       usize,
-    
+
 }
 
 
@@ -220,8 +220,6 @@ impl Parser {
 
 
     fn parse_declaration(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_declaration");
-
         let result: ParseResult<Stmt> = match self.advance().type_ {
 
             TokenClass => self.parse_class_decl(),
@@ -238,13 +236,10 @@ impl Parser {
             self.synchronize();
         }
 
-        self.debug_parse_end();
         result
     }
 
     fn parse_class_decl(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_class_decl");
-
         let name = self.consume(TokenIdentifier, MissingClassIdentifier)?;
 
         let mut superclass = None;
@@ -264,12 +259,10 @@ impl Parser {
 
         self.consume(TokenRightBrace, MissingClassCloseCurly)?;
 
-        self.debug_parse_end();
         Ok(Class::new(name, superclass, methods))
     }
 
     fn parse_function_decl(&mut self, type_: FunctionType) -> ParseResult<FunctionStmt> {
-        self.debug_parse_start("parse_function_decl");
 
         let name = self.consume(TokenIdentifier, MissingFunctionIdentifier(type_))?;
 
@@ -293,12 +286,10 @@ impl Parser {
 
         let body = self.parse_block_statement()?;
 
-        self.debug_parse_end();
         Ok(FunctionStmt::new(name, params, *body.stmts))
     }
 
     fn parse_var_decl(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_var_decl");
 
         let name = self.consume(TokenIdentifier, MissingVariableIdentifier)?;
 
@@ -311,7 +302,6 @@ impl Parser {
 
         self.consume(TokenSemicolon, MissingVariableSemicolon)?;
 
-        self.debug_parse_end();
         Ok(VarStmt::new(name, initializer))
     }
 
@@ -320,10 +310,7 @@ impl Parser {
     //#region Statements
 
     fn parse_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_statement");
-
-
-        let result = match self.advance().type_ {
+        match self.advance().type_ {
             TokenFor       => self.parse_for_statement(),
             TokenIf        => self.parse_if_statement(),
             TokenPrint     => self.parse_print_statement(),
@@ -334,16 +321,10 @@ impl Parser {
                 self.roll_back();
                 self.parse_expression_statement()
             },
-        };
-
-        self.debug_parse_end();
-        result
+        }
     }
 
     fn parse_block_statement(&mut self) -> ParseResult<Block> {
-        self.debug_parse_start("parse_block_statement");
-
-
         let mut statements = vec![];
 
         while !self.check(TokenRightBrace) && !self.is_eof() {
@@ -352,13 +333,10 @@ impl Parser {
 
         self.consume(TokenRightBrace, MissingBlockCloseBrace)?;
 
-        self.debug_parse_end();
         Ok(Block { stmts: Box::new(statements), })
     }
 
     fn parse_for_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_for_statement");
-
         self.consume(TokenLeftParen, MissingForOpenParen)?;
 
         let initializer = match self.peek().type_ {
@@ -401,14 +379,11 @@ impl Parser {
             Some(init) => Block::new(vec![init, body]),
         };
 
-        self.debug_parse_end();
         Ok(body)
     }
 
 
     fn parse_if_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_if_statement");
-
 
         self.consume(TokenLeftParen, MissingIfOpenParen)?;
         let condition = self.parse_expression(None)?;
@@ -421,24 +396,18 @@ impl Parser {
             None
         };
 
-        self.debug_parse_end();
         Ok(IfStmt::new(condition, then_branch, else_branch))
     }
 
     fn parse_print_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_print_statement");
-
         let value = self.parse_expression(None)?;
 
         self.consume(TokenSemicolon, MissingPrintSemicolon)?;
 
-        self.debug_parse_end();
         Ok(PrintStmt::new(value))
     }
 
     fn parse_return_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_return_statement");
-
 
         let keyword = self.previous();
         let value = if !self.check(TokenSemicolon) {
@@ -449,13 +418,10 @@ impl Parser {
 
         self.consume(TokenSemicolon, MissingReturnSemicolon)?;
 
-        self.debug_parse_end();
         Ok(ReturnStmt::new(keyword, value))
     }
 
     fn parse_while_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_while_statement");
-
 
         self.consume(TokenLeftParen, MissingWhileOpenParen)?;
         let condition = self.parse_expression(None)?;
@@ -463,41 +429,30 @@ impl Parser {
 
         let body = self.parse_statement()?;
 
-        self.debug_parse_end();
         Ok(WhileStmt::new(condition, body))
     }
 
     fn parse_expression_statement(&mut self) -> ParseResult<Stmt> {
-        self.debug_parse_start("parse_expression_statement");
-
 
         let expr = self.parse_expression(None)?;
         self.consume(TokenSemicolon, MissingExpressionStmtSemicolon)?;
 
-        self.debug_parse_end();
         Ok(ExpressionStmt::new(expr))
 
     }
 
     fn parse_expression(&mut self, target: Option<Expr>) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_expression");
-
-        let result = self.parse_precedence(Precidence::PrecAssignment, target);
-
-        self.debug_parse_end();
-        result
+        self.parse_precedence(Precidence::PrecAssignment, target)
     }
 
     fn parse_precedence(&mut self, prec: Precidence, target: Option<Expr>) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_precedence");
-
 
         let op   = self.advance();
         let rule = self.get_rule(op.type_)?;
 
         let can_assign = prec <= Precidence::PrecAssignment;
 
-        
+
         let prefix = rule.prefix.ok_or_else(|| self.panic("Missing Prefix Rule"))?;
         let mut target = prefix(self, RuleArgs {
             can_assign,
@@ -521,41 +476,30 @@ impl Parser {
             return Err(self.error(InvalidAssignmentTarget))
         }
 
-
-        self.debug_parse_end();
         Ok(target)
     }
 
     // Rules
 
     fn parse_grouping_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_grouping_expr");
-
-
         let expr = self.parse_expression(None)?;
 
         self.consume(TokenRightParen, MissingGroupingCloseParen)?;
 
-        self.debug_parse_end();
         Ok(expr)
     }
 
     fn parse_call_expr(&mut self, rule_args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_call_expr");
-
 
         let callee = rule_args.target.ok_or_else(|| self.panic("Missing Callee for call expression"))?;
         let callee = collapse_get(callee);
 
         let (paren, arguments) = self.parse_argument_list()?;
 
-        self.debug_parse_end();
         Ok(Call::new(callee, paren, arguments))
     }
 
     fn parse_dot_expr(&mut self, rule_args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_dot_expr");
-
 
         let target = rule_args.target.ok_or_else(|| self.panic("Missing target for dot expression"))?;
         let name   = self.consume(TokenIdentifier, MissingPropertyIdentifier)?;
@@ -581,25 +525,19 @@ impl Parser {
             }
         };
 
-        self.debug_parse_end();
         result
 
     }
 
     fn parse_unary_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_unary_expr");
-
 
         let operator = self.previous();
         let operand  = self.parse_precedence(Precidence::PrecUnary, args.target);
 
-        self.debug_parse_end();
         Ok(Unary::new(operator, operand?))
     }
 
     fn parse_binary_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_binary_expr");
-
 
         let op   = self.previous();
         let rule = self.get_rule(op.type_)?;
@@ -607,15 +545,11 @@ impl Parser {
         let left  = args.target.ok_or_else(|| self.panic("Missing left operand for binary expression"))?;
         let right = self.parse_precedence(rule.precidence.next(), None)?;
 
-        self.debug_parse_end();
         Ok(Binary::new(left, op, right))
     }
 
 
     fn parse_argument_list(&mut self) -> ParseResult<(Token, Vec<Expr>)> {
-        self.debug_parse_start("parse_argument_list");
-
-
         let mut args = vec![];
 
         if !self.check(TokenRightParen) {
@@ -627,20 +561,17 @@ impl Parser {
                 if args.len() > 255 {
                     return Err(self.error(FunctionTooManyParameters));
                 }
-                
+
                 args.push(self.parse_expression(None)?);
             }
         }
 
         let paren = self.consume(TokenRightParen, MissingFunctionCloseParen)?;
 
-        self.debug_parse_end();
         Ok((paren, args))
     }
 
     fn parse_variable_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_variable_expr");
-
         let name   = self.previous();
         let target = Variable::new(name.clone());
 
@@ -652,54 +583,40 @@ impl Parser {
             Ok(Get::new(target, name))
         };
 
-        self.debug_parse_end();
         result
     }
 
     fn parse_literal_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_log("parse_literal_expr");
         Ok(Literal::new(self.previous()))
     }
 
     fn parse_and_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_and_expr");
-        let result = self.parse_logical_expr(args, Precidence::PrecAnd);
-
-        self.debug_parse_end();
-        result
+        self.parse_logical_expr(args, Precidence::PrecAnd)
     }
 
     fn parse_or_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_or_expr");
-        let result = self.parse_logical_expr(args, Precidence::PrecOr);
-        self.debug_parse_end();
-        result
+        self.parse_logical_expr(args, Precidence::PrecOr)
     }
 
     fn parse_logical_expr(&mut self, args: RuleArgs, prec: Precidence) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_logical_expr");
         let operator = self.previous();
         let left     = args.target.ok_or_else(|| self.panic("Missing target for logical expression"))?;
 
         let right = self.parse_precedence(prec, None)?;
 
-        self.debug_parse_end();
         Ok(Logical::new(left, operator, right))
 
     }
 
     fn parse_super_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_start("parse_super_expr");
         let keyword = self.previous();
         self.consume(TokenDot, MissingSuperDot)?;
         let method = self.consume(TokenIdentifier, MissingSuperPropertyIdentifier)?;
 
-        self.debug_parse_end();
         Ok(Super::new(keyword, method))
     }
 
     fn parse_this_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.debug_parse_log("parse_this_expr");
         Ok(This::new(self.previous()))
     }
 
@@ -808,32 +725,6 @@ impl Parser {
             self.advance();
         }
 
-    }
-
-    fn debug_parse_log(&mut self, name: &str) {
-        let ind = self.parse_stack.len();
-
-        print_ind(ind, name);
-    }
-
-
-    // TODO: this doesn't display properly if an Err()? route is taken
-    //       such as a compile error
-    fn debug_parse_start(&mut self, name: &str) {
-        let ind = self.parse_stack.len();
-
-        print_ind(ind, &format!("{} ({}) {{", name, self.peek()));
-
-        self.parse_stack.push(name.to_owned());
-    }
-
-    fn debug_parse_end(&mut self) {
-
-        self.parse_stack.pop();
-
-        let ind = self.parse_stack.len();
-
-        print_ind(ind, "}");
     }
 
 }
