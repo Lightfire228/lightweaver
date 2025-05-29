@@ -10,17 +10,19 @@ pub mod scanner;
 pub mod ast;
 pub mod parser;
 pub mod interpreter;
+pub mod vm;
 
 mod test;
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
-
 pub enum RunError {
     IOError,
     ScannerError(ScanErrorList),
     ParserError (ParseErrorList),
+    RuntimeError(InterpretErrorType)
 }
+use vm::{chunk::{Chunk, OpCode}, value::Value, InterpretErrorType, Vm};
 use RunError::*;
 
 
@@ -37,7 +39,31 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| ParserError(err))?;
 
 
-        display_ast(ast);
+        // display_ast(ast);
+
+        let mut chunk = Chunk::new("test chunk".to_owned());
+
+
+        let constant  = chunk.add_constant(Value::Number(1.2));
+        chunk.write_op(OpCode::OpConstant { index: constant }, 1);
+
+        let constant  = chunk.add_constant(Value::Number(3.4));
+        chunk.write_op(OpCode::OpConstant { index: constant }, 1);
+
+        chunk.write_op(OpCode::OpAdd,                          1);
+
+        let constant  = chunk.add_constant(Value::Number(5.6));
+        chunk.write_op(OpCode::OpConstant { index: constant }, 1);
+
+        chunk.write_op(OpCode::OpDivide,                       1);
+        chunk.write_op(OpCode::OpNegate,                       1);
+
+        chunk.write_op(OpCode::OpReturn,                       1);
+
+        chunk.disassemble();
+
+        let mut vm = Vm::new();
+        vm.interpret(chunk).map_err(|err| RuntimeError(err))?;
 
         Ok("test")
     })() {
@@ -51,9 +77,9 @@ pub fn run_file(path: &Path) -> &str {
 fn display_error(err: RunError) -> ! {
     match err {
         IOError => panic!("Unable to read source file"),
-
         ScannerError(err) => display_scanner_err(err),
         ParserError (err) => display_parser_err (err),
+        RuntimeError(err) => display_runtime_err(err),
     }
 }
 
@@ -113,6 +139,16 @@ fn display_parser_err(err: ParseErrorList) -> ! {
 
     panic!()
 }
+
+fn display_runtime_err(err: InterpretErrorType) -> ! {
+    use InterpretErrorType::*;
+
+    match err {
+        RuntimeError => panic!("Runtime Error"),
+    }
+
+}
+
 
 
 fn display_ast(ast: Ast) {
