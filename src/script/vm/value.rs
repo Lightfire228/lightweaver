@@ -1,30 +1,72 @@
 use std::fmt::Display;
 
-use super::{RuntimeError, RuntimeResult};
+use super::object::{Obj, ObjString, ObjType};
+
 
 #[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Bool  (bool),
+    Obj   (Box<Obj>),
     Nil,
 }
 
 impl Value {
-    pub fn expect_number<F>(&self, err: F) -> RuntimeResult<f64>
-        where F: Fn() -> RuntimeError
-    {
+
+    pub fn new_string(string: String) -> Self {
+        Value::Obj(Box::new(ObjString::new(string)))
+    }
+
+    pub fn as_number(&self) -> Option<f64> {
         match self {
-            Value::Number(x) => Ok(*x),
-            _                => Err(err()),
+            Value::Number(x) => Some(*x),
+            _                => None,
         }
     }
 
     pub fn is_falsey(&self) -> bool {
         match self {
             Value::Nil       => true,
-            Value::Number(_) => false,
             Value::Bool  (x) => !(*x),
+            _                => false,
         }
+    }
+
+    pub fn as_obj(&self) -> Option<&Obj> {
+        match self {
+            Value::Obj(o) => Some(o),
+            _             => None,
+        }
+    }
+
+    pub fn as_obj_mut(&mut self) -> Option<&mut Obj> {
+        match self {
+            Value::Obj(o) => Some(o),
+            _             => None,
+        }
+    }
+
+    pub fn as_string(self) -> Option<ObjString> {
+        match self {
+            Value::Obj(obj) => Some(
+                match obj.type_ {
+                    ObjType::String(obj) => obj
+                }
+            ),
+            _             => None,
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+
+        if let Value::Obj(obj) = &self {
+            if let ObjType::String(_) = obj.type_ {
+                return true;
+            }
+        }
+
+        false
+
     }
 }
 
@@ -40,6 +82,7 @@ impl PartialEq for Value {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Bool  (a), Value::Bool  (b)) => a == b,
+            (Value::Obj   (a), Value::Obj   (b)) => a == b,
             (Value::Nil,       Value::Nil)       => true,
             _                                    => false,
         }
@@ -48,8 +91,10 @@ impl PartialEq for Value {
 
 fn to_str(value: &Value) -> String {
     match value {
+        Value::Obj   (x) => x.to_string(),
         Value::Number(x) => x.to_string(),
         Value::Bool  (x) => x.to_string(),
         Value::Nil       => "nil".to_owned(),
+
     }
 }

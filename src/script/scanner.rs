@@ -167,7 +167,7 @@ impl Scanner {
         }
 
         self.advance();
-        self.add_token(TokenString);
+        self.add_string_token();
     }
 
     fn parse_number(&mut self) {
@@ -218,6 +218,13 @@ impl Scanner {
     fn add_token(&mut self, type_: TokenType) {
         let lexeme = self.get_lexeme();
         self.tokens.push(Token::new(type_, &lexeme, self.line, self.col));
+
+        self.start = self.current;
+    }
+
+    fn add_string_token(&mut self) {
+        let lexeme = self.get_wrapped_lexeme(1);
+        self.tokens.push(Token::new(TokenString, &lexeme, self.line, self.col));
 
         self.start = self.current;
     }
@@ -274,6 +281,10 @@ impl Scanner {
 
     fn get_lexeme(&self) -> String {
         chars_to_str(&self.source[self.start..self.current])
+    }
+
+    fn get_wrapped_lexeme(&self, i: usize) -> String {
+        chars_to_str(&self.source[self.start +i .. self.current -i])
     }
 
     fn finalize(&mut self) {

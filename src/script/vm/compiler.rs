@@ -2,7 +2,7 @@
 
 use crate::script::{ast::{Ast, BinaryOpType, BinaryOperator, Expr, ExpressionStmt, Literal, LiteralType, LogicalType, Stmt, UnaryOpType, UnaryOperator}, tokens::TokenType};
 
-use super::{chunk::{Chunk, OpCode}, value::Value};
+use super::{chunk::{Chunk, OpCode}, object::ObjString, value::Value};
 
 use OpCode   ::*;
 use TokenType::*;
@@ -85,7 +85,10 @@ impl Compiler {
                 let value = Value::Number(to_number(&value.lexeme));
                 self.compile_constant(value);
             },
-            LiteralType::String => todo!(),
+            LiteralType::String => {
+                let value = Value::new_string(value.lexeme);
+                self.compile_constant(value);
+            },
             LiteralType::True   => { self.write_op(OpTrue);  },
             LiteralType::False  => { self.write_op(OpFalse); },
             LiteralType::Nil    => { self.write_op(OpNil);   },
