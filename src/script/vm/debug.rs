@@ -25,13 +25,23 @@ impl OpCode {
         match &self {
             OpConstant { index } => constant_instruction("OP_CONSTANT", chunk, *index),
 
+            OpNil                => simple_instruction  ("OP_NIL"),
+            OpTrue               => simple_instruction  ("OP_TRUE"),
+            OpFalse              => simple_instruction  ("OP_FALSE"),
+
+            OpEqual              => simple_instruction  ("OP_EQUAL"),
+            OpGreater            => simple_instruction  ("OP_GREATER"),
+            OpLess               => simple_instruction  ("OP_LESS"),
+
             OpAdd                => simple_instruction  ("OP_ADD"),
             OpSubtract           => simple_instruction  ("OP_SUBTRACT"),
             OpMultiply           => simple_instruction  ("OP_MULTIPLY"),
             OpDivide             => simple_instruction  ("OP_DIVIDE"),
+            OpNot                => simple_instruction  ("OP_NOT"),
 
             OpNegate             => simple_instruction  ("OP_NEGATE"),
             OpReturn             => simple_instruction  ("OP_RETURN"),
+
         }
     }
 }

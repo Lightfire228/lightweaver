@@ -12,6 +12,13 @@ pub struct BinaryOperator {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum BinaryOpType {
+    NotEqual,
+    Equal,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+
     Add,
     Subtract,
     Multiply,
@@ -58,10 +65,18 @@ impl AstNode for BinaryOperator {
 fn get_type(token: &Token) -> BinaryOpType {
     use TokenType::*;
     match token.type_ {
-        TokenPlus   => BinaryOpType::Add,
-        TokenMinus  => BinaryOpType::Subtract,
-        TokenStar   => BinaryOpType::Multiply,
-        TokenSlash  => BinaryOpType::Divide,
-        _           => panic!("Unknown token type ({}) for binary operator", token.type_),
+
+        TokenBangEqual    => BinaryOpType::NotEqual,
+        TokenEqualEqual   => BinaryOpType::Equal,
+        TokenGreater      => BinaryOpType::Greater,
+        TokenGreaterEqual => BinaryOpType::GreaterEqual,
+        TokenLess         => BinaryOpType::Less,
+        TokenLessEqual    => BinaryOpType::LessEqual,
+
+        TokenPlus         => BinaryOpType::Add,
+        TokenMinus        => BinaryOpType::Subtract,
+        TokenStar         => BinaryOpType::Multiply,
+        TokenSlash        => BinaryOpType::Divide,
+        _                 => panic!("Unknown token type ({}) for binary operator", token.type_),
     }
 }

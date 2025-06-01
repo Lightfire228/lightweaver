@@ -224,6 +224,7 @@ impl Scanner {
 
     fn add_token_match(&mut self, ch: char, first_type: TokenType, second_type: TokenType) {
         if self.match_(ch) {
+            self.advance();
             self.add_token(second_type);
         }
         else {
@@ -324,6 +325,7 @@ pub fn get_keywords() -> HashMap<String, TokenType> {
     add("false",   TokenFalse);
     add("for",     TokenFor);
     add("fun",     TokenFun);
+    add("nil",     TokenNil);
     add("print",   TokenPrint);
     add("return",  TokenReturn);
     add("super",   TokenSuper);

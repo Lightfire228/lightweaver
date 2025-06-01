@@ -11,7 +11,8 @@ pub struct Literal {
 pub enum LiteralType {
     Nil,
     Number,
-    Bool,
+    True,
+    False,
     String,
 }
 
@@ -49,8 +50,8 @@ fn get_type(token: &Token) -> LiteralType {
     use TokenType::*;
     match token.type_ {
         TokenNumber => LiteralType::Number,
-        TokenTrue   => LiteralType::Bool,
-        TokenFalse  => LiteralType::Bool,
+        TokenTrue   => LiteralType::True,
+        TokenFalse  => LiteralType::False,
         TokenString => LiteralType::String,
         TokenNil    => LiteralType::Nil,
         _           => panic!("Unknown token type ({}) for literal", token.type_),

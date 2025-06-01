@@ -14,7 +14,16 @@ pub struct Vm {
     ip:    usize,
 }
 
+pub struct RuntimeError {
+    pub msg:  String,
+    pub line: usize,
+}
+
+pub type RuntimeResult<T> = Result<T, RuntimeError>;
+
 enum BinaryOp {
+    Greater,
+    Less,
     Add,
     Sub,
     Mul,
@@ -30,14 +39,14 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, mut chunks: Vec<Chunk>) -> InterpretResult<()> {
+    pub fn interpret(&mut self, mut chunks: Vec<Chunk>) -> RuntimeResult<()> {
 
         self.chunk = chunks.remove(0);
 
         self.run()
     }
 
-    fn run(&mut self) -> InterpretResult<()> {
+    fn run(&mut self) -> RuntimeResult<()> {
         use OpCode::*;
 
         loop {
@@ -48,15 +57,26 @@ impl Vm {
 
             match *self.get_instruction() {
                 OpConstant { index } => self.op_constant(index),
-                OpAdd                => self.op_binary(BinaryOp::Add),
-                OpSubtract           => self.op_binary(BinaryOp::Sub),
-                OpMultiply           => self.op_binary(BinaryOp::Mul),
-                OpDivide             => self.op_binary(BinaryOp::Div),
 
-                OpNegate             => self.op_negate  (),
+                OpNil                => self.stack.push(Value::Nil),
+                OpTrue               => self.stack.push(Value::Bool(true)),
+                OpFalse              => self.stack.push(Value::Bool(false)),
+
+                OpEqual              => self.op_equal(),
+                OpGreater            => self.op_binary(BinaryOp::Greater)?,
+                OpLess               => self.op_binary(BinaryOp::Less)?,
+
+                OpAdd                => self.op_binary(BinaryOp::Add)?,
+                OpSubtract           => self.op_binary(BinaryOp::Sub)?,
+                OpMultiply           => self.op_binary(BinaryOp::Mul)?,
+                OpDivide             => self.op_binary(BinaryOp::Div)?,
+
+                OpNot                => self.op_not    (),
+
+                OpNegate             => self.op_negate ()?,
                 OpReturn             => {
                     self.op_return();
-                    return Ok(())
+                    return Ok(());
                 }
             }
         }
@@ -76,6 +96,7 @@ impl Vm {
         self.stack.pop().expect("Stack cannot be empty")
     }
 
+    // op codes
 
     fn op_constant(&mut self, index: usize) {
         let constant = self.get_constant(index);
@@ -83,27 +104,47 @@ impl Vm {
         self.stack.push(constant.clone());
     }
 
-    fn op_binary(&mut self, op: BinaryOp) {
+    fn op_binary(&mut self, op: BinaryOp) -> RuntimeResult<()> {
         use BinaryOp::*;
 
-        let b = self.pop_stack().as_number();
-        let a = self.pop_stack().as_number();
+        let b = self.pop_stack().expect_number(|| self.runtime_error("Operand must be a number"))?;
+        let a = self.pop_stack().expect_number(|| self.runtime_error("Operand must be a number"))?;
 
 
         let val = match op {
-            Add => a + b,
-            Sub => a - b,
-            Mul => a * b,
-            Div => a / b,
+            Greater => Value::Bool  (a > b),
+            Less    => Value::Bool  (a < b),
+
+            Add     => Value::Number(a + b),
+            Sub     => Value::Number(a - b),
+            Mul     => Value::Number(a * b),
+            Div     => Value::Number(a / b),
         };
 
-        self.stack.push(Value::Number(val));
+        self.stack.push(val);
+
+        Ok(())
     }
 
-    fn op_negate(&mut self) {
-        let val = self.pop_stack().as_number();
+    fn op_negate(&mut self) -> RuntimeResult<()> {
+        let val = self.pop_stack().expect_number(|| self.runtime_error("Operand must be a number"))?;
 
         self.stack.push(Value::Number(-val));
+
+        Ok(())
+    }
+
+    fn op_not(&mut self) {
+        let val = self.pop_stack().is_falsey();
+
+        self.stack.push(Value::Bool(val));
+    }
+
+    fn op_equal(&mut self) {
+        let a = self.pop_stack();
+        let b = self.pop_stack();
+
+        self.stack.push(Value::Bool(a == b));
     }
 
     fn op_return(&mut self) {
@@ -113,10 +154,12 @@ impl Vm {
     }
 
 
-}
+    // utils
 
-pub type InterpretResult<T> = Result<T, InterpretErrorType>;
-
-pub enum InterpretErrorType {
-    RuntimeError,
+    fn runtime_error(&self, msg: &str) -> RuntimeError {
+        RuntimeError {
+            msg:  msg.to_owned(),
+            line: self.chunk.lines[self.ip -1],
+        }
+    }
 }

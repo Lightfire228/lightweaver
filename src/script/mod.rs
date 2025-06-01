@@ -14,7 +14,7 @@ pub mod vm;
 
 mod test;
 
-use vm::{compiler::{Compiler}, InterpretErrorType, Vm};
+use vm::{compiler::Compiler, RuntimeError, Vm};
 use RunError::*;
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
@@ -25,7 +25,7 @@ pub enum RunError {
     IOError,
     ScannerError(ScanErrorList),
     ParserError (ParseErrorList),
-    RuntimeError(InterpretErrorType)
+    RuntimeErr  (RuntimeError)
 }
 
 
@@ -44,7 +44,7 @@ pub fn run_file(path: &Path) -> &str {
         let chunks  = Compiler::compile(ast);
 
         let mut vm = Vm::new();
-        vm.interpret(chunks).map_err(|err| RuntimeError(err))?;
+        vm.interpret(chunks).map_err(|err| RuntimeErr(err))?;
 
         Ok("test")
     })() {
@@ -60,7 +60,7 @@ fn display_error(err: RunError) -> ! {
         IOError => panic!("Unable to read source file"),
         ScannerError(err) => display_scanner_err(err),
         ParserError (err) => display_parser_err (err),
-        RuntimeError(err) => display_runtime_err(err),
+        RuntimeErr(err)   => display_runtime_err(err),
     }
 }
 
@@ -121,13 +121,8 @@ fn display_parser_err(err: ParseErrorList) -> ! {
     panic!()
 }
 
-fn display_runtime_err(err: InterpretErrorType) -> ! {
-    use InterpretErrorType::*;
-
-    match err {
-        RuntimeError => panic!("Runtime Error"),
-    }
-
+fn display_runtime_err(err: RuntimeError) -> ! {
+    panic!("Runtime error: {}", err.msg)
 }
 
 

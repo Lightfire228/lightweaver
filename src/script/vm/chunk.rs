@@ -3,10 +3,17 @@ use super::value::Value;
 
 pub enum OpCode {
     OpConstant { index: usize },
+    OpNil,
+    OpTrue,
+    OpFalse,
+    OpEqual,
+    OpGreater,
+    OpLess,
     OpAdd,
     OpSubtract,
     OpMultiply,
     OpDivide,
+    OpNot,
     OpNegate,
     OpReturn,
 }

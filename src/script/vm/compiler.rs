@@ -80,13 +80,19 @@ impl Compiler {
     fn compile_literal(&mut self, literal: Literal) {
         let value = literal.value;
 
-        let value = match literal.type_ {
-            LiteralType::Number => Value::Number(to_number(&value.lexeme)),
-            LiteralType::Nil    => todo!(),
-            LiteralType::Bool   => todo!(),
+        match literal.type_ {
+            LiteralType::Number => {
+                let value = Value::Number(to_number(&value.lexeme));
+                self.compile_constant(value);
+            },
             LiteralType::String => todo!(),
+            LiteralType::True   => { self.write_op(OpTrue);  },
+            LiteralType::False  => { self.write_op(OpFalse); },
+            LiteralType::Nil    => { self.write_op(OpNil);   },
         };
+    }
 
+    fn compile_constant(&mut self, value: Value) {
         let index = self.current_chunk_mut().add_constant(value);
 
         self.write_op(OpConstant { index, });
@@ -100,12 +106,19 @@ impl Compiler {
         self.compile_expr(*binary.right);
 
         let value = match binary.type_ {
-            Add      => self.write_op(OpAdd),
-            Subtract => self.write_op(OpSubtract),
-            Multiply => self.write_op(OpMultiply),
-            Divide   => self.write_op(OpDivide),
-        };
 
+            NotEqual     => self.write_ops(OpEqual,   OpNot),
+            Equal        => self.write_op (OpEqual),
+            Greater      => self.write_op (OpGreater),
+            GreaterEqual => self.write_ops(OpLess,    OpNot),
+            Less         => self.write_op (OpLess),
+            LessEqual    => self.write_ops(OpGreater, OpNot),
+
+            Add          => self.write_op (OpAdd),
+            Subtract     => self.write_op (OpSubtract),
+            Multiply     => self.write_op (OpMultiply),
+            Divide       => self.write_op (OpDivide),
+        };
     }
 
     fn compile_unary(&mut self, unary: UnaryOperator) {
@@ -115,7 +128,7 @@ impl Compiler {
 
         match unary.type_ {
             Negate     => self.write_op(OpNegate),
-            LogicalNot => todo!(),
+            LogicalNot => self.write_op(OpNot),
         };
     }
 
@@ -132,6 +145,11 @@ impl Compiler {
     fn write_op(&mut self, op: OpCode) -> usize {
         let line = self.line;
         self.current_chunk_mut().write_op(op, line)
+    }
+    fn write_ops(&mut self, op1: OpCode, op2: OpCode) -> usize {
+        let line = self.line;
+        self.current_chunk_mut().write_op(op1, line);
+        self.current_chunk_mut().write_op(op2, line)
     }
 
 }
