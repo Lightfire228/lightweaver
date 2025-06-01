@@ -32,7 +32,7 @@ use super::AstDisplay;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Expr {
     Assign   (Assign),
-    Binary   (Binary),
+    Binary   (BinaryOperator),
     Call     (Call),
     Get      (Get),
     Grouping (Grouping),
@@ -41,7 +41,7 @@ pub enum Expr {
     Set      (Set),
     Super    (Super),
     This     (This),
-    Unary    (Unary),
+    Unary    (UnaryOperator),
     Variable (Variable),
 }
 

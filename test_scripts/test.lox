@@ -1,12 +1,16 @@
-class Circle {
-  init(radius) {
-    this.radius = radius;
-  }
+// class Circle {
+//   init(radius) {
+//     this.radius = radius;
+//   }
 
-  area() {
-    return 3.141592653 * this.radius * this.radius;
-  }
-}
+//   area() {
+//     return 3.141592653 * this.radius * this.radius;
+//   }
+// }
 
-var circle = Circle(4);
-print circle.area; // Prints roughly "50.2655".
+// var circle = Circle(4);
+// print circle.area; // Prints roughly "50.2655".
+
+
+12.3;
+((-1 + 2) * 3 - -4) / 5;

@@ -4,6 +4,7 @@ use value::Value;
 pub mod chunk;
 pub mod debug;
 pub mod value;
+pub mod compiler;
 
 static DEBUG_TRACE_EXECUTION: bool = true;
 
@@ -29,9 +30,9 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult<()> {
+    pub fn interpret(&mut self, mut chunks: Vec<Chunk>) -> InterpretResult<()> {
 
-        self.chunk = chunk;
+        self.chunk = chunks.remove(0);
 
         self.run()
     }

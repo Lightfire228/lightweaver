@@ -14,19 +14,21 @@ pub mod vm;
 
 mod test;
 
+use vm::{compiler::{Compiler}, InterpretErrorType, Vm};
+use RunError::*;
+
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
+type RunResult      = Result<(), RunError>;
+
 pub enum RunError {
     IOError,
     ScannerError(ScanErrorList),
     ParserError (ParseErrorList),
     RuntimeError(InterpretErrorType)
 }
-use vm::{chunk::{Chunk, OpCode}, value::Value, InterpretErrorType, Vm};
-use RunError::*;
 
 
-type RunResult = Result<(), RunError>;
 
 pub fn run_file(path: &Path) -> &str {
 
@@ -38,32 +40,11 @@ pub fn run_file(path: &Path) -> &str {
 
         let ast    = parse_ast(tokens)       .map_err(|err| ParserError(err))?;
 
-
-        // display_ast(ast);
-
-        let mut chunk = Chunk::new("test chunk".to_owned());
-
-
-        let constant  = chunk.add_constant(Value::Number(1.2));
-        chunk.write_op(OpCode::OpConstant { index: constant }, 1);
-
-        let constant  = chunk.add_constant(Value::Number(3.4));
-        chunk.write_op(OpCode::OpConstant { index: constant }, 1);
-
-        chunk.write_op(OpCode::OpAdd,                          1);
-
-        let constant  = chunk.add_constant(Value::Number(5.6));
-        chunk.write_op(OpCode::OpConstant { index: constant }, 1);
-
-        chunk.write_op(OpCode::OpDivide,                       1);
-        chunk.write_op(OpCode::OpNegate,                       1);
-
-        chunk.write_op(OpCode::OpReturn,                       1);
-
-        chunk.disassemble();
+        display_ast(&ast);
+        let chunks  = Compiler::compile(ast);
 
         let mut vm = Vm::new();
-        vm.interpret(chunk).map_err(|err| RuntimeError(err))?;
+        vm.interpret(chunks).map_err(|err| RuntimeError(err))?;
 
         Ok("test")
     })() {
@@ -151,7 +132,7 @@ fn display_runtime_err(err: InterpretErrorType) -> ! {
 
 
 
-fn display_ast(ast: Ast) {
+fn display_ast(ast: &Ast) {
 
     let args = DisplayArgs { depth: 0 };
 

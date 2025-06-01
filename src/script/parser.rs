@@ -534,7 +534,7 @@ impl Parser {
         let operator = self.previous();
         let operand  = self.parse_precedence(Precidence::PrecUnary, args.target);
 
-        Ok(Unary::new(operator, operand?))
+        Ok(UnaryOperator::new(operator, operand?))
     }
 
     fn parse_binary_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
@@ -545,7 +545,7 @@ impl Parser {
         let left  = args.target.ok_or_else(|| self.panic("Missing left operand for binary expression"))?;
         let right = self.parse_precedence(rule.precidence.next(), None)?;
 
-        Ok(Binary::new(left, op, right))
+        Ok(BinaryOperator::new(left, op, right))
     }
 
 
