@@ -63,20 +63,20 @@ impl AstNode for BinaryOperator {
 }
 
 fn get_type(token: &Token) -> BinaryOpType {
-    use TokenType::*;
+    type T = TokenType;
     match token.type_ {
 
-        TokenBangEqual    => BinaryOpType::NotEqual,
-        TokenEqualEqual   => BinaryOpType::Equal,
-        TokenGreater      => BinaryOpType::Greater,
-        TokenGreaterEqual => BinaryOpType::GreaterEqual,
-        TokenLess         => BinaryOpType::Less,
-        TokenLessEqual    => BinaryOpType::LessEqual,
+        T::BangEqual    => BinaryOpType::NotEqual,
+        T::EqualEqual   => BinaryOpType::Equal,
+        T::Greater      => BinaryOpType::Greater,
+        T::GreaterEqual => BinaryOpType::GreaterEqual,
+        T::Less         => BinaryOpType::Less,
+        T::LessEqual    => BinaryOpType::LessEqual,
 
-        TokenPlus         => BinaryOpType::Add,
-        TokenMinus        => BinaryOpType::Subtract,
-        TokenStar         => BinaryOpType::Multiply,
-        TokenSlash        => BinaryOpType::Divide,
+        T::Plus         => BinaryOpType::Add,
+        T::Minus        => BinaryOpType::Subtract,
+        T::Star         => BinaryOpType::Multiply,
+        T::Slash        => BinaryOpType::Divide,
         _                 => panic!("Unknown token type ({}) for binary operator", token.type_),
     }
 }

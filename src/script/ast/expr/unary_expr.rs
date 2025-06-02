@@ -50,10 +50,10 @@ impl AstNode for UnaryOperator {
 
 
 fn get_type(token: &Token) -> UnaryOpType {
-    use TokenType::*;
+    type T = TokenType;
     match token.type_ {
-        TokenBang  => UnaryOpType::LogicalNot,
-        TokenMinus => UnaryOpType::Negate,
+        T::Bang  => UnaryOpType::LogicalNot,
+        T::Minus => UnaryOpType::Negate,
         _          => panic!("Unknown token type ({}) for unary operator", token.type_),
     }
 }

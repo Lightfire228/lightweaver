@@ -47,13 +47,13 @@ impl AstNode for Literal {
 
 
 fn get_type(token: &Token) -> LiteralType {
-    use TokenType::*;
+    type T = TokenType;
     match token.type_ {
-        TokenNumber => LiteralType::Number,
-        TokenTrue   => LiteralType::True,
-        TokenFalse  => LiteralType::False,
-        TokenString => LiteralType::String,
-        TokenNil    => LiteralType::Nil,
+        T::Number => LiteralType::Number,
+        T::True   => LiteralType::True,
+        T::False  => LiteralType::False,
+        T::String => LiteralType::String,
+        T::Nil    => LiteralType::Nil,
         _           => panic!("Unknown token type ({}) for literal", token.type_),
     }
 }

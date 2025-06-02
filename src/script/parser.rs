@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::script::ast::*;
 
-use crate::script::tokens::TokenType::*;
+use super::tokens::{Token, TokenType};
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
@@ -80,9 +80,10 @@ pub enum ParseErrorType {
     MissingExpression(Token),
 }
 
-use ParseErrorType::*;
+type Prec = Precidence;
 
-use super::tokens::{Token, TokenType};
+type Pe = ParseErrorType;
+type Tt = TokenType;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FunctionType {
@@ -101,35 +102,33 @@ impl FunctionType {
 
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
 enum Precidence {
-    PrecNone,
-    PrecAssignment, // =
-    PrecOr,         // or
-    PrecAnd,        // and
-    PrecEquality,   // == !=
-    PrecComparison, // < > <= >=
-    PrecTerm,       // + -
-    PrecFactor,     // * /
-    PrecUnary,      // ! -
-    PrecCall,       // . ()
-    PrecPrimary
+    None,
+    Assignment, // =
+    Or,         // or
+    And,        // and
+    Equality,   // == !=
+    Comparison, // < > <= >=
+    Term,       // + -
+    Factor,     // * /
+    Unary,      // ! -
+    Call,       // . ()
+    Primary
 }
 
 impl Precidence {
     fn next(&self) -> Precidence {
-        use Precidence::*;
-
         match self {
-            PrecNone       => PrecAssignment,
-            PrecAssignment => PrecOr,
-            PrecOr         => PrecAnd,
-            PrecAnd        => PrecEquality,
-            PrecEquality   => PrecComparison,
-            PrecComparison => PrecTerm,
-            PrecTerm       => PrecFactor,
-            PrecFactor     => PrecUnary,
-            PrecUnary      => PrecCall,
-            PrecCall       => PrecPrimary,
-            PrecPrimary    => panic!("Unknown precidence")
+            Prec::None       => Prec::Assignment,
+            Prec::Assignment => Prec::Or,
+            Prec::Or         => Prec::And,
+            Prec::And        => Prec::Equality,
+            Prec::Equality   => Prec::Comparison,
+            Prec::Comparison => Prec::Term,
+            Prec::Term       => Prec::Factor,
+            Prec::Factor     => Prec::Unary,
+            Prec::Unary      => Prec::Call,
+            Prec::Call       => Prec::Primary,
+            Prec::Primary    => panic!("Unknown precidence")
         }
     }
 }
@@ -184,35 +183,34 @@ impl Parser {
 
 
     fn parse_table() -> HashMap<TokenType, ParseRule> {
-        use Precidence::*;
 
         HashMap::from([
-            (TokenLeftParen,    ParseRule::new(Some(Self::parse_grouping_expr), Some(Self::parse_call_expr) ,   PrecCall)),
-            (TokenDot,          ParseRule::new(None,                            Some(Self::parse_dot_expr),     PrecCall)),
-            (TokenMinus,        ParseRule::new(Some(Self::parse_unary_expr),    Some(Self::parse_binary_expr),  PrecTerm)),
-            (TokenPlus,         ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecTerm)),
-            (TokenSlash,        ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecFactor)),
-            (TokenStar,         ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecFactor)),
-            (TokenBang,         ParseRule::new(Some(Self::parse_unary_expr),    None,                           PrecNone)),
-            (TokenBangEqual,    ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecEquality)),
-            (TokenEqualEqual,   ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecEquality)),
-            (TokenGreater,      ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecComparison)),
-            (TokenGreaterEqual, ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecComparison)),
-            (TokenLess,         ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecComparison)),
-            (TokenLessEqual,    ParseRule::new(None,                            Some(Self::parse_binary_expr),  PrecComparison)),
-            (TokenIdentifier,   ParseRule::new(Some(Self::parse_variable_expr), None,                           PrecNone)),
-            (TokenString,       ParseRule::new(Some(Self::parse_literal_expr),  None,                           PrecNone)),
-            (TokenNumber,       ParseRule::new(Some(Self::parse_literal_expr),  None,                           PrecNone)),
-            (TokenAnd,          ParseRule::new(None,                            Some(Self::parse_and_expr),     PrecAnd)),
-            (TokenOr,           ParseRule::new(None,                            Some(Self::parse_or_expr),      PrecOr)),
-            (TokenTrue,         ParseRule::new(Some(Self::parse_literal_expr),  None,                           PrecNone)),
-            (TokenFalse,        ParseRule::new(Some(Self::parse_literal_expr),  None,                           PrecNone)),
-            (TokenNil,          ParseRule::new(Some(Self::parse_literal_expr),  None,                           PrecNone)),
-            (TokenSuper,        ParseRule::new(Some(Self::parse_super_expr),    None,                           PrecNone)),
-            (TokenThis,         ParseRule::new(Some(Self::parse_this_expr),     None,                           PrecNone)),
-            (TokenSemicolon,    ParseRule::new(None,                            None,                           PrecNone)),
-            (TokenRightBrace,   ParseRule::new(None,                            None,                           PrecNone)),
-            (TokenRightParen,   ParseRule::new(None,                            None,                           PrecNone)),
+            (Tt::LeftParen,    ParseRule::new(Some(Self::parse_grouping_expr), Some(Self::parse_call_expr) ,   Prec::Call)),
+            (Tt::Dot,          ParseRule::new(None,                            Some(Self::parse_dot_expr),     Prec::Call)),
+            (Tt::Minus,        ParseRule::new(Some(Self::parse_unary_expr),    Some(Self::parse_binary_expr),  Prec::Term)),
+            (Tt::Plus,         ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Term)),
+            (Tt::Slash,        ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Factor)),
+            (Tt::Star,         ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Factor)),
+            (Tt::Bang,         ParseRule::new(Some(Self::parse_unary_expr),    None,                           Prec::None)),
+            (Tt::BangEqual,    ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Equality)),
+            (Tt::EqualEqual,   ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Equality)),
+            (Tt::Greater,      ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Comparison)),
+            (Tt::GreaterEqual, ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Comparison)),
+            (Tt::Less,         ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Comparison)),
+            (Tt::LessEqual,    ParseRule::new(None,                            Some(Self::parse_binary_expr),  Prec::Comparison)),
+            (Tt::Identifier,   ParseRule::new(Some(Self::parse_variable_expr), None,                           Prec::None)),
+            (Tt::String,       ParseRule::new(Some(Self::parse_literal_expr),  None,                           Prec::None)),
+            (Tt::Number,       ParseRule::new(Some(Self::parse_literal_expr),  None,                           Prec::None)),
+            (Tt::And,          ParseRule::new(None,                            Some(Self::parse_and_expr),     Prec::And)),
+            (Tt::Or,           ParseRule::new(None,                            Some(Self::parse_or_expr),      Prec::Or)),
+            (Tt::True,         ParseRule::new(Some(Self::parse_literal_expr),  None,                           Prec::None)),
+            (Tt::False,        ParseRule::new(Some(Self::parse_literal_expr),  None,                           Prec::None)),
+            (Tt::Nil,          ParseRule::new(Some(Self::parse_literal_expr),  None,                           Prec::None)),
+            (Tt::Super,        ParseRule::new(Some(Self::parse_super_expr),    None,                           Prec::None)),
+            (Tt::This,         ParseRule::new(Some(Self::parse_this_expr),     None,                           Prec::None)),
+            (Tt::Semicolon,    ParseRule::new(None,                            None,                           Prec::None)),
+            (Tt::RightBrace,   ParseRule::new(None,                            None,                           Prec::None)),
+            (Tt::RightParen,   ParseRule::new(None,                            None,                           Prec::None)),
         ])
     }
 
@@ -222,9 +220,9 @@ impl Parser {
     fn parse_declaration(&mut self) -> ParseResult<Stmt> {
         let result: ParseResult<Stmt> = match self.advance().type_ {
 
-            TokenClass => self.parse_class_decl(),
-            TokenFun   => self.parse_function_decl(FunctionType::Function).map(|f| Stmt::Function(f)),
-            TokenVar   => self.parse_var_decl(),
+            Tt::Class => self.parse_class_decl(),
+            Tt::Fun   => self.parse_function_decl(FunctionType::Function).map(|f| Stmt::Function(f)),
+            Tt::Var   => self.parse_var_decl(),
 
             _ => {
                 self.roll_back();
@@ -240,49 +238,49 @@ impl Parser {
     }
 
     fn parse_class_decl(&mut self) -> ParseResult<Stmt> {
-        let name = self.consume(TokenIdentifier, MissingClassIdentifier)?;
+        let name = self.consume(Tt::Identifier, Pe::MissingClassIdentifier)?;
 
         let mut superclass = None;
-        if self.match_(&[TokenLess]) {
+        if self.match_(&[Tt::Less]) {
 
-            self.consume(TokenIdentifier, MissingSuperclassIdentifier)?;
+            self.consume(Tt::Identifier, Pe::MissingSuperclassIdentifier)?;
             let name = self.previous();
             superclass = Some(Variable { name, });
         }
 
-        self.consume(TokenLeftBrace, MissingClassOpenCurly)?;
+        self.consume(Tt::LeftBrace, Pe::MissingClassOpenCurly)?;
 
         let mut methods = vec![];
-        while !self.check(TokenRightBrace) && !self.is_eof() {
+        while !self.check(Tt::RightBrace) && !self.is_eof() {
             methods.push(self.parse_function_decl(FunctionType::Method)?);
         }
 
-        self.consume(TokenRightBrace, MissingClassCloseCurly)?;
+        self.consume(Tt::RightBrace, Pe::MissingClassCloseCurly)?;
 
         Ok(Class::new(name, superclass, methods))
     }
 
     fn parse_function_decl(&mut self, type_: FunctionType) -> ParseResult<FunctionStmt> {
 
-        let name = self.consume(TokenIdentifier, MissingFunctionIdentifier(type_))?;
+        let name = self.consume(Tt::Identifier, Pe::MissingFunctionIdentifier(type_))?;
 
-        self.consume(TokenLeftParen, MissingFunctionOpenParen(type_))?;
+        self.consume(Tt::LeftParen, Pe::MissingFunctionOpenParen(type_))?;
 
         let mut params = vec![];
-        if !self.check(TokenRightParen) {
+        if !self.check(Tt::RightParen) {
 
-            params.push(self.consume(TokenIdentifier, MissingParameterIdentifier)?);
+            params.push(self.consume(Tt::Identifier, Pe::MissingParameterIdentifier)?);
 
-            while self.match_(&[TokenComma]) {
+            while self.match_(&[Tt::Comma]) {
                 if params.len() > 255 {
-                    return Err(self.error(FunctionTooManyParameters))
+                    return Err(self.error(Pe::FunctionTooManyParameters))
                 }
-                params.push(self.consume(TokenIdentifier, MissingParameterIdentifier)?);
+                params.push(self.consume(Tt::Identifier, Pe::MissingParameterIdentifier)?);
             }
         }
 
-        self.consume(TokenRightParen, MissingFunctionCloseParen)?;
-        self.consume(TokenLeftBrace,  MissingFunctionOpenBrace(type_))?;
+        self.consume(Tt::RightParen, Pe::MissingFunctionCloseParen)?;
+        self.consume(Tt::LeftBrace,  Pe::MissingFunctionOpenBrace(type_))?;
 
         let body = self.parse_block_statement()?;
 
@@ -291,16 +289,16 @@ impl Parser {
 
     fn parse_var_decl(&mut self) -> ParseResult<Stmt> {
 
-        let name = self.consume(TokenIdentifier, MissingVariableIdentifier)?;
+        let name = self.consume(Tt::Identifier, Pe::MissingVariableIdentifier)?;
 
-        let initializer = if self.match_(&[TokenEqual]) {
+        let initializer = if self.match_(&[Tt::Equal]) {
 
             Some(self.parse_expression(None)?)
         } else {
             None
         };
 
-        self.consume(TokenSemicolon, MissingVariableSemicolon)?;
+        self.consume(Tt::Semicolon, Pe::MissingVariableSemicolon)?;
 
         Ok(VarStmt::new(name, initializer))
     }
@@ -311,12 +309,12 @@ impl Parser {
 
     fn parse_statement(&mut self) -> ParseResult<Stmt> {
         match self.advance().type_ {
-            TokenFor       => self.parse_for_statement(),
-            TokenIf        => self.parse_if_statement(),
-            TokenPrint     => self.parse_print_statement(),
-            TokenReturn    => self.parse_return_statement(),
-            TokenWhile     => self.parse_while_statement(),
-            TokenLeftBrace => self.parse_block_statement().map(|block| Stmt::Block(block)),
+            Tt::For       => self.parse_for_statement(),
+            Tt::If        => self.parse_if_statement(),
+            Tt::Print     => self.parse_print_statement(),
+            Tt::Return    => self.parse_return_statement(),
+            Tt::While     => self.parse_while_statement(),
+            Tt::LeftBrace => self.parse_block_statement().map(|block| Stmt::Block(block)),
             _ => {
                 self.roll_back();
                 self.parse_expression_statement()
@@ -327,37 +325,37 @@ impl Parser {
     fn parse_block_statement(&mut self) -> ParseResult<Block> {
         let mut statements = vec![];
 
-        while !self.check(TokenRightBrace) && !self.is_eof() {
+        while !self.check(Tt::RightBrace) && !self.is_eof() {
             statements.push(self.parse_declaration()?);
         }
 
-        self.consume(TokenRightBrace, MissingBlockCloseBrace)?;
+        self.consume(Tt::RightBrace, Pe::MissingBlockCloseBrace)?;
 
         Ok(Block { stmts: Box::new(statements), })
     }
 
     fn parse_for_statement(&mut self) -> ParseResult<Stmt> {
-        self.consume(TokenLeftParen, MissingForOpenParen)?;
+        self.consume(Tt::LeftParen, Pe::MissingForOpenParen)?;
 
         let initializer = match self.peek().type_ {
-            TokenSemicolon => None,
-            TokenVar       => Some(self.parse_var_decl()?),
+            Tt::Semicolon => None,
+            Tt::Var       => Some(self.parse_var_decl()?),
             _              => Some(self.parse_expression_statement()?),
         };
 
-        let condition = if self.check(TokenSemicolon) {
+        let condition = if self.check(Tt::Semicolon) {
             Some(self.parse_expression(None)?)
         } else {
             None
         };
-        self.consume(TokenSemicolon, MissingForConditionDelimiter)?;
+        self.consume(Tt::Semicolon, Pe::MissingForConditionDelimiter)?;
 
-        let increment = if self.check(TokenRightParen) {
+        let increment = if self.check(Tt::RightParen) {
             Some(self.parse_expression(None)?)
         } else {
             None
         };
-        self.consume(TokenRightParen, MissingForCloseParen)?;
+        self.consume(Tt::RightParen, Pe::MissingForCloseParen)?;
 
         let mut body = self.parse_statement()?;
 
@@ -385,12 +383,12 @@ impl Parser {
 
     fn parse_if_statement(&mut self) -> ParseResult<Stmt> {
 
-        self.consume(TokenLeftParen, MissingIfOpenParen)?;
+        self.consume(Tt::LeftParen, Pe::MissingIfOpenParen)?;
         let condition = self.parse_expression(None)?;
-        self.consume(TokenRightParen, MissingIfCloseParen)?;
+        self.consume(Tt::RightParen, Pe::MissingIfCloseParen)?;
 
         let then_branch = self.parse_statement()?;
-        let else_branch = if self.match_(&[TokenElse]) {
+        let else_branch = if self.match_(&[Tt::Else]) {
             Some(self.parse_statement()?)
         } else {
             None
@@ -402,7 +400,7 @@ impl Parser {
     fn parse_print_statement(&mut self) -> ParseResult<Stmt> {
         let value = self.parse_expression(None)?;
 
-        self.consume(TokenSemicolon, MissingPrintSemicolon)?;
+        self.consume(Tt::Semicolon, Pe::MissingPrintSemicolon)?;
 
         Ok(PrintStmt::new(value))
     }
@@ -410,22 +408,22 @@ impl Parser {
     fn parse_return_statement(&mut self) -> ParseResult<Stmt> {
 
         let keyword = self.previous();
-        let value = if !self.check(TokenSemicolon) {
+        let value = if !self.check(Tt::Semicolon) {
             Some(self.parse_expression(None)?)
         } else {
             None
         };
 
-        self.consume(TokenSemicolon, MissingReturnSemicolon)?;
+        self.consume(Tt::Semicolon, Pe::MissingReturnSemicolon)?;
 
         Ok(ReturnStmt::new(keyword, value))
     }
 
     fn parse_while_statement(&mut self) -> ParseResult<Stmt> {
 
-        self.consume(TokenLeftParen, MissingWhileOpenParen)?;
+        self.consume(Tt::LeftParen, Pe::MissingWhileOpenParen)?;
         let condition = self.parse_expression(None)?;
-        self.consume(TokenRightParen, MissingWhileCloseParen)?;
+        self.consume(Tt::RightParen, Pe::MissingWhileCloseParen)?;
 
         let body = self.parse_statement()?;
 
@@ -435,14 +433,14 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> ParseResult<Stmt> {
 
         let expr = self.parse_expression(None)?;
-        self.consume(TokenSemicolon, MissingExpressionStmtSemicolon)?;
+        self.consume(Tt::Semicolon, Pe::MissingExpressionStmtSemicolon)?;
 
         Ok(ExpressionStmt::new(expr))
 
     }
 
     fn parse_expression(&mut self, target: Option<Expr>) -> ParseResult<Expr> {
-        self.parse_precedence(Precidence::PrecAssignment, target)
+        self.parse_precedence(Prec::Assignment, target)
     }
 
     fn parse_precedence(&mut self, prec: Precidence, target: Option<Expr>) -> ParseResult<Expr> {
@@ -450,7 +448,7 @@ impl Parser {
         let op   = self.advance();
         let rule = self.get_rule(op.type_)?;
 
-        let can_assign = prec <= Precidence::PrecAssignment;
+        let can_assign = prec <= Prec::Assignment;
 
 
         let prefix = rule.prefix.ok_or_else(|| self.panic("Missing Prefix Rule"))?;
@@ -472,8 +470,8 @@ impl Parser {
             })?;
         }
 
-        if can_assign && self.match_(&[TokenEqual]) {
-            return Err(self.error(InvalidAssignmentTarget))
+        if can_assign && self.match_(&[Tt::Equal]) {
+            return Err(self.error(Pe::InvalidAssignmentTarget))
         }
 
         Ok(target)
@@ -484,7 +482,7 @@ impl Parser {
     fn parse_grouping_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
         let expr = self.parse_expression(None)?;
 
-        self.consume(TokenRightParen, MissingGroupingCloseParen)?;
+        self.consume(Tt::RightParen, Pe::MissingGroupingCloseParen)?;
 
         Ok(expr)
     }
@@ -502,19 +500,19 @@ impl Parser {
     fn parse_dot_expr(&mut self, rule_args: RuleArgs) -> ParseResult<Expr> {
 
         let target = rule_args.target.ok_or_else(|| self.panic("Missing target for dot expression"))?;
-        let name   = self.consume(TokenIdentifier, MissingPropertyIdentifier)?;
+        let name   = self.consume(Tt::Identifier, Pe::MissingPropertyIdentifier)?;
 
-        let result = if rule_args.can_assign && self.match_(&[TokenEqual]) {
+        let result = if rule_args.can_assign && self.match_(&[Tt::Equal]) {
             let value = self.parse_expression(Some(target.clone()))?;
 
             match value {
                 Expr::Variable(_)   => Ok(Assign::new(name, value)),
                 Expr::Get     (get) => Ok(Set   ::new(target, name, *get.expr)),
-                _                   => Err(self.error(InvalidAssignmentTarget))
+                _                   => Err(self.error(Pe::InvalidAssignmentTarget))
             }
 
         }
-        else if self.match_(&[TokenLeftParen]) {
+        else if self.match_(&[Tt::LeftParen]) {
             let (paren, arguments) = self.parse_argument_list()?;
             Ok(Call::new(target, paren, arguments))
         }
@@ -532,7 +530,7 @@ impl Parser {
     fn parse_unary_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
 
         let operator = self.previous();
-        let operand  = self.parse_precedence(Precidence::PrecUnary, args.target);
+        let operand  = self.parse_precedence(Prec::Unary, args.target);
 
         Ok(UnaryOperator::new(operator, operand?))
     }
@@ -552,21 +550,21 @@ impl Parser {
     fn parse_argument_list(&mut self) -> ParseResult<(Token, Vec<Expr>)> {
         let mut args = vec![];
 
-        if !self.check(TokenRightParen) {
+        if !self.check(Tt::RightParen) {
 
             args.push(self.parse_expression(None)?);
 
-            while self.match_(&[TokenComma]) {
+            while self.match_(&[Tt::Comma]) {
 
                 if args.len() > 255 {
-                    return Err(self.error(FunctionTooManyParameters));
+                    return Err(self.error(Pe::FunctionTooManyParameters));
                 }
 
                 args.push(self.parse_expression(None)?);
             }
         }
 
-        let paren = self.consume(TokenRightParen, MissingFunctionCloseParen)?;
+        let paren = self.consume(Tt::RightParen, Pe::MissingFunctionCloseParen)?;
 
         Ok((paren, args))
     }
@@ -575,7 +573,7 @@ impl Parser {
         let name   = self.previous();
         let target = Variable::new(name.clone());
 
-        let result = if args.can_assign && self.match_(&[TokenEqual]) {
+        let result = if args.can_assign && self.match_(&[Tt::Equal]) {
             let value  = self.parse_expression(None)?;
             Ok(Set::new(target, name, value))
         }
@@ -591,11 +589,11 @@ impl Parser {
     }
 
     fn parse_and_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.parse_logical_expr(args, Precidence::PrecAnd)
+        self.parse_logical_expr(args, Prec::And)
     }
 
     fn parse_or_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        self.parse_logical_expr(args, Precidence::PrecOr)
+        self.parse_logical_expr(args, Prec::Or)
     }
 
     fn parse_logical_expr(&mut self, args: RuleArgs, prec: Precidence) -> ParseResult<Expr> {
@@ -610,8 +608,8 @@ impl Parser {
 
     fn parse_super_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
         let keyword = self.previous();
-        self.consume(TokenDot, MissingSuperDot)?;
-        let method = self.consume(TokenIdentifier, MissingSuperPropertyIdentifier)?;
+        self.consume(Tt::Dot, Pe::MissingSuperDot)?;
+        let method = self.consume(Tt::Identifier, Pe::MissingSuperPropertyIdentifier)?;
 
         Ok(Super::new(keyword, method))
     }
@@ -661,7 +659,7 @@ impl Parser {
     }
 
     pub fn is_eof(&self) -> bool {
-        self.peek().type_ == TokenEOF || self.current >= self.tokens.len()
+        self.peek().type_ == Tt::EOF || self.current >= self.tokens.len()
     }
 
     pub fn peek(&self) -> &Token {
@@ -696,26 +694,26 @@ impl Parser {
     fn get_rule(&self, op: TokenType) -> ParseResult<ParseRule> {
         Ok(*self.parse_table
             .get(&op)
-            .ok_or(self.error(MissingExpression(self.previous())))?
+            .ok_or(self.error(Pe::MissingExpression(self.previous())))?
         )
     }
 
     fn synchronize(&mut self) {
 
         while !self.is_eof() {
-            if self.previous().type_ == TokenSemicolon {
+            if self.previous().type_ == Tt::Semicolon {
                 return;
             }
 
             match self.peek().type_ {
-                  TokenClass
-                | TokenFun
-                | TokenVar
-                | TokenFor
-                | TokenIf
-                | TokenWhile
-                | TokenPrint
-                | TokenReturn => {
+                  Tt::Class
+                  | Tt::Fun
+                  | Tt::Var
+                  | Tt::For
+                  | Tt::If
+                  | Tt::While
+                  | Tt::Print
+                  | Tt::Return => {
                     return;
                 }
 

@@ -15,7 +15,6 @@ pub mod vm;
 mod test;
 
 use vm::{compiler::Compiler, RuntimeError, Vm};
-use RunError::*;
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
@@ -25,26 +24,27 @@ pub enum RunError {
     IOError,
     ScannerError(ScanErrorList),
     ParserError (ParseErrorList),
-    RuntimeErr  (RuntimeError)
+    RuntimeError(RuntimeError)
 }
 
+type Re = RunError;
 
 
 pub fn run_file(path: &Path) -> &str {
 
     match (|| {
 
-        let source = fs::read_to_string(path).map_err(|_|   IOError)?;
+        let source = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
 
-        let tokens = scan_tokens(&source)    .map_err(|err| ScannerError(err))?;
+        let tokens = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
 
-        let ast    = parse_ast(tokens)       .map_err(|err| ParserError(err))?;
+        let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
 
         display_ast(&ast);
         let chunks  = Compiler::compile(ast);
 
         let mut vm = Vm::new();
-        vm.interpret(chunks).map_err(|err| RuntimeErr(err))?;
+        vm.interpret(chunks).map_err(|err| Re::RuntimeError(err))?;
 
         Ok("test")
     })() {
@@ -57,22 +57,22 @@ pub fn run_file(path: &Path) -> &str {
 
 fn display_error(err: RunError) -> ! {
     match err {
-        IOError => panic!("Unable to read source file"),
-        ScannerError(err) => display_scanner_err(err),
-        ParserError (err) => display_parser_err (err),
-        RuntimeErr(err)   => display_runtime_err(err),
+        Re::IOError => panic!("Unable to read source file"),
+        Re::ScannerError(err) => display_scanner_err(err),
+        Re::ParserError (err) => display_parser_err (err),
+        Re::RuntimeError(err) => display_runtime_err(err),
     }
 }
 
 fn display_scanner_err(err: ScanErrorList) -> ! {
-    use ScannerErrorType::*;
+    type Se = ScannerErrorType;
 
     for e in err.iter() {
         eprint!("Compile Error: Line {} - Col {} - \n> ", e.line, e.col);
 
         match &e.type_ {
-            UnterminatedString      => eprintln!("Unterminated String"),
-            UnexpectedCharacter(ch) => eprintln!("Unexpected character: '{}'", ch),
+            Se::UnterminatedString      => eprintln!("Unterminated String"),
+            Se::UnexpectedCharacter(ch) => eprintln!("Unexpected character: '{}'", ch),
         }
     }
 
@@ -80,41 +80,41 @@ fn display_scanner_err(err: ScanErrorList) -> ! {
 }
 
 fn display_parser_err(err: ParseErrorList) -> ! {
-    use ParseErrorType::*;
+    type Pe = ParseErrorType;
 
     for e in err.iter() {
         eprint!("Compile Error: Line {} - Col {} - \n> ", e.token.line, e.token.col);
 
         match &e.type_ {
-            MissingClassIdentifier                  => eprintln!("Expect class name"),
-            MissingSuperclassIdentifier             => eprintln!("Expect superclass name"),
-            MissingClassOpenCurly                   => eprintln!("Expect '{{' before class body"),
-            MissingClassCloseCurly                  => eprintln!("Expect '}}' after class body"),
-            MissingFunctionIdentifier(type_)        => eprintln!("Expect {} name",             type_.to_string()),
-            MissingFunctionOpenParen (type_)        => eprintln!("Expect '(' after {} name",   type_.to_string()),
-            MissingFunctionOpenBrace (type_)        => eprintln!("Expect '}}' before {} name", type_.to_string()),
-            MissingFunctionCloseParen               => eprintln!("Expect ')' after parameters"),
-            FunctionTooManyParameters               => eprintln!("Can't have more than 255 parameters"),
-            MissingParameterIdentifier              => eprintln!("Expect parameter name"),
-            MissingVariableIdentifier               => eprintln!("Expect variable name"),
-            MissingVariableSemicolon                => eprintln!("Expect ';' after variable declaration"),
-            MissingForOpenParen                     => eprintln!("Expect '(' after 'for'"),
-            MissingForCloseParen                    => eprintln!("Expect ')' after for clauses"),
-            MissingForConditionDelimiter            => eprintln!("Expect ';' after loop condition"),
-            MissingIfOpenParen                      => eprintln!("Expect '(' after 'if'"),
-            MissingIfCloseParen                     => eprintln!("Expect ')' after if contition"),
-            MissingPrintSemicolon                   => eprintln!("Expect ';' after print"),
-            MissingReturnSemicolon                  => eprintln!("Expect ';' after return value"),
-            MissingWhileOpenParen                   => eprintln!("Expect '(' after while"),
-            MissingWhileCloseParen                  => eprintln!("Expect ')' after condition"),
-            MissingExpressionStmtSemicolon          => eprintln!("Expect ';' after expression"),
-            MissingBlockCloseBrace                  => eprintln!("Expect '}}' after block"),
-            InvalidAssignmentTarget                 => eprintln!("Invalid assignment target"),
-            MissingPropertyIdentifier               => eprintln!("Expect property name after '.'"),
-            MissingSuperDot                         => eprintln!("Expect '.' after super"),
-            MissingSuperPropertyIdentifier          => eprintln!("Expect superclass method name"),
-            MissingGroupingCloseParen               => eprintln!("Expect ')' after expression"),
-            MissingExpression(token)                => eprintln!("Expect expression ({})", token),
+            Pe::MissingClassIdentifier                  => eprintln!("Expect class name"),
+            Pe::MissingSuperclassIdentifier             => eprintln!("Expect superclass name"),
+            Pe::MissingClassOpenCurly                   => eprintln!("Expect '{{' before class body"),
+            Pe::MissingClassCloseCurly                  => eprintln!("Expect '}}' after class body"),
+            Pe::MissingFunctionIdentifier(type_)        => eprintln!("Expect {} name",             type_.to_string()),
+            Pe::MissingFunctionOpenParen (type_)        => eprintln!("Expect '(' after {} name",   type_.to_string()),
+            Pe::MissingFunctionOpenBrace (type_)        => eprintln!("Expect '}}' before {} name", type_.to_string()),
+            Pe::MissingFunctionCloseParen               => eprintln!("Expect ')' after parameters"),
+            Pe::FunctionTooManyParameters               => eprintln!("Can't have more than 255 parameters"),
+            Pe::MissingParameterIdentifier              => eprintln!("Expect parameter name"),
+            Pe::MissingVariableIdentifier               => eprintln!("Expect variable name"),
+            Pe::MissingVariableSemicolon                => eprintln!("Expect ';' after variable declaration"),
+            Pe::MissingForOpenParen                     => eprintln!("Expect '(' after 'for'"),
+            Pe::MissingForCloseParen                    => eprintln!("Expect ')' after for clauses"),
+            Pe::MissingForConditionDelimiter            => eprintln!("Expect ';' after loop condition"),
+            Pe::MissingIfOpenParen                      => eprintln!("Expect '(' after 'if'"),
+            Pe::MissingIfCloseParen                     => eprintln!("Expect ')' after if contition"),
+            Pe::MissingPrintSemicolon                   => eprintln!("Expect ';' after print"),
+            Pe::MissingReturnSemicolon                  => eprintln!("Expect ';' after return value"),
+            Pe::MissingWhileOpenParen                   => eprintln!("Expect '(' after while"),
+            Pe::MissingWhileCloseParen                  => eprintln!("Expect ')' after condition"),
+            Pe::MissingExpressionStmtSemicolon          => eprintln!("Expect ';' after expression"),
+            Pe::MissingBlockCloseBrace                  => eprintln!("Expect '}}' after block"),
+            Pe::InvalidAssignmentTarget                 => eprintln!("Invalid assignment target"),
+            Pe::MissingPropertyIdentifier               => eprintln!("Expect property name after '.'"),
+            Pe::MissingSuperDot                         => eprintln!("Expect '.' after super"),
+            Pe::MissingSuperPropertyIdentifier          => eprintln!("Expect superclass method name"),
+            Pe::MissingGroupingCloseParen               => eprintln!("Expect ')' after expression"),
+            Pe::MissingExpression(token)                => eprintln!("Expect expression ({})", token),
         }
     }
 

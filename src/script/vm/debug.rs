@@ -16,31 +16,30 @@ impl Chunk {
 
 impl OpCode {
     pub fn disassemble(&self, chunk: &Chunk, offset: usize) {
-        use OpCode::*;
-
         print!("{:04} ", offset);
 
         print_line(chunk, offset);
 
+        type O = OpCode;
         match &self {
-            OpConstant { index } => constant_instruction("OP_CONSTANT", chunk, *index),
+            O::OpConstant { index } => constant_instruction("OP_CONSTANT", chunk, *index),
 
-            OpNil                => simple_instruction  ("OP_NIL"),
-            OpTrue               => simple_instruction  ("OP_TRUE"),
-            OpFalse              => simple_instruction  ("OP_FALSE"),
+            O::OpNil                => simple_instruction  ("OP_NIL"),
+            O::OpTrue               => simple_instruction  ("OP_TRUE"),
+            O::OpFalse              => simple_instruction  ("OP_FALSE"),
 
-            OpEqual              => simple_instruction  ("OP_EQUAL"),
-            OpGreater            => simple_instruction  ("OP_GREATER"),
-            OpLess               => simple_instruction  ("OP_LESS"),
+            O::OpEqual              => simple_instruction  ("OP_EQUAL"),
+            O::OpGreater            => simple_instruction  ("OP_GREATER"),
+            O::OpLess               => simple_instruction  ("OP_LESS"),
 
-            OpAdd                => simple_instruction  ("OP_ADD"),
-            OpSubtract           => simple_instruction  ("OP_SUBTRACT"),
-            OpMultiply           => simple_instruction  ("OP_MULTIPLY"),
-            OpDivide             => simple_instruction  ("OP_DIVIDE"),
-            OpNot                => simple_instruction  ("OP_NOT"),
+            O::OpAdd                => simple_instruction  ("OP_ADD"),
+            O::OpSubtract           => simple_instruction  ("OP_SUBTRACT"),
+            O::OpMultiply           => simple_instruction  ("OP_MULTIPLY"),
+            O::OpDivide             => simple_instruction  ("OP_DIVIDE"),
+            O::OpNot                => simple_instruction  ("OP_NOT"),
 
-            OpNegate             => simple_instruction  ("OP_NEGATE"),
-            OpReturn             => simple_instruction  ("OP_RETURN"),
+            O::OpNegate             => simple_instruction  ("OP_NEGATE"),
+            O::OpReturn             => simple_instruction  ("OP_RETURN"),
 
         }
     }

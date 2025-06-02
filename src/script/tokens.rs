@@ -5,27 +5,27 @@ use core::fmt;
 pub enum TokenType {
 
   // Single-character tokens.
-  TokenLeftParen,  TokenRightParen,
-  TokenLeftBrace,  TokenRightBrace,
-  TokenComma,      TokenDot,        TokenMinus, TokenPlus,
-  TokenSemicolon,  TokenSlash,      TokenStar,
+  LeftParen,  RightParen,
+  LeftBrace,  RightBrace,
+  Comma,      Dot,        Minus, Plus,
+  Semicolon,  Slash,      Star,
 
   // One or two character tokens.
-  TokenBang,    TokenBangEqual,
-  TokenEqual,   TokenEqualEqual,
-  TokenGreater, TokenGreaterEqual,
-  TokenLess,    TokenLessEqual,
+  Bang,    BangEqual,
+  Equal,   EqualEqual,
+  Greater, GreaterEqual,
+  Less,    LessEqual,
 
   // Literals.
-  TokenIdentifier, TokenString, TokenNumber,
+  Identifier, String, Number,
 
   // Keywords.
-  TokenAnd,   TokenClass,  TokenElse,  TokenFalse,
-  TokenFor,   TokenFun,    TokenIf,    TokenNil,   TokenOr,
-  TokenPrint, TokenReturn, TokenSuper, TokenThis,
-  TokenTrue,  TokenVar,    TokenWhile,
+  And,   Class,  Else,  False,
+  For,   Fun,    If,    Nil,   Or,
+  Print, Return, Super, This,
+  True,  Var,    While,
 
-  TokenError, TokenEOF
+  Error, EOF
 }
 
 
@@ -49,7 +49,7 @@ impl Token {
 
     pub fn new_true() -> Self {
         Self::new(
-            TokenType::TokenTrue,
+            TokenType::True,
             "true",
             0,
             0,
@@ -58,7 +58,7 @@ impl Token {
 
     pub fn new_false() -> Self {
         Self::new(
-            TokenType::TokenFalse,
+            TokenType::False,
             "false",
             0,
             0,

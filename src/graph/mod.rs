@@ -23,7 +23,7 @@ type Link<T> = Box<Child<T>>;
 
 impl<T> GraphTree<T> {
     pub fn new() -> Self {
-        GraphTree { 
+        GraphTree {
             children: Vec::new(),
         }
     }
@@ -39,7 +39,7 @@ impl<T> GraphTree<T> {
             Box::new(Child::SubTree(node))
         );
     }
-    
+
     pub fn peek(&self) -> Option<&Child<T>> {
         self.children.last().map(|c| {
             c.as_ref()
@@ -55,12 +55,11 @@ impl<T> GraphTree<T> {
     /// this recursively looks through the last child of each node
     /// and returns the last element contained in it
     pub fn peek_deep(&self) -> Option<&T> {
-        use self::Child::*;
 
         self.children.last().map(|c| {
             match c.as_ref() {
-                LeafNode(l)  => Some(l),
-                SubTree(sub) => sub.peek_deep()
+                Child::LeafNode(l)  => Some(l),
+                Child::SubTree(sub) => sub.peek_deep()
             }
         })?
     }
@@ -68,12 +67,11 @@ impl<T> GraphTree<T> {
     /// this recursively looks through the last child of each node
     /// and returns the last element contained in it
     pub fn peek_deep_mut(&mut self) -> Option<&mut T> {
-        use self::Child::*;
 
         self.children.last_mut().map(|c| {
             match c.as_mut() {
-                LeafNode(l)  => Some(l),
-                SubTree(sub) => sub.peek_deep_mut()
+                Child::LeafNode(l)  => Some(l),
+                Child::SubTree(sub) => sub.peek_deep_mut()
             }
         })?
     }
@@ -127,7 +125,7 @@ mod test {
         assert_eq!(root.peek_mut(),      Some(&mut LeafNode(3)));
         assert_eq!(root.peek_deep(),     Some(&    3));
         assert_eq!(root.peek_deep_mut(), Some(&mut 3));
-        
+
         // test peek mutability
         let a = root.peek_mut();
         match a.unwrap() {
@@ -135,11 +133,11 @@ mod test {
             SubTree(_)     => assert!(false)
         }
         assert_eq!(root.peek_mut(), Some(&mut LeafNode(4)));
-        
+
         // test deep peek mutability
         let a = root.peek_deep_mut();
         *a.unwrap() = 5;
-        
+
         assert_eq!(root.peek_deep_mut(), Some(&mut 5));
 
 
@@ -162,7 +160,7 @@ mod test {
 
         assert_eq!(root.peek(),      Some(&SubTree(n)));
         assert_eq!(root.peek_deep(), Some(&5));
-        
+
         root.push(3);
 
         assert_eq!(root.peek(),      Some(&LeafNode(3)));

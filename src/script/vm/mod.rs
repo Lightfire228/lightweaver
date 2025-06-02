@@ -1,5 +1,4 @@
 use chunk::{Chunk, OpCode};
-use object::ObjString;
 use value::Value;
 
 pub mod chunk;
@@ -11,9 +10,10 @@ pub mod object;
 static DEBUG_TRACE_EXECUTION: bool = true;
 
 pub struct Vm {
-    chunk: Chunk,
-    stack: Vec<Value>,
-    ip:    usize,
+    chunk:   Chunk,
+    ip:      usize,
+    stack:   Vec<Value>,
+    strings: Vec<String>,
 }
 
 pub struct RuntimeError {
@@ -35,9 +35,10 @@ enum BinaryOp {
 impl Vm {
     pub fn new() -> Self {
         Self {
-            chunk: Chunk::new("null chunk".to_owned()),
-            stack: vec![],
-            ip:    0,
+            chunk:   Chunk::new("null chunk".to_owned()),
+            ip:      0,
+            stack:   vec![],
+            strings: vec![],
         }
     }
 
@@ -49,7 +50,6 @@ impl Vm {
     }
 
     fn run(&mut self) -> RuntimeResult<()> {
-        use OpCode::*;
 
         loop {
 
@@ -57,26 +57,27 @@ impl Vm {
                 self.chunk.code[self.ip].disassemble(&self.chunk, self.ip);
             }
 
+            type O = OpCode;
             match *self.get_instruction() {
-                OpConstant { index } => self.op_constant(index),
+                O::OpConstant { index } => self.op_constant(index),
 
-                OpNil                => self.stack.push(Value::Nil),
-                OpTrue               => self.stack.push(Value::Bool(true)),
-                OpFalse              => self.stack.push(Value::Bool(false)),
+                O::OpNil                => self.stack.push(Value::Nil),
+                O::OpTrue               => self.stack.push(Value::Bool(true)),
+                O::OpFalse              => self.stack.push(Value::Bool(false)),
 
-                OpEqual              => self.op_equal(),
-                OpGreater            => self.op_binary(BinaryOp::Greater)?,
-                OpLess               => self.op_binary(BinaryOp::Less)?,
+                O::OpEqual              => self.op_equal(),
+                O::OpGreater            => self.op_binary(BinaryOp::Greater)?,
+                O::OpLess               => self.op_binary(BinaryOp::Less)?,
 
-                OpAdd                => self.op_add()?,
-                OpSubtract           => self.op_binary(BinaryOp::Sub)?,
-                OpMultiply           => self.op_binary(BinaryOp::Mul)?,
-                OpDivide             => self.op_binary(BinaryOp::Div)?,
+                O::OpAdd                => self.op_add()?,
+                O::OpSubtract           => self.op_binary(BinaryOp::Sub)?,
+                O::OpMultiply           => self.op_binary(BinaryOp::Mul)?,
+                O::OpDivide             => self.op_binary(BinaryOp::Div)?,
 
-                OpNot                => self.op_not    (),
+                O::OpNot                => self.op_not    (),
 
-                OpNegate             => self.op_negate ()?,
-                OpReturn             => {
+                O::OpNegate             => self.op_negate ()?,
+                O::OpReturn             => {
                     self.op_return();
                     return Ok(());
                 }
@@ -122,19 +123,17 @@ impl Vm {
     }
 
     fn op_binary(&mut self, op: BinaryOp) -> RuntimeResult<()> {
-        use BinaryOp::*;
-
         let b = self.pop_number()?;
         let a = self.pop_number()?;
 
-
+        type B = BinaryOp;
         let val = match op {
-            Greater => Value::Bool  (a > b),
-            Less    => Value::Bool  (a < b),
+            B::Greater => Value::Bool  (a > b),
+            B::Less    => Value::Bool  (a < b),
 
-            Sub     => Value::Number(a - b),
-            Mul     => Value::Number(a * b),
-            Div     => Value::Number(a / b),
+            B::Sub     => Value::Number(a - b),
+            B::Mul     => Value::Number(a * b),
+            B::Div     => Value::Number(a / b),
         };
 
         self.stack.push(val);
@@ -193,7 +192,6 @@ impl Vm {
 
         self.stack.push(Value::new_string(format!("{}{}", a.string, b.string)));
     }
-
 
     // utils
 

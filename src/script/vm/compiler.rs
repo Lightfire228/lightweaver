@@ -1,11 +1,10 @@
 #![allow(unused_variables)] // TODO:
 
-use crate::script::{ast::{Ast, BinaryOpType, BinaryOperator, Expr, ExpressionStmt, Literal, LiteralType, LogicalType, Stmt, UnaryOpType, UnaryOperator}, tokens::TokenType};
+use crate::script::{ast::{Ast, BinaryOpType, BinaryOperator, Expr, ExpressionStmt, Literal, LiteralType, Stmt, UnaryOpType, UnaryOperator}};
 
-use super::{chunk::{Chunk, OpCode}, object::ObjString, value::Value};
+use super::{chunk::{Chunk, OpCode}, value::Value};
 
 use OpCode   ::*;
-use TokenType::*;
 
 
 pub struct Compiler {
@@ -102,36 +101,34 @@ impl Compiler {
     }
 
     fn compile_binary(&mut self, binary: BinaryOperator) {
-        use BinaryOpType::*;
         let value = binary.operator.lexeme;
 
         self.compile_expr(*binary.left);
         self.compile_expr(*binary.right);
 
+        type B = BinaryOpType;
         let value = match binary.type_ {
+            B::NotEqual     => self.write_ops(OpEqual,   OpNot),
+            B::Equal        => self.write_op (OpEqual),
+            B::Greater      => self.write_op (OpGreater),
+            B::GreaterEqual => self.write_ops(OpLess,    OpNot),
+            B::Less         => self.write_op (OpLess),
+            B::LessEqual    => self.write_ops(OpGreater, OpNot),
 
-            NotEqual     => self.write_ops(OpEqual,   OpNot),
-            Equal        => self.write_op (OpEqual),
-            Greater      => self.write_op (OpGreater),
-            GreaterEqual => self.write_ops(OpLess,    OpNot),
-            Less         => self.write_op (OpLess),
-            LessEqual    => self.write_ops(OpGreater, OpNot),
-
-            Add          => self.write_op (OpAdd),
-            Subtract     => self.write_op (OpSubtract),
-            Multiply     => self.write_op (OpMultiply),
-            Divide       => self.write_op (OpDivide),
+            B::Add          => self.write_op (OpAdd),
+            B::Subtract     => self.write_op (OpSubtract),
+            B::Multiply     => self.write_op (OpMultiply),
+            B::Divide       => self.write_op (OpDivide),
         };
     }
 
     fn compile_unary(&mut self, unary: UnaryOperator) {
-        use UnaryOpType::*;
-
         self.compile_expr(*unary.right);
 
+        type U = UnaryOpType;
         match unary.type_ {
-            Negate     => self.write_op(OpNegate),
-            LogicalNot => self.write_op(OpNot),
+            U::Negate     => self.write_op(OpNegate),
+            U::LogicalNot => self.write_op(OpNot),
         };
     }
 

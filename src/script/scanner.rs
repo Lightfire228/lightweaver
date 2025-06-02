@@ -5,6 +5,9 @@ use std::{collections::HashMap, string::String};
 type Keywords   = HashMap<String, TokenType>;
 type ScanResult = Result<Vec<Token>, Vec<ScannerError>>;
 
+type Se = ScannerErrorType;
+type Tt = TokenType;
+
 pub fn scan_tokens(source: &str) -> ScanResult {
     let mut scanner = Scanner::new(source);
 
@@ -44,8 +47,6 @@ pub enum ScannerErrorType {
     UnterminatedString,
     UnexpectedCharacter(String),
 }
-
-use ScannerErrorType::*;
 
 #[derive(Debug)]
 pub struct ScannerError {
@@ -97,26 +98,26 @@ impl Scanner {
 
         match ch {
 
-            '(' => self.add_token(TokenLeftParen),
-            ')' => self.add_token(TokenRightParen),
-            '{' => self.add_token(TokenLeftBrace),
-            '}' => self.add_token(TokenRightBrace),
-            ';' => self.add_token(TokenSemicolon),
-            ',' => self.add_token(TokenComma),
-            '.' => self.add_token(TokenDot),
-            '-' => self.add_token(TokenMinus),
-            '+' => self.add_token(TokenPlus),
-            '/' => self.add_token(TokenSlash),
-            '*' => self.add_token(TokenStar),
+            '(' => self.add_token(LeftParen),
+            ')' => self.add_token(RightParen),
+            '{' => self.add_token(LeftBrace),
+            '}' => self.add_token(RightBrace),
+            ';' => self.add_token(Semicolon),
+            ',' => self.add_token(Comma),
+            '.' => self.add_token(Dot),
+            '-' => self.add_token(Minus),
+            '+' => self.add_token(Plus),
+            '/' => self.add_token(Slash),
+            '*' => self.add_token(Star),
 
-            '!' => self.add_token_match('=', TokenBang,    TokenBangEqual),
-            '=' => self.add_token_match('=', TokenEqual,   TokenEqualEqual),
-            '<' => self.add_token_match('=', TokenLess,    TokenLessEqual),
-            '>' => self.add_token_match('=', TokenGreater, TokenGreaterEqual),
+            '!' => self.add_token_match('=', Bang,    BangEqual),
+            '=' => self.add_token_match('=', Equal,   EqualEqual),
+            '<' => self.add_token_match('=', Less,    LessEqual),
+            '>' => self.add_token_match('=', Greater, GreaterEqual),
 
             '"' => self.parse_string(),
 
-            _   => self.add_error(UnexpectedCharacter(ch.to_string())),
+            _   => self.add_error(Se::UnexpectedCharacter(ch.to_string())),
         }
     }
 
@@ -163,7 +164,7 @@ impl Scanner {
         }
 
         if self.is_eof() {
-            self.add_error(UnterminatedString);
+            self.add_error(Se::UnterminatedString);
         }
 
         self.advance();
@@ -186,7 +187,7 @@ impl Scanner {
             }
         }
 
-        self.add_token(TokenNumber);
+        self.add_token(Tt::Number);
     }
 
     fn parse_identifier(&mut self) {
@@ -201,7 +202,7 @@ impl Scanner {
 
         let lexeme = self.get_lexeme();
 
-        self.keywords.get(&lexeme).unwrap_or(&TokenIdentifier).to_owned()
+        self.keywords.get(&lexeme).unwrap_or(&Tt::Identifier).to_owned()
     }
 
     // #endregion
@@ -224,7 +225,7 @@ impl Scanner {
 
     fn add_string_token(&mut self) {
         let lexeme = self.get_wrapped_lexeme(1);
-        self.tokens.push(Token::new(TokenString, &lexeme, self.line, self.col));
+        self.tokens.push(Token::new(Tt::String, &lexeme, self.line, self.col));
 
         self.start = self.current;
     }
@@ -288,7 +289,7 @@ impl Scanner {
     }
 
     fn finalize(&mut self) {
-        self.tokens.push(Token::new(TokenEOF, "", self.line, self.col));
+        self.tokens.push(Token::new(Tt::EOF, "", self.line, self.col));
     }
 
     fn add_error(&mut self, err_type: ScannerErrorType) {
@@ -330,20 +331,20 @@ pub fn get_keywords() -> HashMap<String, TokenType> {
         dict.insert(String::from(k), v);
     };
 
-    add("and",     TokenAnd);
-    add("class",   TokenClass);
-    add("else",    TokenElse);
-    add("false",   TokenFalse);
-    add("for",     TokenFor);
-    add("fun",     TokenFun);
-    add("nil",     TokenNil);
-    add("print",   TokenPrint);
-    add("return",  TokenReturn);
-    add("super",   TokenSuper);
-    add("this",    TokenThis);
-    add("true",    TokenTrue);
-    add("var",     TokenVar);
-    add("while",   TokenWhile);
+    add("and",     Tt::And);
+    add("class",   Tt::Class);
+    add("else",    Tt::Else);
+    add("false",   Tt::False);
+    add("for",     Tt::For);
+    add("fun",     Tt::Fun);
+    add("nil",     Tt::Nil);
+    add("print",   Tt::Print);
+    add("return",  Tt::Return);
+    add("super",   Tt::Super);
+    add("this",    Tt::This);
+    add("true",    Tt::True);
+    add("var",     Tt::Var);
+    add("while",   Tt::While);
 
     dict
 }
