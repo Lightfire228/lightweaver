@@ -1,14 +1,18 @@
+use crate::script::vm::value::Value;
+
 use super::chunk::{Chunk, OpCode};
 
 
 impl Chunk {
-    pub fn disassemble(&self) {
+    pub fn disassemble(&self, stack: &[Value]) {
         println!("== {} ==", &self.name);
 
         println!("addr line instruction");
 
         for i in 0..self.code.len() {
             self.code[i].disassemble(self, i);
+            print_stack(stack);
+            println!("");
         }
     }
 }
@@ -18,34 +22,38 @@ impl OpCode {
     pub fn disassemble(&self, chunk: &Chunk, offset: usize) {
         print!("{:04} ", offset);
 
-        print_line(chunk, offset);
+        print_line_info(chunk, offset);
 
         type O = OpCode;
         match &self {
-            O::OpConstant { index } => constant_instruction("OP_CONSTANT", chunk, *index),
+            O::Constant  { index } => constant_instruction("OP_CONSTANT",     chunk, *index),
+            O::DefGlobal { index } => constant_instruction("OP_DEF_GLOBAL",   chunk, *index),
+            O::GetGlobal { index } => constant_instruction("OP_GET_GLOBAL",   chunk, *index),
+            O::SetGlobal { index } => constant_instruction("OP_SET_GLOBAL",   chunk, *index),
 
-            O::OpNil                => simple_instruction  ("OP_NIL"),
-            O::OpTrue               => simple_instruction  ("OP_TRUE"),
-            O::OpFalse              => simple_instruction  ("OP_FALSE"),
+            O::Nil                 => simple_instruction  ("OP_NIL"),
+            O::True                => simple_instruction  ("OP_TRUE"),
+            O::False               => simple_instruction  ("OP_FALSE"),
+            O::Pop                 => simple_instruction  ("OP_POP"),
 
-            O::OpEqual              => simple_instruction  ("OP_EQUAL"),
-            O::OpGreater            => simple_instruction  ("OP_GREATER"),
-            O::OpLess               => simple_instruction  ("OP_LESS"),
+            O::Equal               => simple_instruction  ("OP_EQUAL"),
+            O::Greater             => simple_instruction  ("OP_GREATER"),
+            O::Less                => simple_instruction  ("OP_LESS"),
 
-            O::OpAdd                => simple_instruction  ("OP_ADD"),
-            O::OpSubtract           => simple_instruction  ("OP_SUBTRACT"),
-            O::OpMultiply           => simple_instruction  ("OP_MULTIPLY"),
-            O::OpDivide             => simple_instruction  ("OP_DIVIDE"),
-            O::OpNot                => simple_instruction  ("OP_NOT"),
+            O::Add                 => simple_instruction  ("OP_ADD"),
+            O::Subtract            => simple_instruction  ("OP_SUBTRACT"),
+            O::Multiply            => simple_instruction  ("OP_MULTIPLY"),
+            O::Divide              => simple_instruction  ("OP_DIVIDE"),
+            O::Not                 => simple_instruction  ("OP_NOT"),
 
-            O::OpNegate             => simple_instruction  ("OP_NEGATE"),
-            O::OpReturn             => simple_instruction  ("OP_RETURN"),
-
+            O::Print               => simple_instruction  ("OP_PRINT"),
+            O::Negate              => simple_instruction  ("OP_NEGATE"),
+            O::Return              => simple_instruction  ("OP_RETURN"),
         }
     }
 }
 
-fn print_line(chunk: &Chunk, offset: usize) {
+fn print_line_info(chunk: &Chunk, offset: usize) {
 
     if offset > 0 && chunk.lines[offset] == chunk.lines[offset -1] {
         print!("   | ");
@@ -55,10 +63,31 @@ fn print_line(chunk: &Chunk, offset: usize) {
     }
 }
 
+pub fn print_stack(stack: &[Value]) {
+    for x in stack {
+        print!("[ {x} ]")
+    }
+}
+
+
 fn simple_instruction(name: &str) {
-    println!("{name}")
+    let msg = format!("{:16} {:3}_ _", name, "");
+    let msg = right_adjust(&msg);
+    print!("{msg}")
 }
 
 fn constant_instruction(name: &str, chunk: &Chunk, index: usize) {
-    println!("{:16} {:4} {}", name, index, &chunk.constants[index])
+    let msg = format!("{:16} {:4} {:30} ", name, index, &chunk.constants[index]);
+    let msg = right_adjust(&msg);
+    print!("{msg}");
+
+
+}
+
+fn right_adjust(msg: &str) -> String {
+    let col = 50;
+    assert!(msg.len() < col);
+
+    let spaces = col - msg.len();
+    format!("{} {}| ", msg, " ".repeat(spaces))
 }

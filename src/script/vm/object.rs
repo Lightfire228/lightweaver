@@ -5,12 +5,12 @@ pub struct Obj {
     pub type_: ObjType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjType {
     String(ObjString),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjString {
     pub string: String,
 }

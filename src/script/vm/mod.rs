@@ -1,5 +1,9 @@
+use std::collections::{HashMap, HashSet};
+
 use chunk::{Chunk, OpCode};
 use value::Value;
+
+use crate::script::vm::{debug::print_stack, object::ObjString};
 
 pub mod chunk;
 pub mod debug;
@@ -9,11 +13,12 @@ pub mod object;
 
 static DEBUG_TRACE_EXECUTION: bool = true;
 
+// TODO: String interning
 pub struct Vm {
     chunk:   Chunk,
     ip:      usize,
     stack:   Vec<Value>,
-    strings: Vec<String>,
+    globals: HashMap<String, Value>
 }
 
 pub struct RuntimeError {
@@ -38,7 +43,7 @@ impl Vm {
             chunk:   Chunk::new("null chunk".to_owned()),
             ip:      0,
             stack:   vec![],
-            strings: vec![],
+            globals: HashMap::new(),
         }
     }
 
@@ -55,29 +60,37 @@ impl Vm {
 
             if DEBUG_TRACE_EXECUTION {
                 self.chunk.code[self.ip].disassemble(&self.chunk, self.ip);
+                print_stack(&self.stack);
+                println!();
             }
 
             type O = OpCode;
             match *self.get_instruction() {
-                O::OpConstant { index } => self.op_constant(index),
+                O::Constant  { index } => self.op_constant  (index),
+                O::DefGlobal { index } => self.op_def_global(index),
+                O::GetGlobal { index } => self.op_get_global(index)?,
+                O::SetGlobal { index } => self.op_set_global(index)?,
 
-                O::OpNil                => self.stack.push(Value::Nil),
-                O::OpTrue               => self.stack.push(Value::Bool(true)),
-                O::OpFalse              => self.stack.push(Value::Bool(false)),
+                O::Nil                => self.push_stack(Value::Nil),
+                O::True               => self.push_stack(Value::Bool(true)),
+                O::False              => self.push_stack(Value::Bool(false)),
 
-                O::OpEqual              => self.op_equal(),
-                O::OpGreater            => self.op_binary(BinaryOp::Greater)?,
-                O::OpLess               => self.op_binary(BinaryOp::Less)?,
+                O::Pop                => self.op_pop(),
 
-                O::OpAdd                => self.op_add()?,
-                O::OpSubtract           => self.op_binary(BinaryOp::Sub)?,
-                O::OpMultiply           => self.op_binary(BinaryOp::Mul)?,
-                O::OpDivide             => self.op_binary(BinaryOp::Div)?,
+                O::Equal              => self.op_equal(),
+                O::Greater            => self.op_binary(BinaryOp::Greater)?,
+                O::Less               => self.op_binary(BinaryOp::Less)?,
 
-                O::OpNot                => self.op_not    (),
+                O::Add                => self.op_add()?,
+                O::Subtract           => self.op_binary(BinaryOp::Sub)?,
+                O::Multiply           => self.op_binary(BinaryOp::Mul)?,
+                O::Divide             => self.op_binary(BinaryOp::Div)?,
 
-                O::OpNegate             => self.op_negate ()?,
-                O::OpReturn             => {
+                O::Not                => self.op_not    (),
+
+                O::Print              => self.op_print(),
+                O::Negate             => self.op_negate ()?,
+                O::Return             => {
                     self.op_return();
                     return Ok(());
                 }
@@ -97,6 +110,10 @@ impl Vm {
 
     fn pop_stack(&mut self) -> Value {
         self.stack.pop().expect("Stack cannot be empty")
+    }
+
+    fn push_stack(&mut self, val: Value) {
+        self.stack.push(val);
     }
 
     fn pop_number(&mut self) -> RuntimeResult<f64> {
@@ -119,8 +136,46 @@ impl Vm {
     fn op_constant(&mut self, index: usize) {
         let constant = self.get_constant(index);
 
-        self.stack.push(constant.clone());
+        self.push_stack(constant.clone());
     }
+
+    fn op_def_global(&mut self, index: usize) {
+        let name = self.get_constant_as_str(index);
+        let val  = self.pop_stack();
+
+        self.globals.insert(name, val);
+    }
+
+    fn op_get_global(&mut self, index: usize) -> RuntimeResult<()> {
+        let name  = self.get_constant_as_str(index);
+
+        let value = match self.globals.get(&name) {
+            Some(value) => value,
+            None        => {
+                let msg = format!("Undefined variable '{name}'");
+                Err(self.runtime_error(&msg))?
+            },
+        };
+
+        // TODO: should clone?
+        self.push_stack(value.clone());
+
+        Ok(())
+    }
+
+    fn op_set_global(&mut self, index: usize) -> RuntimeResult<()> {
+        let name = self.get_constant_as_str(index);
+
+        if self.globals.get(&name).is_none() {
+            let msg = format!("Undefined variable '{name}'");
+            Err(self.runtime_error(&msg))?
+        }
+
+        *self.globals.get_mut(&name).unwrap() = self.pop_stack();
+
+        Ok(())
+    }
+
 
     fn op_binary(&mut self, op: BinaryOp) -> RuntimeResult<()> {
         let b = self.pop_number()?;
@@ -136,21 +191,21 @@ impl Vm {
             B::Div     => Value::Number(a / b),
         };
 
-        self.stack.push(val);
+        self.push_stack(val);
 
         Ok(())
     }
 
     fn op_add(&mut self) -> RuntimeResult<()> {
 
-        let b = self.peek_stack(0);
-        let a = self.peek_stack(1);
+        let b = self.pop_stack();
+        let a = self.pop_stack();
 
-        if a.is_string() && b.is_string() {
-            self.concatenate();
+        if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
+            self.push_stack(concatenate(a, b));
         }
         else if let (Some(a), Some(b)) = (a.as_number(), b.as_number()) {
-            self.stack.push(Value::Number(a + b));
+            self.push_stack(Value::Number(a + b));
         }
         else {
             return Err(self.runtime_error("Operands must be two numbers or two strings"))
@@ -159,10 +214,16 @@ impl Vm {
         Ok(())
     }
 
+    fn op_print(&mut self) {
+        let val = self.pop_stack();
+
+        println!("{val}")
+    }
+
     fn op_negate(&mut self) -> RuntimeResult<()> {
         let val = self.pop_number()?;
 
-        self.stack.push(Value::Number(-val));
+        self.push_stack(Value::Number(-val));
 
         Ok(())
     }
@@ -170,14 +231,18 @@ impl Vm {
     fn op_not(&mut self) {
         let val = self.pop_stack().is_falsey();
 
-        self.stack.push(Value::Bool(val));
+        self.push_stack(Value::Bool(val));
+    }
+
+    fn op_pop(&mut self) {
+        self.pop_stack();
     }
 
     fn op_equal(&mut self) {
         let a = self.pop_stack();
         let b = self.pop_stack();
 
-        self.stack.push(Value::Bool(a == b));
+        self.push_stack(Value::Bool(a == b));
     }
 
     fn op_return(&mut self) {
@@ -186,11 +251,8 @@ impl Vm {
         println!("{}", constant);
     }
 
-    fn concatenate(&mut self) {
-        let b = self.pop_stack().as_string().unwrap();
-        let a = self.pop_stack().as_string().unwrap();
-
-        self.stack.push(Value::new_string(format!("{}{}", a.string, b.string)));
+    fn concatenate(&mut self, val1: &str, val2: &str) {
+        self.push_stack(Value::new_string(format!("{}{}", val1, val2)));
     }
 
     // utils
@@ -202,4 +264,15 @@ impl Vm {
         }
     }
 
+    fn get_constant_as_str(&self, index: usize) -> String {
+        self.chunk.constants[index]
+            .as_str()
+            .expect("Expect constant value to be of type ObjString")
+            .to_owned()
+    }
+
+}
+
+fn concatenate(val1: &str, val2: &str) -> Value {
+    Value::new_string(format!("{}{}", val1, val2))
 }

@@ -57,6 +57,17 @@ impl Value {
         }
     }
 
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::Obj(obj) => Some(
+                match &obj.type_ {
+                    ObjType::String(obj) => &obj.string
+                }
+            ),
+            _             => None,
+        }
+    }
+
     pub fn is_string(&self) -> bool {
 
         if let Value::Obj(obj) = &self {

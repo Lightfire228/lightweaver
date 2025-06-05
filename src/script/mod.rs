@@ -122,7 +122,7 @@ fn display_parser_err(err: ParseErrorList) -> ! {
 }
 
 fn display_runtime_err(err: RuntimeError) -> ! {
-    panic!("Runtime error: {}", err.msg)
+    panic!("Runtime error: [line {}] {}", err.line, err.msg)
 }
 
 
