@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use chunk::{Chunk, OpCode};
 use value::Value;
 
-use crate::script::vm::{debug::print_stack, object::ObjString};
+use crate::script::vm::{debug::print_stack};
 
 pub mod chunk;
 pub mod debug;

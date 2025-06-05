@@ -71,6 +71,7 @@ impl Value {
     pub fn is_string(&self) -> bool {
 
         if let Value::Obj(obj) = &self {
+            #[allow(irrefutable_let_patterns)]
             if let ObjType::String(_) = obj.type_ {
                 return true;
             }

@@ -11,6 +11,7 @@ pub struct Logical {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum LogicalType {
+    None,
 }
 
 impl Logical {
@@ -52,8 +53,9 @@ impl AstNode for Logical {
 }
 
 
-fn get_type(token: &Token) -> LogicalType {
-    match token.type_ {
-        _           => panic!("Unknown token type ({}) for logical operator", token.type_),
-    }
+fn get_type(_token: &Token) -> LogicalType {
+    // match token.type_ {
+    //     _           => panic!("Unknown token type ({}) for logical operator", token.type_),
+    // }
+    LogicalType::None
 }
