@@ -12,20 +12,20 @@
 // print circle.area; // Prints roughly "50.2655".
 
 
-12.3;
-((-1 + 2) * 3 - -4) / 5;
+// 12.3;
+// ((-1 + 2) * 3 - -4) / 5;
 
-true;
+// true;
 
-nil;
+// nil;
 
-!(5 - 4 > 3 * 2 == !nil);
+// !(5 - 4 > 3 * 2 == !nil);
 
-"a" + "b";
+// "a" + "b";
 
 
-print 1 + 2;
-print 3 * 4;
+// print 1 + 2;
+// print 3 * 4;
 
 
 var a = 5;
@@ -38,3 +38,8 @@ var beverage  = "cafe au lait";
 breakfast     = "beignets with " + beverage;
 
 print breakfast;
+
+
+// {
+//     var test = "a";
+// }

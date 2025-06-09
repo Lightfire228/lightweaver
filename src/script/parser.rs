@@ -506,7 +506,7 @@ impl Parser {
             let value = self.parse_expression(Some(target.clone()))?;
 
             match value {
-                Expr::Variable(_)   => Ok(Assign::new(name, value)),
+                Expr::Variable(_)   => Ok(Assign::new(Variable::new(name), value)),
                 Expr::Get     (get) => Ok(Set   ::new(target, name, *get.expr)),
                 _                   => Err(self.error(Pe::InvalidAssignmentTarget))
             }
@@ -570,15 +570,15 @@ impl Parser {
     }
 
     fn parse_variable_expr(&mut self, args: RuleArgs) -> ParseResult<Expr> {
-        let name   = self.previous();
+        let name = self.previous();
         let target = Variable::new(name.clone());
 
         let result = if args.can_assign && self.match_(&[Tt::Equal]) {
             let value  = self.parse_expression(None)?;
-            Ok(Set::new(target, name, value))
+            Ok(Assign::new(target, value))
         }
         else {
-            Ok(Get::new(target, name))
+            Ok(Get::new(target.as_expr(), name))
         };
 
         result

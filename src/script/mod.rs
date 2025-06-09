@@ -41,7 +41,7 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
 
         display_ast(&ast);
-        let chunks  = Compiler::compile(ast);
+        let chunks  = Compiler::compile(ast) .unwrap();
 
         let mut vm = Vm::new();
         vm.interpret(chunks).map_err(|err| Re::RuntimeError(err))?;

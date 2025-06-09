@@ -1,4 +1,4 @@
-use crate::script::{ast::{Ast, BinaryOpType, BinaryOperator, Expr, ExpressionStmt, Get, Literal, LiteralType, Set, Stmt, UnaryOpType, UnaryOperator, VarStmt, Variable}, tokens::Token};
+use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Expr, ExpressionStmt, Get, Literal, LiteralType, Set, Stmt, UnaryOpType, UnaryOperator, VarStmt, Variable}, tokens::Token};
 
 use super::{chunk::{Chunk, OpCode}, object::ObjString, value::Value};
 
@@ -6,9 +6,29 @@ type Op = OpCode;
 
 
 pub struct Compiler {
-    chunks: Vec<Chunk>,
-    line:   usize,
+    chunk:       Chunk,
+    line:        usize,
+    locals:      Vec<Local>,
+    scope_depth: usize,
 }
+
+struct Local {
+    name:        Token,
+    depth:       usize,
+    initialized: bool,
+}
+
+enum VariableType {
+    Global,
+    Local,
+}
+
+#[derive(Debug)]
+pub struct CompileError {
+    pub msg: String
+}
+
+pub type CompilerResult<T> = Result<T, CompileError>;
 
 impl Compiler {
 
@@ -16,39 +36,54 @@ impl Compiler {
         let name = "script".to_owned();
 
         Self {
-            chunks: vec![Chunk::new(name)],
-            line:   0,
+            chunk:       Chunk::new(name),
+            line:        0,
+            locals:      vec![],
+            scope_depth: 0,
         }
     }
 
-    pub fn compile(ast: Ast) -> Vec<Chunk> {
+    pub fn compile(ast: Ast) -> CompilerResult<Vec<Chunk>> {
 
         let mut compiler = Self::new();
 
         for stmt in ast.stmts {
-            compiler.compile_stmt(stmt);
+            compiler.compile_stmt(stmt)?;
         }
 
         compiler.write_op(Op::Return);
 
-        compiler.chunks
+        Ok(vec![compiler.chunk])
 
     }
 
     // Statements
 
-    fn compile_stmt(&mut self, stmt: Stmt) {
+    fn compile_stmt(&mut self, stmt: Stmt) -> CompilerResult<()> {
         match stmt {
-            Stmt::Block      (_stmt) => todo!(),
+            Stmt::Block      ( stmt) => self.compile_block_stmt(stmt)?,
             Stmt::Class      (_stmt) => todo!(),
             Stmt::Expression ( stmt) => self.compile_expr_stmt (stmt),
             Stmt::Function   (_stmt) => todo!(),
             Stmt::If         (_stmt) => todo!(),
             Stmt::Print      ( stmt) => self.compile_print_stmt(stmt.expr),
             Stmt::Return     (_stmt) => todo!(),
-            Stmt::Var        ( stmt) => self.compile_var_stmt  (stmt),
+            Stmt::Var        ( stmt) => self.compile_var_stmt  (stmt)?,
             Stmt::While      (_stmt) => todo!(),
+        };
+
+        Ok(())
+    }
+
+    fn compile_block_stmt(&mut self, block: Block) -> CompilerResult<()> {
+        self.begin_scope();
+
+        for stmt in *block.stmts {
+            self.compile_stmt(stmt)?;
         }
+
+        self.end_scope();
+        Ok(())
     }
 
     fn compile_expr_stmt(&mut self, expr_stmt: ExpressionStmt) {
@@ -63,25 +98,40 @@ impl Compiler {
         // Print pops
     }
 
-    fn compile_var_stmt(&mut self, stmt: VarStmt) {
-
+    fn compile_var_stmt(&mut self, stmt: VarStmt) -> CompilerResult<()> {
         self.line = stmt.name.line;
-        let name_index = self.make_identifier_constant(stmt.name);
+
+        let     local = self.scope_depth > 0;
+        let mut index = 0;
+
+        dbg!(local);
+        dbg!(&stmt);
+
+        if local {
+            self.declare_local(&stmt.name);
+        }
+        else {
+            index = self.make_identifier_constant(stmt.name.clone());
+        }
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr),
             None       => { self.write_op(Op::Nil); }
         }
 
-        self.define_variable(name_index);
+        if !local {
+            self.define_global(index);
+        }
 
+
+        Ok(())
     }
 
     // Expressions
 
     fn compile_expr(&mut self, expr: Expr) {
         match expr {
-            Expr::Assign   (_expr) => todo!(),
+            Expr::Assign   ( expr) => self.compile_assign_expr (expr),
             Expr::Binary   ( expr) => self.compile_binary_expr (expr),
             Expr::Call     (_expr) => todo!(),
             Expr::Get      ( expr) => self.compile_get_expr    (expr),
@@ -92,7 +142,8 @@ impl Compiler {
             Expr::Super    (_expr) => todo!(),
             Expr::This     (_expr) => todo!(),
             Expr::Unary    ( expr) => self.compile_unary_expr  (expr),
-            Expr::Variable ( expr) => self.compile_var_expr    (expr),
+            // Expr::Variable ( expr) => self.compile_var_expr    (expr),
+            Expr::Variable ( expr) => todo!(),
         };
     }
 
@@ -103,11 +154,11 @@ impl Compiler {
         match literal.type_ {
             LiteralType::Number => {
                 let value = Value::Number(to_number(&value.lexeme));
-                self.make_constant(value);
+                self.emit_constant(value);
             },
             LiteralType::String => {
                 let value = Value::new_string(value.lexeme);
-                self.make_constant(value);
+                self.emit_constant(value);
             },
             LiteralType::True   => { self.write_op(Op::True);  },
             LiteralType::False  => { self.write_op(Op::False); },
@@ -115,56 +166,20 @@ impl Compiler {
         };
     }
 
-    fn compile_set_expr(&mut self, set: Set) {
-        self.line = set.name.line;
+    fn compile_assign_expr(&mut self, assign: Assign) {
 
-        let index = self.make_identifier_constant(set.name);
-        self.compile_expr(*set.value);
+        self.compile_expr(*assign.value);
 
-        self.write_op(Op::SetGlobal { index, });
-    }
-
-    fn make_constant(&mut self, value: Value) -> usize {
-
-        let chunk = self.current_chunk_mut();
-
-        let mut index = None;
-
-        // TODO: this is dumb, should be using string interning instead
-        for (i, constant) in chunk.constants.iter().enumerate() {
-            if value.is_string() && *constant == value {
-                index = Some(i)
+        let set_op = match self.resolve_local(&assign.target.name) {
+            Some(_) => panic!(),
+            None    => {
+                let index = self.make_identifier_constant(assign.target.name);
+                Op::SetGlobal { index, }
             }
-        }
-
-        let index = match index {
-            Some(index) => index,
-            None        => {
-                let index = self.current_chunk_mut().add_constant(value);
-                self.write_op(Op::Constant { index, });
-                index
-            },
         };
 
-
-        index
+        self.write_op(set_op);
     }
-
-
-    fn make_identifier_constant(&mut self, name: Token) -> usize {
-        self.make_constant(str_to_val(name.lexeme))
-    }
-
-    fn define_variable(&mut self, index: usize ) {
-        self.write_op(Op::DefGlobal { index, });
-    }
-
-    // fn make_global(&mut self, name: Token) {
-    //     let index = self.make_constant(str_to_val(name.lexeme));
-
-    //     self.write_op(OpCode::DefGlobal { index, });
-    // }
-
 
 
     fn compile_binary_expr(&mut self, binary: BinaryOperator) {
@@ -204,8 +219,8 @@ impl Compiler {
     fn compile_var_expr(&mut self, var: Variable) {
         self.line = var.name.line;
 
-        let index = self.make_identifier_constant(var.name);
-        self.write_op(Op::GetGlobal { index, });
+
+
     }
 
     fn compile_get_expr(&mut self, get: Get) {
@@ -215,14 +230,94 @@ impl Compiler {
         self.write_op(Op::GetGlobal { index, });
     }
 
+    fn compile_set_expr(&mut self, set: Set) {
+        self.line = set.name.line;
+
+        let index = self.make_identifier_constant(set.name);
+        self.compile_expr(*set.value);
+
+        self.write_op(Op::SetGlobal { index, });
+    }
+
+
+    // Variables
+
+    fn make_constant(&mut self, value: Value) -> usize {
+
+        let chunk = self.current_chunk_mut();
+
+        let mut index = None;
+
+        // TODO: this is dumb, should be using string interning instead
+        for (i, constant) in chunk.constants.iter().enumerate() {
+            if value.is_string() && *constant == value {
+                index = Some(i)
+            }
+        }
+
+        index.unwrap_or(
+            self.current_chunk_mut().add_constant(value)
+        )
+    }
+
+    fn emit_constant(&mut self, value: Value) -> usize {
+        let index = self.current_chunk_mut().add_constant(value);
+        self.write_op(Op::Constant { index, })
+    }
+
+
+    fn make_identifier_constant(&mut self, name: Token) -> usize {
+        self.make_constant(str_to_val(name.lexeme))
+    }
+
+    fn declare_local(&mut self, name: &Token) {
+        // TODO: allow locals to shadow each other?
+        for local in self.locals.iter().rev() {
+            if local.initialized && local.depth < self.scope_depth {
+                break;
+            }
+
+            if local.name.lexeme == name.lexeme {
+                panic!("todo, make this a compiler error")
+            }
+        }
+
+        self.add_local(name.clone());
+    }
+
+    fn define_global(&mut self, index: usize) {
+        self.write_op(Op::DefGlobal { index, });
+        // self.write_op(Op::Pop);
+    }
+
+    fn add_local(&mut self, name: Token) {
+        self.locals.push(Local {
+            name,
+            depth:       self.scope_depth,
+            initialized: false,
+        });
+    }
+
+    fn resolve_local(&self, name: &Token) -> Option<usize> {
+        for (i, local) in self.locals.iter().enumerate().rev() {
+
+            if local.name.lexeme == name.lexeme {
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
+
     // utils
 
     fn current_chunk(&self) -> &Chunk {
-        self.chunks.last().expect("Chunk list cannot be empty")
+        &self.chunk
     }
 
     fn current_chunk_mut(&mut self) -> &mut Chunk {
-        self.chunks.last_mut().expect("Chunk list cannot be empty")
+        &mut self.chunk
     }
 
     fn write_op(&mut self, op: OpCode) -> usize {
@@ -233,6 +328,20 @@ impl Compiler {
         let line = self.line;
         self.current_chunk_mut().write_op(op1, line);
         self.current_chunk_mut().write_op(op2, line)
+    }
+
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+
+        let pop_count = self.locals.iter().filter(|l| l.depth > self.scope_depth).count();
+
+        for _ in 0..pop_count {
+            self.write_op(Op::Pop);
+        }
     }
 
 }

@@ -1,19 +1,19 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, Variable, WalkArgs}, tokens::Token};
 
 use super::Expr;
 
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Assign {
-    pub name:  Token,
-    pub value: Box::<Expr>,
+    pub target: Variable,
+    pub value:  Box::<Expr>,
 }
 
 
 impl Assign {
-    pub fn new(name: Token, value: Expr) -> Expr {
+    pub fn new(target: Variable, value: Expr) -> Expr {
         Expr::Assign(Self {
-            name,
+            target,
             value: Box::new(value),
         })
     }

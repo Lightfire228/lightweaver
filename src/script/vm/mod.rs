@@ -31,7 +31,6 @@ pub type RuntimeResult<T> = Result<T, RuntimeError>;
 enum BinaryOp {
     Greater,
     Less,
-    // Add,
     Sub,
     Mul,
     Div
@@ -49,6 +48,7 @@ impl Vm {
 
     pub fn interpret(&mut self, mut chunks: Vec<Chunk>) -> RuntimeResult<()> {
 
+        self.push_stack(Value::new_string("<script>".to_owned()));
         self.chunk = chunks.remove(0);
 
         self.run()
@@ -171,7 +171,7 @@ impl Vm {
             Err(self.runtime_error(&msg))?
         }
 
-        *self.globals.get_mut(&name).unwrap() = self.pop_stack();
+        *self.globals.get_mut(&name).unwrap() = self.peek_stack(0).clone();
 
         Ok(())
     }

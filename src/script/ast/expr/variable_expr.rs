@@ -8,8 +8,12 @@ pub struct Variable {
 
 
 impl Variable {
-    pub fn new(name: Token) -> Expr {
-        Expr::Variable(Self { name })
+    pub fn new(name: Token) -> Variable {
+        Self { name }
+    }
+
+    pub fn as_expr(self) -> Expr {
+        Expr::Variable(self)
     }
 }
 
