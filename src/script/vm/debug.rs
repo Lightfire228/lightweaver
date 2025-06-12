@@ -27,9 +27,13 @@ impl OpCode {
         type O = OpCode;
         match &self {
             O::Constant  { index } => constant_instruction("OP_CONSTANT",     chunk, *index),
+
             O::DefGlobal { index } => constant_instruction("OP_DEF_GLOBAL",   chunk, *index),
             O::GetGlobal { index } => constant_instruction("OP_GET_GLOBAL",   chunk, *index),
             O::SetGlobal { index } => constant_instruction("OP_SET_GLOBAL",   chunk, *index),
+
+            O::GetLocal  { index } => byte_instruction    ("OP_GET_LOCAL",    *index),
+            O::SetLocal  { index } => byte_instruction    ("OP_SET_LOCAL",    *index),
 
             O::Nil                 => simple_instruction  ("OP_NIL"),
             O::True                => simple_instruction  ("OP_TRUE"),
@@ -80,8 +84,12 @@ fn constant_instruction(name: &str, chunk: &Chunk, index: usize) {
     let msg = format!("{:16} {:4} {:30} ", name, index, &chunk.constants[index]);
     let msg = right_adjust(&msg);
     print!("{msg}");
+}
 
-
+fn byte_instruction(name: &str, index: usize) {
+    let msg = format!("{:16} {:4}", name, index);
+    let msg = right_adjust(&msg);
+    print!("{msg}");
 }
 
 fn right_adjust(msg: &str) -> String {

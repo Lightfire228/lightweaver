@@ -3,9 +3,14 @@ use super::value::Value;
 
 pub enum OpCode {
     Constant  { index: usize },
+
     DefGlobal { index: usize },
     GetGlobal { index: usize },
     SetGlobal { index: usize },
+
+    GetLocal  { index: usize },
+    SetLocal  { index: usize },
+
     Nil,
     True,
     False,

@@ -12,6 +12,7 @@ pub struct Compiler {
     scope_depth: usize,
 }
 
+#[derive(Debug)]
 struct Local {
     name:        Token,
     depth:       usize,
@@ -104,9 +105,6 @@ impl Compiler {
         let     local = self.scope_depth > 0;
         let mut index = 0;
 
-        dbg!(local);
-        dbg!(&stmt);
-
         if local {
             self.declare_local(&stmt.name);
         }
@@ -119,13 +117,15 @@ impl Compiler {
             None       => { self.write_op(Op::Nil); }
         }
 
-        if !local {
+        if local {
+            self.mark_initialized();
+        }
+        else {
             self.define_global(index);
         }
-
-
         Ok(())
     }
+
 
     // Expressions
 
@@ -142,8 +142,7 @@ impl Compiler {
             Expr::Super    (_expr) => todo!(),
             Expr::This     (_expr) => todo!(),
             Expr::Unary    ( expr) => self.compile_unary_expr  (expr),
-            // Expr::Variable ( expr) => self.compile_var_expr    (expr),
-            Expr::Variable ( expr) => todo!(),
+            Expr::Variable ( expr) => self.compile_var_expr    (expr),
         };
     }
 
@@ -219,7 +218,15 @@ impl Compiler {
     fn compile_var_expr(&mut self, var: Variable) {
         self.line = var.name.line;
 
+        let local = self.resolve_local(&var.name);
 
+        match local {
+            Some(index) => self.write_op(Op::GetLocal { index, }),
+            None        => {
+                let index = self.make_identifier_constant(var.name);
+                self.write_op(Op::GetGlobal { index, })
+            }
+        };
 
     }
 
@@ -302,11 +309,22 @@ impl Compiler {
         for (i, local) in self.locals.iter().enumerate().rev() {
 
             if local.name.lexeme == name.lexeme {
+
+                if !local.initialized {
+                    panic!("Can't read local variable in its own initializer")
+                }
+
                 return Some(i);
             }
         }
 
         None
+    }
+
+    fn mark_initialized(&mut self) {
+        let local = self.locals.last_mut().expect("No Local to mark initialized");
+
+        local.initialized = true;
     }
 
 
@@ -341,6 +359,7 @@ impl Compiler {
 
         for _ in 0..pop_count {
             self.write_op(Op::Pop);
+            self.locals.pop();
         }
     }
 

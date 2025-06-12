@@ -67,30 +67,34 @@ impl Vm {
             type O = OpCode;
             match *self.get_instruction() {
                 O::Constant  { index } => self.op_constant  (index),
+
                 O::DefGlobal { index } => self.op_def_global(index),
                 O::GetGlobal { index } => self.op_get_global(index)?,
                 O::SetGlobal { index } => self.op_set_global(index)?,
 
-                O::Nil                => self.push_stack(Value::Nil),
-                O::True               => self.push_stack(Value::Bool(true)),
-                O::False              => self.push_stack(Value::Bool(false)),
+                O::GetLocal  { index } => self.op_get_local (index),
+                O::SetLocal  { index } => self.op_set_local (index),
 
-                O::Pop                => self.op_pop(),
+                O::Nil                 => self.push_stack(Value::Nil),
+                O::True                => self.push_stack(Value::Bool(true)),
+                O::False               => self.push_stack(Value::Bool(false)),
 
-                O::Equal              => self.op_equal(),
-                O::Greater            => self.op_binary(BinaryOp::Greater)?,
-                O::Less               => self.op_binary(BinaryOp::Less)?,
+                O::Pop                 => self.op_pop(),
 
-                O::Add                => self.op_add()?,
-                O::Subtract           => self.op_binary(BinaryOp::Sub)?,
-                O::Multiply           => self.op_binary(BinaryOp::Mul)?,
-                O::Divide             => self.op_binary(BinaryOp::Div)?,
+                O::Equal               => self.op_equal(),
+                O::Greater             => self.op_binary(BinaryOp::Greater)?,
+                O::Less                => self.op_binary(BinaryOp::Less)?,
 
-                O::Not                => self.op_not    (),
+                O::Add                 => self.op_add()?,
+                O::Subtract            => self.op_binary(BinaryOp::Sub)?,
+                O::Multiply            => self.op_binary(BinaryOp::Mul)?,
+                O::Divide              => self.op_binary(BinaryOp::Div)?,
 
-                O::Print              => self.op_print(),
-                O::Negate             => self.op_negate ()?,
-                O::Return             => {
+                O::Not                 => self.op_not    (),
+
+                O::Print               => self.op_print(),
+                O::Negate              => self.op_negate ()?,
+                O::Return              => {
                     self.op_return();
                     return Ok(());
                 }
@@ -174,6 +178,15 @@ impl Vm {
         *self.globals.get_mut(&name).unwrap() = self.peek_stack(0).clone();
 
         Ok(())
+    }
+
+    fn op_get_local(&mut self, index: usize) {
+        self.push_stack(self.stack[index +1].clone());
+    }
+
+    fn op_set_local(&mut self, index: usize) {
+        let value = self.peek_stack(0).clone();
+        self.stack[index +1] = value;
     }
 
 

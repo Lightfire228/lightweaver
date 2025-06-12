@@ -490,7 +490,6 @@ impl Parser {
     fn parse_call_expr(&mut self, rule_args: RuleArgs) -> ParseResult<Expr> {
 
         let callee = rule_args.target.ok_or_else(|| self.panic("Missing Callee for call expression"))?;
-        let callee = collapse_get(callee);
 
         let (paren, arguments) = self.parse_argument_list()?;
 
@@ -578,7 +577,7 @@ impl Parser {
             Ok(Assign::new(target, value))
         }
         else {
-            Ok(Get::new(target.as_expr(), name))
+            Ok(target.as_expr())
         };
 
         result
@@ -730,16 +729,4 @@ impl Parser {
 
 fn print_ind(ind: usize, msg: &str) {
     println!("{}{}", " ".repeat(ind * 4), msg);
-}
-
-
-fn collapse_get(mut expr: Expr) -> Expr {
-
-    loop {
-        expr = match expr {
-            Expr::Get(get) => *get.expr,
-            _              => return expr,
-        }
-
-    }
 }

@@ -40,6 +40,15 @@ breakfast     = "beignets with " + beverage;
 print breakfast;
 
 
-// {
-//     var test = "a";
-// }
+{
+    var test = "a";
+
+    var test2 = "b";
+
+    {
+        var test = test2 + "c";
+
+        print test;
+
+    }
+}
