@@ -19,40 +19,44 @@ impl Chunk {
 
 
 impl OpCode {
-    pub fn disassemble(&self, chunk: &Chunk, offset: usize) {
-        print!("{:04} ", offset);
+    pub fn disassemble(&self, chunk: &Chunk, ip: usize) {
+        print!("{:04} ", ip);
 
-        print_line_info(chunk, offset);
+        print_line_info(chunk, ip);
 
         type O = OpCode;
         match &self {
-            O::Constant  { index } => constant_instruction("OP_CONSTANT",     chunk, *index),
+            O::Constant  { index }       => constant_instruction("OP_CONSTANT",     chunk, *index),
 
-            O::DefGlobal { index } => constant_instruction("OP_DEF_GLOBAL",   chunk, *index),
-            O::GetGlobal { index } => constant_instruction("OP_GET_GLOBAL",   chunk, *index),
-            O::SetGlobal { index } => constant_instruction("OP_SET_GLOBAL",   chunk, *index),
+            O::DefGlobal { index }       => constant_instruction("OP_DEF_GLOBAL",   chunk, *index),
+            O::GetGlobal { index }       => constant_instruction("OP_GET_GLOBAL",   chunk, *index),
+            O::SetGlobal { index }       => constant_instruction("OP_SET_GLOBAL",   chunk, *index),
 
-            O::GetLocal  { index } => byte_instruction    ("OP_GET_LOCAL",    *index),
-            O::SetLocal  { index } => byte_instruction    ("OP_SET_LOCAL",    *index),
+            O::GetLocal  { index }       => byte_instruction    ("OP_GET_LOCAL",    *index),
+            O::SetLocal  { index }       => byte_instruction    ("OP_SET_LOCAL",    *index),
 
-            O::Nil                 => simple_instruction  ("OP_NIL"),
-            O::True                => simple_instruction  ("OP_TRUE"),
-            O::False               => simple_instruction  ("OP_FALSE"),
-            O::Pop                 => simple_instruction  ("OP_POP"),
+            O::JumpIfFalse { offset }    => jump_instruction    ("JUMP_IF_FALSE",   ip, *offset, 1),
+            O::JumpIfTrue  { offset }    => jump_instruction    ("JUMP_IF_TRUE",    ip, *offset, 1),
+            O::Jump        { offset }    => jump_instruction    ("JUMP",            ip, *offset, 1),
 
-            O::Equal               => simple_instruction  ("OP_EQUAL"),
-            O::Greater             => simple_instruction  ("OP_GREATER"),
-            O::Less                => simple_instruction  ("OP_LESS"),
+            O::Nil                       => simple_instruction  ("OP_NIL"),
+            O::True                      => simple_instruction  ("OP_TRUE"),
+            O::False                     => simple_instruction  ("OP_FALSE"),
+            O::Pop                       => simple_instruction  ("OP_POP"),
 
-            O::Add                 => simple_instruction  ("OP_ADD"),
-            O::Subtract            => simple_instruction  ("OP_SUBTRACT"),
-            O::Multiply            => simple_instruction  ("OP_MULTIPLY"),
-            O::Divide              => simple_instruction  ("OP_DIVIDE"),
-            O::Not                 => simple_instruction  ("OP_NOT"),
+            O::Equal                     => simple_instruction  ("OP_EQUAL"),
+            O::Greater                   => simple_instruction  ("OP_GREATER"),
+            O::Less                      => simple_instruction  ("OP_LESS"),
 
-            O::Print               => simple_instruction  ("OP_PRINT"),
-            O::Negate              => simple_instruction  ("OP_NEGATE"),
-            O::Return              => simple_instruction  ("OP_RETURN"),
+            O::Add                       => simple_instruction  ("OP_ADD"),
+            O::Subtract                  => simple_instruction  ("OP_SUBTRACT"),
+            O::Multiply                  => simple_instruction  ("OP_MULTIPLY"),
+            O::Divide                    => simple_instruction  ("OP_DIVIDE"),
+            O::Not                       => simple_instruction  ("OP_NOT"),
+
+            O::Print                     => simple_instruction  ("OP_PRINT"),
+            O::Negate                    => simple_instruction  ("OP_NEGATE"),
+            O::Return                    => simple_instruction  ("OP_RETURN"),
         }
     }
 }
@@ -90,6 +94,15 @@ fn byte_instruction(name: &str, index: usize) {
     let msg = format!("{:16} {:4}", name, index);
     let msg = right_adjust(&msg);
     print!("{msg}");
+}
+
+fn jump_instruction(name: &str, ip: usize, offset: usize, sign: isize) {
+    let delta = offset as isize * sign;
+    let dest  = (ip as isize + delta) as usize;
+
+    let msg = format!("{:16} {:4} -> {}", name, offset, dest);
+    let msg = right_adjust(&msg);
+    print!("{msg}")
 }
 
 fn right_adjust(msg: &str) -> String {

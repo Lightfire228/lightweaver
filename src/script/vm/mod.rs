@@ -36,6 +36,11 @@ enum BinaryOp {
     Div
 }
 
+enum JumpType {
+    IfFalsey,
+    IfTruthy,
+}
+
 impl Vm {
     pub fn new() -> Self {
         Self {
@@ -50,6 +55,9 @@ impl Vm {
 
         self.push_stack(Value::new_string("<script>".to_owned()));
         self.chunk = chunks.remove(0);
+
+        self.chunk.disassemble(&[]);
+        println!();
 
         self.run()
     }
@@ -66,35 +74,39 @@ impl Vm {
 
             type O = OpCode;
             match *self.get_instruction() {
-                O::Constant  { index } => self.op_constant  (index),
+                O::Constant    { index }  => self.op_constant  (index),
 
-                O::DefGlobal { index } => self.op_def_global(index),
-                O::GetGlobal { index } => self.op_get_global(index)?,
-                O::SetGlobal { index } => self.op_set_global(index)?,
+                O::DefGlobal   { index }  => self.op_def_global(index),
+                O::GetGlobal   { index }  => self.op_get_global(index)?,
+                O::SetGlobal   { index }  => self.op_set_global(index)?,
 
-                O::GetLocal  { index } => self.op_get_local (index),
-                O::SetLocal  { index } => self.op_set_local (index),
+                O::GetLocal    { index }  => self.op_get_local (index),
+                O::SetLocal    { index }  => self.op_set_local (index),
 
-                O::Nil                 => self.push_stack(Value::Nil),
-                O::True                => self.push_stack(Value::Bool(true)),
-                O::False               => self.push_stack(Value::Bool(false)),
+                O::JumpIfFalse { offset } => self.op_jump_if(JumpType::IfFalsey, offset),
+                O::JumpIfTrue  { offset } => self.op_jump_if(JumpType::IfTruthy, offset),
+                O::Jump        { offset } => self.op_jump   (offset),
 
-                O::Pop                 => self.op_pop(),
+                O::Nil                    => self.push_stack(Value::Nil),
+                O::True                   => self.push_stack(Value::Bool(true)),
+                O::False                  => self.push_stack(Value::Bool(false)),
 
-                O::Equal               => self.op_equal(),
-                O::Greater             => self.op_binary(BinaryOp::Greater)?,
-                O::Less                => self.op_binary(BinaryOp::Less)?,
+                O::Pop                    => self.op_pop(),
 
-                O::Add                 => self.op_add()?,
-                O::Subtract            => self.op_binary(BinaryOp::Sub)?,
-                O::Multiply            => self.op_binary(BinaryOp::Mul)?,
-                O::Divide              => self.op_binary(BinaryOp::Div)?,
+                O::Equal                  => self.op_equal(),
+                O::Greater                => self.op_binary(BinaryOp::Greater)?,
+                O::Less                   => self.op_binary(BinaryOp::Less)?,
 
-                O::Not                 => self.op_not    (),
+                O::Add                    => self.op_add()?,
+                O::Subtract               => self.op_binary(BinaryOp::Sub)?,
+                O::Multiply               => self.op_binary(BinaryOp::Mul)?,
+                O::Divide                 => self.op_binary(BinaryOp::Div)?,
 
-                O::Print               => self.op_print(),
-                O::Negate              => self.op_negate ()?,
-                O::Return              => {
+                O::Not                    => self.op_not    (),
+
+                O::Print                  => self.op_print(),
+                O::Negate                 => self.op_negate ()?,
+                O::Return                 => {
                     self.op_return();
                     return Ok(());
                 }
@@ -187,6 +199,23 @@ impl Vm {
     fn op_set_local(&mut self, index: usize) {
         let value = self.peek_stack(0).clone();
         self.stack[index +1] = value;
+    }
+
+    fn op_jump_if(&mut self, jump_type: JumpType, offset: usize) {
+        let is_falsey = self.peek_stack(0).is_falsey();
+
+        let jump_on_false = match jump_type {
+            JumpType::IfFalsey => true,
+            JumpType::IfTruthy => false,
+        };
+
+        if is_falsey == jump_on_false {
+            self.ip += offset;
+        }
+    }
+
+    fn op_jump(&mut self, offset: usize) {
+        self.ip += offset;
     }
 
 

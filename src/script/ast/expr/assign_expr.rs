@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, Variable, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, Variable, WalkArgs}};
 
 use super::Expr;
 

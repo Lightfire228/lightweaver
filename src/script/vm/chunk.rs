@@ -1,15 +1,21 @@
+use std::fmt::Display;
+
 use super::value::Value;
 
 
 pub enum OpCode {
-    Constant  { index: usize },
+    Constant    { index: usize },
 
-    DefGlobal { index: usize },
-    GetGlobal { index: usize },
-    SetGlobal { index: usize },
+    DefGlobal   { index: usize },
+    GetGlobal   { index: usize },
+    SetGlobal   { index: usize },
 
-    GetLocal  { index: usize },
-    SetLocal  { index: usize },
+    GetLocal    { index: usize },
+    SetLocal    { index: usize },
+
+    JumpIfFalse { offset: usize },
+    JumpIfTrue  { offset: usize },
+    Jump        { offset: usize },
 
     Nil,
     True,
@@ -56,5 +62,37 @@ impl Chunk {
         self.constants.push(value);
 
         self.constants.len() -1
+    }
+}
+
+impl Display for OpCode {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            OpCode::Constant    { index }  => format!("Constant {}",    index),
+            OpCode::DefGlobal   { index }  => format!("DefGlobal {}",   index),
+            OpCode::GetGlobal   { index }  => format!("GetGlobal {}",   index),
+            OpCode::SetGlobal   { index }  => format!("SetGlobal {}",   index),
+            OpCode::GetLocal    { index }  => format!("GetLocal {}",    index),
+            OpCode::SetLocal    { index }  => format!("SetLocal {}",    index),
+            OpCode::JumpIfFalse { offset } => format!("JumpIfFalse {}", offset),
+            OpCode::JumpIfTrue  { offset } => format!("JumpIfTrue {}",  offset),
+            OpCode::Jump        { offset } => format!("Jump {}",        offset),
+            OpCode::Nil                    => format!("Nil"),
+            OpCode::True                   => format!("True"),
+            OpCode::False                  => format!("False"),
+            OpCode::Pop                    => format!("Pop"),
+            OpCode::Equal                  => format!("Equal"),
+            OpCode::Greater                => format!("Greater"),
+            OpCode::Less                   => format!("Less"),
+            OpCode::Add                    => format!("Add"),
+            OpCode::Subtract               => format!("Subtract"),
+            OpCode::Multiply               => format!("Multiply"),
+            OpCode::Divide                 => format!("Divide"),
+            OpCode::Not                    => format!("Not"),
+            OpCode::Negate                 => format!("Negate"),
+            OpCode::Print                  => format!("Print"),
+            OpCode::Return                 => format!("Return"),
+        })
     }
 }

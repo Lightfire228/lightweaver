@@ -337,6 +337,7 @@ pub fn get_keywords() -> HashMap<String, TokenType> {
     add("false",   Tt::False);
     add("for",     Tt::For);
     add("fun",     Tt::Fun);
+    add("if",      Tt::If);
     add("nil",     Tt::Nil);
     add("print",   Tt::Print);
     add("return",  Tt::Return);

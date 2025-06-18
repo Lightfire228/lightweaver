@@ -52,3 +52,10 @@ print breakfast;
 
     }
 }
+
+if (false) {
+    print "made it";
+}
+else {
+    print "didn't make it";
+}
