@@ -6,6 +6,8 @@ use super::tokens::{Token, TokenType};
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
+static DEBUG_LOG: bool = false;
+
 pub fn parse_ast(tokens: Vec<Token>) -> Result<Ast, Vec<ParseError>> {
     let mut parser = Parser::new(tokens);
 
@@ -234,7 +236,7 @@ impl Parser {
             self.synchronize();
         }
 
-        self.log_exit_func();
+        self.log_exit_func("parse_declaration");
         result
     }
 
@@ -260,7 +262,7 @@ impl Parser {
 
         self.consume(Tt::RightBrace, Pe::MissingClassCloseCurly)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_class_decl");
         Ok(Class::new(name, superclass, methods))
     }
 
@@ -289,7 +291,7 @@ impl Parser {
 
         let body = self.parse_block_statement()?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_function_decl");
         Ok(FunctionStmt::new(name, params, *body.stmts))
     }
 
@@ -307,7 +309,7 @@ impl Parser {
 
         self.consume(Tt::Semicolon, Pe::MissingVariableSemicolon)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_var_decl");
         Ok(VarStmt::new(name, initializer))
     }
 
@@ -331,7 +333,7 @@ impl Parser {
             },
         };
 
-        self.log_exit_func();
+        self.log_exit_func("parse_statement");
         stmt
     }
 
@@ -346,7 +348,7 @@ impl Parser {
 
         self.consume(Tt::RightBrace, Pe::MissingBlockCloseBrace)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_block_statement");
         Ok(Block { stmts: Box::new(statements), })
     }
 
@@ -357,22 +359,23 @@ impl Parser {
 
         let initializer = match self.peek().type_ {
             Tt::Semicolon => None,
-            Tt::Var       => Some(self.parse_var_decl()?),
-            _             => Some(self.parse_expression_statement()?),
+            Tt::Var       => { self.advance(); Some(self.parse_var_decl()?)},
+            _             =>                   Some(self.parse_expression_statement()?),
         };
 
         let condition = if self.check(Tt::Semicolon) {
-            Some(self.parse_expression(None)?)
-        } else {
             None
+        } else {
+            Some(self.parse_expression(None)?)
         };
         self.consume(Tt::Semicolon, Pe::MissingForConditionDelimiter)?;
 
         let increment = if self.check(Tt::RightParen) {
-            Some(self.parse_expression(None)?)
-        } else {
             None
+        } else {
+            Some(self.parse_expression(None)?)
         };
+
         self.consume(Tt::RightParen, Pe::MissingForCloseParen)?;
 
         let mut body = self.parse_statement()?;
@@ -395,7 +398,7 @@ impl Parser {
             Some(init) => Block::new(vec![init, body]),
         };
 
-        self.log_exit_func();
+        self.log_exit_func("parse_for_statement");
         Ok(body)
     }
 
@@ -416,7 +419,7 @@ impl Parser {
         };
 
 
-        self.log_exit_func();
+        self.log_exit_func("parse_if_statement");
         Ok(IfStmt::new(condition, then_branch, else_branch))
     }
 
@@ -427,7 +430,7 @@ impl Parser {
 
         self.consume(Tt::Semicolon, Pe::MissingPrintSemicolon)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_print_statement");
         Ok(PrintStmt::new(value))
     }
 
@@ -443,7 +446,7 @@ impl Parser {
 
         self.consume(Tt::Semicolon, Pe::MissingReturnSemicolon)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_return_statement");
         Ok(ReturnStmt::new(keyword, value))
     }
 
@@ -456,7 +459,7 @@ impl Parser {
 
         let body = self.parse_statement()?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_while_statement");
         Ok(WhileStmt::new(condition, body))
     }
 
@@ -466,7 +469,7 @@ impl Parser {
         let expr = self.parse_expression(None)?;
         self.consume(Tt::Semicolon, Pe::MissingExpressionStmtSemicolon)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_expression_statement");
         Ok(ExpressionStmt::new(expr))
 
     }
@@ -476,7 +479,7 @@ impl Parser {
 
         let expr = self.parse_precedence(Prec::Assignment, target);
 
-        self.log_exit_func();
+        self.log_exit_func("parse_expression");
         expr
     }
 
@@ -512,7 +515,7 @@ impl Parser {
             return Err(self.error(Pe::InvalidAssignmentTarget))
         }
 
-        self.log_exit_func();
+        self.log_exit_func("parse_precedence");
         Ok(target)
     }
 
@@ -525,7 +528,7 @@ impl Parser {
 
         self.consume(Tt::RightParen, Pe::MissingGroupingCloseParen)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_grouping_expr");
         Ok(expr)
     }
 
@@ -536,7 +539,7 @@ impl Parser {
 
         let (paren, arguments) = self.parse_argument_list()?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_call_expr");
         Ok(Call::new(callee, paren, arguments))
     }
 
@@ -567,7 +570,7 @@ impl Parser {
             }
         };
 
-        self.log_exit_func();
+        self.log_exit_func("parse_dot_expr");
         result
 
     }
@@ -578,7 +581,7 @@ impl Parser {
         let operator = self.previous();
         let operand  = self.parse_precedence(Prec::Unary, args.target);
 
-        self.log_exit_func();
+        self.log_exit_func("parse_unary_expr");
         Ok(UnaryOperator::new(operator, operand?))
     }
 
@@ -591,7 +594,7 @@ impl Parser {
         let left  = args.target.ok_or_else(|| self.panic("Missing left operand for binary expression"))?;
         let right = self.parse_precedence(rule.precidence.next(), None)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_binary_expr");
         Ok(BinaryOperator::new(left, op, right))
     }
 
@@ -617,7 +620,7 @@ impl Parser {
 
         let paren = self.consume(Tt::RightParen, Pe::MissingFunctionCloseParen)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_argument_list");
         Ok((paren, args))
     }
 
@@ -635,7 +638,7 @@ impl Parser {
             Ok(target.as_expr())
         };
 
-        self.log_exit_func();
+        self.log_exit_func("parse_variable_expr");
         result
     }
 
@@ -662,7 +665,7 @@ impl Parser {
 
         let right = self.parse_precedence(prec, None)?;
 
-        self.log_exit_func();
+        self.log_exit_func("parse_logical_expr");
         Ok(Logical::new(left, operator, right))
 
     }
@@ -687,19 +690,25 @@ impl Parser {
 
     #[allow(unused_variables)]
     fn log_enter_func(&mut self, name: &str) {
-        // println!("{}{name} ({}) {{", " ".repeat(self.depth), self.peek());
+        if DEBUG_LOG {
+            println!("{}{name} ({}) {{", " ".repeat(self.depth), self.peek());
+        }
         self.depth += 1;
     }
 
     #[allow(unused_variables)]
-    fn log_exit_func(&mut self) {
+    fn log_exit_func(&mut self, name: &str) {
         self.depth -= 1;
-        // println!("{}}}", " ".repeat(self.depth));
+        if DEBUG_LOG {
+            println!("{}}} /{name}", " ".repeat(self.depth));
+        }
     }
 
     #[allow(unused_variables)]
     fn log_func(&self, name: &str) {
-        // println!("{}{name} ({})", " ".repeat(self.depth), self.peek());
+        if DEBUG_LOG {
+            println!("{}{name} ({})", " ".repeat(self.depth), self.peek());
+        }
     }
 
     // Utility functions

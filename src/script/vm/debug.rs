@@ -26,18 +26,20 @@ impl OpCode {
 
         type O = OpCode;
         match &self {
-            O::Constant  { index }       => constant_instruction("OP_CONSTANT",     chunk, *index),
+            O::Constant  { index }       => constant_instruction("OP_CONSTANT",      chunk, *index),
 
-            O::DefGlobal { index }       => constant_instruction("OP_DEF_GLOBAL",   chunk, *index),
-            O::GetGlobal { index }       => constant_instruction("OP_GET_GLOBAL",   chunk, *index),
-            O::SetGlobal { index }       => constant_instruction("OP_SET_GLOBAL",   chunk, *index),
+            O::DefGlobal { index }       => constant_instruction("OP_DEF_GLOBAL",    chunk, *index),
+            O::GetGlobal { index }       => constant_instruction("OP_GET_GLOBAL",    chunk, *index),
+            O::SetGlobal { index }       => constant_instruction("OP_SET_GLOBAL",    chunk, *index),
 
-            O::GetLocal  { index }       => byte_instruction    ("OP_GET_LOCAL",    *index),
-            O::SetLocal  { index }       => byte_instruction    ("OP_SET_LOCAL",    *index),
+            O::GetLocal  { index }       => byte_instruction    ("OP_GET_LOCAL",     *index),
+            O::SetLocal  { index }       => byte_instruction    ("OP_SET_LOCAL",     *index),
 
-            O::JumpIfFalse { offset }    => jump_instruction    ("JUMP_IF_FALSE",   ip, *offset, 1),
-            O::JumpIfTrue  { offset }    => jump_instruction    ("JUMP_IF_TRUE",    ip, *offset, 1),
-            O::Jump        { offset }    => jump_instruction    ("JUMP",            ip, *offset, 1),
+            O::JumpIfFalse { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, *offset,  1),
+            O::JumpIfTrue  { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, *offset,  1),
+            O::Jump        { offset }    => jump_instruction    ("OP_JUMP",          ip, *offset,  1),
+
+            O::Loop        { offset }    => jump_instruction    ("OP_LOOP",          ip, *offset, -1),
 
             O::Nil                       => simple_instruction  ("OP_NIL"),
             O::True                      => simple_instruction  ("OP_TRUE"),

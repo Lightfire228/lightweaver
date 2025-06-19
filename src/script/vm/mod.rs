@@ -87,6 +87,8 @@ impl Vm {
                 O::JumpIfTrue  { offset } => self.op_jump_if(JumpType::IfTruthy, offset),
                 O::Jump        { offset } => self.op_jump   (offset),
 
+                O::Loop        { offset } => self.op_loop   (offset),
+
                 O::Nil                    => self.push_stack(Value::Nil),
                 O::True                   => self.push_stack(Value::Bool(true)),
                 O::False                  => self.push_stack(Value::Bool(false)),
@@ -216,6 +218,10 @@ impl Vm {
 
     fn op_jump(&mut self, offset: usize) {
         self.ip += offset;
+    }
+
+    fn op_loop(&mut self, offset: usize) {
+        self.ip -= offset;
     }
 
 

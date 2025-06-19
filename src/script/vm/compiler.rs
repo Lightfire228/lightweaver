@@ -1,6 +1,6 @@
 use std::usize;
 
-use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token};
+use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token};
 
 use super::{chunk::{Chunk, OpCode}, object::ObjString, value::Value};
 
@@ -79,7 +79,7 @@ impl Compiler {
             Stmt::Print      (stmt) => self.compile_print_stmt (stmt.expr),
             Stmt::Return     (stmt) => self.compile_return_stmt(stmt),
             Stmt::Var        (stmt) => self.compile_var_decl   (stmt)?,
-            Stmt::While      (stmt) => self.compile_while_stmt (stmt),
+            Stmt::While      (stmt) => self.compile_while_stmt (stmt)?,
         };
 
         Ok(())
@@ -105,7 +105,7 @@ impl Compiler {
 
     fn compile_expr_stmt(&mut self, expr_stmt: ExpressionStmt) {
         self.compile_expr(expr_stmt.expr);
-        self.write_op(Op::Pop);
+        self.write_pop();
     }
 
     fn compile_func_decl(&mut self, _func: FunctionStmt) {
@@ -115,13 +115,13 @@ impl Compiler {
     fn compile_if_stmt(&mut self, if_stmt: IfStmt) -> CompilerResult<()> {
         self.compile_expr(if_stmt.condition);
         let jump_then_op = self.emit_jump(JumpType::IfFalse);
-        self.write_op(Op::Pop); // Pop the condition temporary if no jump
+        self.write_pop(); // Pop the condition temporary if no jump
 
         self.compile_stmt(*if_stmt.then_branch)?;
         let jump_else_op = self.emit_jump(JumpType::Always);
 
         self.patch_jump(jump_then_op);
-        self.write_op(Op::Pop); // Pop the condition temporary if jump
+        self.write_pop(); // Pop the condition temporary if jump
         if let Some(stmt) = if_stmt.else_branch {
             self.compile_stmt(*stmt)?;
         }
@@ -171,8 +171,21 @@ impl Compiler {
         // Delcarations are allowed to leave stack locals
     }
 
-    fn compile_while_stmt(&mut self, _while: WhileStmt) {
-        todo!()
+    fn compile_while_stmt(&mut self, while_: WhileStmt) -> CompilerResult<()> {
+        let loop_start = self.current_chunk().code.len();
+
+        self.compile_expr(while_.condition);
+
+        let exit_jump_op = self.emit_jump(JumpType::IfFalse);
+        self.write_pop();
+
+        self.compile_stmt(*while_.body)?;
+        self.emit_loop(loop_start);
+
+        self.patch_jump(exit_jump_op);
+        self.write_pop();
+
+        Ok(())
     }
 
 
@@ -214,8 +227,21 @@ impl Compiler {
         };
     }
 
-    fn compile_logical_expr(&mut self, _logical: Logical) {
-        todo!()
+    fn compile_logical_expr(&mut self, logical: Logical) {
+        self.compile_expr(*logical.left);
+        match logical.type_ {
+            LogicalType::And => self.compile_logical_jump(*logical.right, JumpType::IfFalse),
+            LogicalType::Or  => self.compile_logical_jump(*logical.right, JumpType::IfTrue),
+        }
+    }
+
+    fn compile_logical_jump(&mut self, right: Expr, jump_type: JumpType) {
+        let jump_op = self.emit_jump(jump_type);
+        self.write_pop();
+
+        self.compile_expr(right);
+
+        self.patch_jump(jump_op);
     }
 
     fn compile_assign_expr(&mut self, assign: Assign) {
@@ -223,8 +249,8 @@ impl Compiler {
         self.compile_expr(*assign.value);
 
         let set_op = match self.resolve_local(&assign.target.name) {
-            Some(_) => panic!(),
-            None    => {
+            Some(index) => Op::SetLocal { index },
+            None        => {
                 let index = self.make_identifier_constant(assign.target.name);
                 Op::SetGlobal { index, }
             }
@@ -363,6 +389,11 @@ impl Compiler {
         };
     }
 
+    fn emit_loop(&mut self, loop_start: usize) -> usize {
+        let offset = self.current_chunk().code.len() - loop_start +1;
+        self.write_op(Op::Loop { offset, })
+    }
+
 
     fn make_identifier_constant(&mut self, name: Token) -> usize {
         self.make_constant(str_to_val(name.lexeme))
@@ -438,6 +469,10 @@ impl Compiler {
         self.current_chunk_mut().write_op(op2, line)
     }
 
+    fn write_pop(&mut self) -> usize {
+        self.write_op(Op::Pop)
+    }
+
     fn begin_scope(&mut self) {
         self.scope_depth += 1;
     }
@@ -448,7 +483,7 @@ impl Compiler {
         let pop_count = self.locals.iter().filter(|l| l.depth > self.scope_depth).count();
 
         for _ in 0..pop_count {
-            self.write_op(Op::Pop);
+            self.write_pop();
             self.locals.pop();
         }
     }

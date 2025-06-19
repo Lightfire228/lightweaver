@@ -17,6 +17,8 @@ pub enum OpCode {
     JumpIfTrue  { offset: usize },
     Jump        { offset: usize },
 
+    Loop        { offset: usize },
+
     Nil,
     True,
     False,
@@ -78,6 +80,7 @@ impl Display for OpCode {
             OpCode::JumpIfFalse { offset } => format!("JumpIfFalse {}", offset),
             OpCode::JumpIfTrue  { offset } => format!("JumpIfTrue {}",  offset),
             OpCode::Jump        { offset } => format!("Jump {}",        offset),
+            OpCode::Loop        { offset } => format!("Loop {}",        offset),
             OpCode::Nil                    => format!("Nil"),
             OpCode::True                   => format!("True"),
             OpCode::False                  => format!("False"),

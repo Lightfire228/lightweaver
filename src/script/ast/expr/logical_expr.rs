@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::{Token, TokenType}};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -11,7 +11,8 @@ pub struct Logical {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum LogicalType {
-    None,
+    And,
+    Or,
 }
 
 impl Logical {
@@ -53,9 +54,11 @@ impl AstNode for Logical {
 }
 
 
-fn get_type(_token: &Token) -> LogicalType {
-    // match token.type_ {
-    //     _           => panic!("Unknown token type ({}) for logical operator", token.type_),
-    // }
-    LogicalType::None
+fn get_type(token: &Token) -> LogicalType {
+    type Tt = TokenType;
+    match token.type_ {
+        Tt::And => LogicalType::And,
+        Tt::Or  => LogicalType::Or,
+        _       => panic!("Unknown token type ({}) for logical operator", token.type_),
+    }
 }

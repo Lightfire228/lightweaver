@@ -59,3 +59,18 @@ if (false) {
 else {
     print "didn't make it";
 }
+
+if (true or false) {
+    print "it worked 2";
+}
+
+
+for (var i = 0; i < 10; i = i+1) {
+    print i;
+}
+
+var a = 0;
+while (a < 10) {
+    a = a + 1;
+    print a;
+}
