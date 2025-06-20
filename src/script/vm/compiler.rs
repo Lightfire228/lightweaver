@@ -496,5 +496,5 @@ fn to_number(lexeme: &str) -> f64 {
 }
 
 fn str_to_val(string: String) -> Value {
-    Value::Obj(Box::new(ObjString::new(string)))
+    Value::Obj(ObjString::new(string))
 }

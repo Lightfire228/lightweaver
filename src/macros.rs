@@ -15,7 +15,7 @@ macro_rules! multi_line {
 
 #[cfg(test)]
 mod test {
-    
+
     #[test]
     fn base() {
 

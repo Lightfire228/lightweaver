@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub struct Obj {
@@ -15,11 +15,13 @@ pub struct ObjString {
     pub string: String,
 }
 
+pub type ObjRef = Rc<RefCell<Obj>>;
+
 impl Obj {
-    fn new(type_: ObjType) -> Self {
-        Self {
+    fn new(type_: ObjType) -> ObjRef {
+        Rc::new(RefCell::new(Self {
             type_,
-        }
+        }))
     }
 }
 
@@ -42,7 +44,7 @@ impl Display for Obj {
 }
 
 impl ObjString {
-    pub fn new(string: String) -> Obj {
+    pub fn new(string: String) -> ObjRef {
         Obj::new(ObjType::String(Self {
             string,
         }))

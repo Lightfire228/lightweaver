@@ -18,7 +18,7 @@ pub struct Vm {
     chunk:   Chunk,
     ip:      usize,
     stack:   Vec<Value>,
-    globals: HashMap<String, Value>
+    globals: HashMap<String, Value>,
 }
 
 pub struct RuntimeError {
@@ -175,7 +175,6 @@ impl Vm {
             },
         };
 
-        // TODO: should clone?
         self.push_stack(value.clone());
 
         Ok(())
@@ -249,7 +248,7 @@ impl Vm {
         let b = self.pop_stack();
         let a = self.pop_stack();
 
-        if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
+        if let (Some(a), Some(b)) = (a.as_string(), b.as_string()) {
             self.push_stack(concatenate(a, b));
         }
         else if let (Some(a), Some(b)) = (a.as_number(), b.as_number()) {
@@ -314,13 +313,13 @@ impl Vm {
 
     fn get_constant_as_str(&self, index: usize) -> String {
         self.chunk.constants[index]
-            .as_str()
+            .as_string()
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
     }
 
 }
 
-fn concatenate(val1: &str, val2: &str) -> Value {
+fn concatenate(val1: String, val2: String) -> Value {
     Value::new_string(format!("{}{}", val1, val2))
 }

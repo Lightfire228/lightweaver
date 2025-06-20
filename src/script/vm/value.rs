@@ -1,4 +1,6 @@
-use std::fmt::Display;
+use std::{cell::RefMut, fmt::Display};
+
+use crate::script::vm::object::ObjRef;
 
 use super::object::{Obj, ObjString, ObjType};
 
@@ -7,14 +9,14 @@ use super::object::{Obj, ObjString, ObjType};
 pub enum Value {
     Number(f64),
     Bool  (bool),
-    Obj   (Box<Obj>),
+    Obj   (ObjRef),
     Nil,
 }
 
 impl Value {
 
     pub fn new_string(string: String) -> Self {
-        Value::Obj(Box::new(ObjString::new(string)))
+        Value::Obj(ObjString::new(string))
     }
 
     pub fn as_number(&self) -> Option<f64> {
@@ -32,38 +34,41 @@ impl Value {
         }
     }
 
-    pub fn as_obj(&self) -> Option<&Obj> {
+    pub fn as_obj(&self) -> Option<ObjRef> {
         match self {
-            Value::Obj(o) => Some(o),
+            Value::Obj(o) => Some(o.clone()),
             _             => None,
         }
     }
 
-    pub fn as_obj_mut(&mut self) -> Option<&mut Obj> {
+    pub fn as_obj_mut(&mut self) -> Option<RefMut<Obj>> {
         match self {
-            Value::Obj(o) => Some(o),
+            Value::Obj(o) => Some(o.borrow_mut()),
             _             => None,
         }
     }
 
-    pub fn as_string(self) -> Option<ObjString> {
+    pub fn as_obj_string(&self) -> Option<ObjString> {
         match self {
-            Value::Obj(obj) => Some(
-                match obj.type_ {
-                    ObjType::String(obj) => obj
+            Value::Obj(obj) => Some({
+
+                match &(*obj).borrow().type_ {
+                    ObjType::String(obj) => obj.clone()
                 }
-            ),
+
+            }),
             _             => None,
         }
     }
 
-    pub fn as_str(&self) -> Option<&str> {
+    pub fn as_string(&self) -> Option<String> {
         match self {
-            Value::Obj(obj) => Some(
-                match &obj.type_ {
-                    ObjType::String(obj) => &obj.string
+            Value::Obj(obj) => Some({
+
+                match &obj.as_ref().borrow().type_ {
+                    ObjType::String(obj) => obj.string.clone()
                 }
-            ),
+            }),
             _             => None,
         }
     }
@@ -72,7 +77,7 @@ impl Value {
 
         if let Value::Obj(obj) = &self {
             #[allow(irrefutable_let_patterns)]
-            if let ObjType::String(_) = obj.type_ {
+            if let ObjType::String(_) = obj.as_ref().borrow().type_ {
                 return true;
             }
         }
@@ -103,7 +108,7 @@ impl PartialEq for Value {
 
 fn to_str(value: &Value) -> String {
     match value {
-        Value::Obj   (x) => x.to_string(),
+        Value::Obj   (x) => x.as_ref().borrow().to_string(),
         Value::Number(x) => x.to_string(),
         Value::Bool  (x) => x.to_string(),
         Value::Nil       => "nil".to_owned(),
