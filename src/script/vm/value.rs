@@ -1,4 +1,4 @@
-use crate::script::vm::gc::Context;
+use crate::script::vm::gc::{Context, ObjectId};
 
 use super::object::{Obj, ObjType};
 
@@ -7,13 +7,13 @@ use super::object::{Obj, ObjType};
 pub enum Value {
     Number(f64),
     Bool  (bool),
-    Obj   (usize),
+    Obj   (ObjectId),
     Nil,
 }
 
 impl Value {
 
-    pub fn new_obj(obj_id: usize) -> Self {
+    pub fn new_obj(obj_id: ObjectId) -> Self {
         Value::Obj(obj_id)
     }
 

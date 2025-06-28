@@ -1,10 +1,10 @@
 use std::{fmt::Display};
 
-use crate::script::vm::chunk::Chunk;
+use crate::script::vm::{chunk::Chunk, gc::ObjectId};
 
 #[derive(Debug, Clone)]
 pub struct Obj {
-    pub id:    usize,
+    pub id:    ObjectId,
     pub type_: ObjType,
 }
 
@@ -29,7 +29,7 @@ pub struct ObjFunction {
 impl Obj {
     fn new(type_: ObjType) -> Obj {
         Self {
-            id:    usize::MAX,
+            id:    usize::MAX.into(),
             type_,
         }
     }

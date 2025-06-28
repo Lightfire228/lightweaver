@@ -1,48 +1,74 @@
+use std::ops::{Deref, DerefMut};
+
 use crate::script::vm::object::{Obj, ObjString};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ObjectId(pub usize);
 
 #[derive(Debug)]
 pub struct Context {
-    id:   usize,
-    objs: Vec<Obj>,
+    id:   ObjectId,
+    objs: Vec<Box<Obj>>,
 }
 
 impl Context {
 
     pub fn new() -> Self {
         Self {
-            id:    0,
+            id:    0.into(),
             objs:  vec![],
         }
     }
 
-    pub fn add(&mut self, mut obj: Obj) -> usize {
+    pub fn add(&mut self, mut obj: Obj) -> ObjectId {
 
         let id = self.next_id();
         obj.id = id;
 
-        self.objs.push(obj);
+        self.objs.push(Box::new(obj));
 
         id
     }
 
-    pub fn add_string(&mut self, str: &str) -> usize {
+    pub fn add_string(&mut self, str: &str) -> ObjectId {
         let obj = ObjString::new(str.to_owned()).into();
 
         self.add(obj)
     }
 
-    pub fn get(&self, id: usize) -> &Obj {
-        &self.objs[id]
+    pub fn get(&self, id: ObjectId) -> &Obj {
+        &self.objs[*id]
     }
 
-    pub fn get_mut(&mut self, id: usize) -> &mut Obj {
-        &mut self.objs[id]
+    pub fn get_mut(&mut self, id: ObjectId) -> &mut Obj {
+        &mut self.objs[*id]
     }
 
-    fn next_id(&mut self) -> usize {
+    fn next_id(&mut self) -> ObjectId {
         let id = self.id;
-        self.id += 1;
+        *self.id += 1;
 
         id
+    }
+}
+
+
+impl From<usize> for ObjectId {
+    fn from(value: usize) -> Self {
+        ObjectId(value)
+    }
+}
+
+impl Deref for ObjectId {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ObjectId {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

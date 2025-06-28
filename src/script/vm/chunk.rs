@@ -10,14 +10,14 @@ use super::value::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpCode {
-    Constant    { index: ConstIndex },
+    Constant    { index:  ConstIndex },
 
-    DefGlobal   { name: ConstIndex },
-    GetGlobal   { name: ConstIndex },
-    SetGlobal   { name: ConstIndex },
+    DefGlobal   { name:   ConstIndex },
+    GetGlobal   { name:   ConstIndex },
+    SetGlobal   { name:   ConstIndex },
 
-    GetLocal    { index: StackIndex },
-    SetLocal    { index: StackIndex },
+    GetLocal    { index:  StackIndex },
+    SetLocal    { index:  StackIndex },
 
     JumpIfFalse { offset: Offset },
     JumpIfTrue  { offset: Offset },
