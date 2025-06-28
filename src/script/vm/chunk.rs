@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use super::value::Value;
 
-
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpCode {
     Constant    { index: usize },
 
@@ -36,6 +36,7 @@ pub enum OpCode {
     Return,
 }
 
+#[derive(Debug, Clone)]
 pub struct Chunk {
     pub name:      String,
     pub code:      Vec<OpCode>,
@@ -54,16 +55,20 @@ impl Chunk {
     }
 
     pub fn write_op(&mut self, op: OpCode, line: usize) -> usize {
+        let index = self.code.len();
+
         self.code .push(op);
         self.lines.push(line);
 
-        self.code.len() -1
+        index
     }
 
     pub fn add_constant(&mut self, value: Value) -> usize {
+        let index = self.constants.len();
+
         self.constants.push(value);
 
-        self.constants.len() -1
+        index
     }
 }
 

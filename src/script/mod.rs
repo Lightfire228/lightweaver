@@ -16,6 +16,8 @@ mod test;
 
 use vm::{compiler::Compiler, RuntimeError, Vm};
 
+use crate::script::vm::gc::Context;
+
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
 type RunResult      = Result<(), RunError>;
@@ -34,6 +36,8 @@ pub fn run_file(path: &Path) -> &str {
 
     match (|| {
 
+        let mut ctx = Context::new();
+
         let source = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
 
         let tokens = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
@@ -41,9 +45,9 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
 
         display_ast(&ast);
-        let chunks  = Compiler::compile(ast) .unwrap();
+        let chunks  = Compiler::compile(ast, &mut ctx) .unwrap();
 
-        let mut vm = Vm::new();
+        let mut vm = Vm::new(ctx);
         vm.interpret(chunks).map_err(|err| Re::RuntimeError(err))?;
 
         Ok("test")

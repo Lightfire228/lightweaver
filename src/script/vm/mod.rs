@@ -1,15 +1,18 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use chunk::{Chunk, OpCode};
 use value::Value;
+use gc::Context;
 
-use crate::script::vm::{debug::print_stack};
+use crate::script::vm::{debug::print_stack, object::ObjString};
 
 pub mod chunk;
 pub mod debug;
 pub mod value;
 pub mod compiler;
 pub mod object;
+pub mod gc;
+
 
 static DEBUG_TRACE_EXECUTION: bool = true;
 
@@ -19,6 +22,7 @@ pub struct Vm {
     ip:      usize,
     stack:   Vec<Value>,
     globals: HashMap<String, Value>,
+    ctx:     Context,
 }
 
 pub struct RuntimeError {
@@ -42,21 +46,26 @@ enum JumpType {
 }
 
 impl Vm {
-    pub fn new() -> Self {
+    pub fn new(ctx: Context) -> Self {
         Self {
             chunk:   Chunk::new("null chunk".to_owned()),
             ip:      0,
             stack:   vec![],
             globals: HashMap::new(),
+            ctx,
         }
     }
 
     pub fn interpret(&mut self, mut chunks: Vec<Chunk>) -> RuntimeResult<()> {
 
-        self.push_stack(Value::new_string("<script>".to_owned()));
+
+        let str = self.ctx.add_string("<script>");
+        let val = Value::Obj(str);
+
+        self.push_stack(val);
         self.chunk = chunks.remove(0);
 
-        self.chunk.disassemble(&[]);
+        self.chunk.disassemble(&[], &self.ctx);
         println!();
 
         self.run()
@@ -64,11 +73,15 @@ impl Vm {
 
     fn run(&mut self) -> RuntimeResult<()> {
 
+        println!(">>>>>>>>>>>>>>>>>>>>> ");
+        dbg!(&self.chunk.constants);
+        dbg!(&self.ctx);
+
         loop {
 
             if DEBUG_TRACE_EXECUTION {
-                self.chunk.code[self.ip].disassemble(&self.chunk, self.ip);
-                print_stack(&self.stack);
+                self.chunk.code[self.ip].disassemble(&self.chunk, self.ip, &self.ctx);
+                print_stack(&self.stack, &self.ctx);
                 println!();
             }
 
@@ -158,14 +171,14 @@ impl Vm {
     }
 
     fn op_def_global(&mut self, index: usize) {
-        let name = self.get_constant_as_str(index);
+        let name = self.get_constant_as_str(index, &self.ctx);
         let val  = self.pop_stack();
 
         self.globals.insert(name, val);
     }
 
     fn op_get_global(&mut self, index: usize) -> RuntimeResult<()> {
-        let name  = self.get_constant_as_str(index);
+        let name  = self.get_constant_as_str(index, &self.ctx);
 
         let value = match self.globals.get(&name) {
             Some(value) => value,
@@ -181,7 +194,7 @@ impl Vm {
     }
 
     fn op_set_global(&mut self, index: usize) -> RuntimeResult<()> {
-        let name = self.get_constant_as_str(index);
+        let name = self.get_constant_as_str(index, &self.ctx);
 
         if self.globals.get(&name).is_none() {
             let msg = format!("Undefined variable '{name}'");
@@ -248,8 +261,16 @@ impl Vm {
         let b = self.pop_stack();
         let a = self.pop_stack();
 
-        if let (Some(a), Some(b)) = (a.as_string(), b.as_string()) {
-            self.push_stack(concatenate(a, b));
+        if a.is_lw_string(&self.ctx) && b.is_lw_string(&self.ctx) {
+            let result = {
+                let a  = a.to_str(&self.ctx).unwrap();
+                let b  = b.to_str(&self.ctx).unwrap();
+                format!("{a}{b}")
+            };
+
+            let obj = self.ctx.add_string(&result);
+            let val = Value::new_obj(obj);
+            self.push_stack(val);
         }
         else if let (Some(a), Some(b)) = (a.as_number(), b.as_number()) {
             self.push_stack(Value::Number(a + b));
@@ -264,7 +285,7 @@ impl Vm {
     fn op_print(&mut self) {
         let val = self.pop_stack();
 
-        println!("{val}")
+        println!("{}", val.display(&self.ctx))
     }
 
     fn op_negate(&mut self) -> RuntimeResult<()> {
@@ -295,11 +316,12 @@ impl Vm {
     fn op_return(&mut self) {
         let constant = self.pop_stack();
 
-        println!("{}", constant);
+        println!("{}", constant.display(&self.ctx));
     }
 
     fn concatenate(&mut self, val1: &str, val2: &str) {
-        self.push_stack(Value::new_string(format!("{}{}", val1, val2)));
+        let val = concatenate(val1, val2, &mut self.ctx);
+        self.push_stack(val);
     }
 
     // utils
@@ -311,15 +333,20 @@ impl Vm {
         }
     }
 
-    fn get_constant_as_str(&self, index: usize) -> String {
+    fn get_constant_as_str(&self, index: usize, ctx: &Context) -> String {
         self.chunk.constants[index]
-            .as_string()
+            .to_str(ctx)
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
     }
 
 }
 
-fn concatenate(val1: String, val2: String) -> Value {
-    Value::new_string(format!("{}{}", val1, val2))
+fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
+
+    let str = format!("{val1}{val2}");
+
+    let id  = ctx.add(ObjString::new(str).into());
+
+    Value::new_obj(id)
 }

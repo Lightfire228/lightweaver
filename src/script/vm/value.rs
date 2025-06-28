@@ -1,22 +1,22 @@
-use std::{cell::RefMut, fmt::Display};
+use std::{fmt::Display};
 
-use crate::script::vm::object::ObjRef;
+use crate::script::vm::gc::Context;
 
-use super::object::{Obj, ObjString, ObjType};
+use super::object::{Obj, ObjType};
 
 
 #[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Bool  (bool),
-    Obj   (ObjRef),
+    Obj   (usize),
     Nil,
 }
 
 impl Value {
 
-    pub fn new_string(string: String) -> Self {
-        Value::Obj(ObjString::new(string))
+    pub fn new_obj(obj_id: usize) -> Self {
+        Value::Obj(obj_id)
     }
 
     pub fn as_number(&self) -> Option<f64> {
@@ -34,65 +34,68 @@ impl Value {
         }
     }
 
-    pub fn as_obj(&self) -> Option<ObjRef> {
+    pub fn as_obj<'a>(&'a self, ctx: &'a Context) -> Option<&'a Obj> {
+
         match self {
-            Value::Obj(o) => Some(o.clone()),
+            Value::Obj(o) => {
+                Some(ctx.get(*o))
+            },
             _             => None,
         }
     }
 
-    pub fn as_obj_mut(&mut self) -> Option<RefMut<Obj>> {
+    pub fn as_obj_mut<'a>(&'a mut self, ctx: &'a mut Context) -> Option<&'a Obj> {
+
         match self {
-            Value::Obj(o) => Some(o.borrow_mut()),
+            Value::Obj(o) => {
+                Some(ctx.get_mut(*o))
+            },
             _             => None,
         }
     }
 
-    pub fn as_obj_string(&self) -> Option<ObjString> {
+    pub fn to_str<'a, 'b: 'a>(&'a self, ctx: &'b Context) -> Option<&'b str> {
+
         match self {
-            Value::Obj(obj) => Some({
+            Value::Obj(obj_id) => Some({
 
-                match &(*obj).borrow().type_ {
-                    ObjType::String(obj) => obj.clone()
-                }
+                let obj = ctx.get(*obj_id);
 
-            }),
-            _             => None,
-        }
-    }
-
-    pub fn as_string(&self) -> Option<String> {
-        match self {
-            Value::Obj(obj) => Some({
-
-                match &obj.as_ref().borrow().type_ {
-                    ObjType::String(obj) => obj.string.clone()
+                match &obj.type_ {
+                    ObjType::String  (obj)   => &obj.string,
+                    _                        => None?
                 }
             }),
-            _             => None,
+            _ => None,
         }
     }
 
-    pub fn is_string(&self) -> bool {
+    pub fn is_lw_string(&self, ctx: &Context) -> bool {
 
-        if let Value::Obj(obj) = &self {
-            #[allow(irrefutable_let_patterns)]
-            if let ObjType::String(_) = obj.as_ref().borrow().type_ {
-                return true;
+        match self {
+            Value::Obj(obj_id) => {
+                let obj = ctx.get(*obj_id);
+
+                match obj.type_ {
+                    ObjType::String(_) => true,
+                    _                  => false,
+                }
             }
+            _                  => false,
         }
 
-        false
+    }
 
+    pub fn display(&self, ctx: &Context) -> String {
+        match self {
+            Value::Obj   (x) => ctx.get(*x).to_string(),
+            Value::Number(x) => x.to_string(),
+            Value::Bool  (x) => x.to_string(),
+            Value::Nil       => "nil".to_owned(),
+        }
     }
 }
 
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", to_str(self))
-    }
-}
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
@@ -103,15 +106,5 @@ impl PartialEq for Value {
             (Value::Nil,       Value::Nil)       => true,
             _                                    => false,
         }
-    }
-}
-
-fn to_str(value: &Value) -> String {
-    match value {
-        Value::Obj   (x) => x.as_ref().borrow().to_string(),
-        Value::Number(x) => x.to_string(),
-        Value::Bool  (x) => x.to_string(),
-        Value::Nil       => "nil".to_owned(),
-
     }
 }

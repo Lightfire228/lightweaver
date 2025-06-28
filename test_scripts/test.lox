@@ -28,9 +28,9 @@
 // print 3 * 4;
 
 
-var a = 5;
+// var a = 5;
 
-
+print "test";
 
 
 var breakfast = "beignets";
@@ -40,37 +40,37 @@ breakfast     = "beignets with " + beverage;
 print breakfast;
 
 
-{
-    var test = "a";
+// {
+//     var test = "a";
 
-    var test2 = "b";
+//     var test2 = "b";
 
-    {
-        var test = test2 + "c";
+//     {
+//         var test = test2 + "c";
 
-        print test;
+//         print test;
 
-    }
-}
+//     }
+// }
 
-if (false) {
-    print "made it";
-}
-else {
-    print "didn't make it";
-}
+// if (false) {
+//     print "made it";
+// }
+// else {
+//     print "didn't make it";
+// }
 
-if (true or false) {
-    print "it worked 2";
-}
+// if (true or false) {
+//     print "it worked 2";
+// }
 
 
-for (var i = 0; i < 10; i = i+1) {
-    print i;
-}
+// for (var i = 0; i < 10; i = i+1) {
+//     print i;
+// }
 
-var a = 0;
-while (a < 10) {
-    a = a + 1;
-    print a;
-}
+// var a = 0;
+// while (a < 10) {
+//     a = a + 1;
+//     print a;
+// }

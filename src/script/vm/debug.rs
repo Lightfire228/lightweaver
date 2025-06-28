@@ -1,17 +1,17 @@
-use crate::script::vm::value::Value;
+use crate::script::vm::{gc::Context, value::Value};
 
 use super::chunk::{Chunk, OpCode};
 
 
 impl Chunk {
-    pub fn disassemble(&self, stack: &[Value]) {
+    pub fn disassemble(&self, stack: &[Value], ctx: &Context) {
         println!("== {} ==", &self.name);
 
         println!("addr line instruction");
 
         for i in 0..self.code.len() {
-            self.code[i].disassemble(self, i);
-            print_stack(stack);
+            self.code[i].disassemble(self, i, ctx);
+            print_stack(stack, ctx);
             println!("");
         }
     }
@@ -19,18 +19,18 @@ impl Chunk {
 
 
 impl OpCode {
-    pub fn disassemble(&self, chunk: &Chunk, ip: usize) {
+    pub fn disassemble(&self, chunk: &Chunk, ip: usize, ctx: &Context) {
         print!("{:04} ", ip);
 
         print_line_info(chunk, ip);
 
         type O = OpCode;
         match &self {
-            O::Constant  { index }       => constant_instruction("OP_CONSTANT",      chunk, *index),
+            O::Constant  { index }       => constant_instruction("OP_CONSTANT",      chunk, *index, ctx),
 
-            O::DefGlobal { index }       => constant_instruction("OP_DEF_GLOBAL",    chunk, *index),
-            O::GetGlobal { index }       => constant_instruction("OP_GET_GLOBAL",    chunk, *index),
-            O::SetGlobal { index }       => constant_instruction("OP_SET_GLOBAL",    chunk, *index),
+            O::DefGlobal { index }       => constant_instruction("OP_DEF_GLOBAL",    chunk, *index, ctx),
+            O::GetGlobal { index }       => constant_instruction("OP_GET_GLOBAL",    chunk, *index, ctx),
+            O::SetGlobal { index }       => constant_instruction("OP_SET_GLOBAL",    chunk, *index, ctx),
 
             O::GetLocal  { index }       => byte_instruction    ("OP_GET_LOCAL",     *index),
             O::SetLocal  { index }       => byte_instruction    ("OP_SET_LOCAL",     *index),
@@ -73,9 +73,9 @@ fn print_line_info(chunk: &Chunk, offset: usize) {
     }
 }
 
-pub fn print_stack(stack: &[Value]) {
+pub fn print_stack(stack: &[Value], ctx: &Context) {
     for x in stack {
-        print!("[ {x} ]")
+        print!("[ {} ]", x.display(ctx))
     }
 }
 
@@ -86,8 +86,10 @@ fn simple_instruction(name: &str) {
     print!("{msg}")
 }
 
-fn constant_instruction(name: &str, chunk: &Chunk, index: usize) {
-    let msg = format!("{:16} {:4} {:30} ", name, index, &chunk.constants[index]);
+fn constant_instruction(name: &str, chunk: &Chunk, index: usize, ctx: &Context) {
+    // dbg!(index);
+    let msg = format!("{:16} {:4} {:30} ", name, index, &chunk.constants[index].display(ctx));
+    // let msg = format!("{:16} {:4} {:30} ", name, index, "");
     let msg = right_adjust(&msg);
     print!("{msg}");
 }
@@ -108,7 +110,7 @@ fn jump_instruction(name: &str, ip: usize, offset: usize, sign: isize) {
 }
 
 fn right_adjust(msg: &str) -> String {
-    let col = 50;
+    let col = 60;
     assert!(msg.len() < col);
 
     let spaces = col - msg.len();
