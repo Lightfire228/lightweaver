@@ -26,20 +26,19 @@ impl OpCode {
 
         type O = OpCode;
         match &self {
-            O::Constant  { index }       => constant_instruction("OP_CONSTANT",      chunk, *index, ctx),
+            O::Constant  { index }       => constant_instruction("OP_CONSTANT",      chunk, index.0, ctx),
 
-            O::DefGlobal { index }       => constant_instruction("OP_DEF_GLOBAL",    chunk, *index, ctx),
-            O::GetGlobal { index }       => constant_instruction("OP_GET_GLOBAL",    chunk, *index, ctx),
-            O::SetGlobal { index }       => constant_instruction("OP_SET_GLOBAL",    chunk, *index, ctx),
+            O::DefGlobal { name }        => constant_instruction("OP_DEF_GLOBAL",    chunk, name.0, ctx),
+            O::GetGlobal { name }        => constant_instruction("OP_GET_GLOBAL",    chunk, name.0, ctx),
+            O::SetGlobal { name }        => constant_instruction("OP_SET_GLOBAL",    chunk, name.0, ctx),
 
-            O::GetLocal  { index }       => byte_instruction    ("OP_GET_LOCAL",     *index),
-            O::SetLocal  { index }       => byte_instruction    ("OP_SET_LOCAL",     *index),
+            O::GetLocal  { index }       => byte_instruction    ("OP_GET_LOCAL",     index.0),
+            O::SetLocal  { index }       => byte_instruction    ("OP_SET_LOCAL",     index.0),
 
-            O::JumpIfFalse { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, *offset,  1),
-            O::JumpIfTrue  { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, *offset,  1),
-            O::Jump        { offset }    => jump_instruction    ("OP_JUMP",          ip, *offset,  1),
-
-            O::Loop        { offset }    => jump_instruction    ("OP_LOOP",          ip, *offset, -1),
+            O::JumpIfFalse { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, offset.0,  1),
+            O::JumpIfTrue  { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, offset.0,  1),
+            O::Jump        { offset }    => jump_instruction    ("OP_JUMP",          ip, offset.0,  1),
+            O::Loop        { offset }    => jump_instruction    ("OP_LOOP",          ip, offset.0, -1),
 
             O::Nil                       => simple_instruction  ("OP_NIL"),
             O::True                      => simple_instruction  ("OP_TRUE"),
@@ -87,7 +86,6 @@ fn simple_instruction(name: &str) {
 }
 
 fn constant_instruction(name: &str, chunk: &Chunk, index: usize, ctx: &Context) {
-    // dbg!(index);
     let msg = format!("{:16} {:4} {:30} ", name, index, &chunk.constants[index].display(ctx));
     // let msg = format!("{:16} {:4} {:30} ", name, index, "");
     let msg = right_adjust(&msg);

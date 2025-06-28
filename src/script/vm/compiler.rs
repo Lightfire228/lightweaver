@@ -1,5 +1,5 @@
 
-use crate::{script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token, vm::gc::Context}};
+use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::Context}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
@@ -134,7 +134,6 @@ impl Compiler {
     fn compile_print_stmt(&mut self, expr: Expr, ctx: &mut Context) {
         self.compile_expr(expr, ctx);
         self.write_op(Op::Print);
-        // Print pops
     }
 
     fn compile_return_stmt(&mut self, _return: ReturnStmt) {
@@ -145,7 +144,7 @@ impl Compiler {
         self.line = stmt.name.line;
 
         let     local = self.scope_depth > 0;
-        let mut index = 0;
+        let mut index = ConstIndex(0);
 
         if local {
             self.declare_local(&stmt.name);
@@ -161,17 +160,18 @@ impl Compiler {
 
         if local {
             self.mark_initialized();
+            // Local delcarations are allowed to leave stack locals
         }
         else {
             self.define_global(index);
+            // Global declarations must not
         }
         Ok(())
 
-        // Delcarations are allowed to leave stack locals
     }
 
     fn compile_while_stmt(&mut self, while_: WhileStmt, ctx: &mut Context) -> CompilerResult<()> {
-        let loop_start = self.current_chunk().code.len();
+        let loop_start = BytecodeIndex(self.current_chunk().code.len());
 
         self.compile_expr(while_.condition, ctx);
 
@@ -252,8 +252,8 @@ impl Compiler {
         let set_op = match self.resolve_local(&assign.target.name) {
             Some(index) => Op::SetLocal { index },
             None        => {
-                let index = self.make_identifier_constant(assign.target.name, ctx);
-                Op::SetGlobal { index, }
+                let name = self.make_identifier_constant(assign.target.name, ctx);
+                Op::SetGlobal { name, }
             }
         };
 
@@ -307,8 +307,8 @@ impl Compiler {
         match local {
             Some(index) => self.write_op(Op::GetLocal { index, }),
             None        => {
-                let index = self.make_identifier_constant(var.name, ctx);
-                self.write_op(Op::GetGlobal { index, })
+                let name = self.make_identifier_constant(var.name, ctx);
+                self.write_op(Op::GetGlobal { name, })
             }
         };
 
@@ -317,17 +317,17 @@ impl Compiler {
     fn compile_get_expr(&mut self, get: Get, ctx: &mut Context) {
         self.line = get.name.line;
 
-        let index = self.make_identifier_constant(get.name, ctx);
-        self.write_op(Op::GetGlobal { index, });
+        let name = self.make_identifier_constant(get.name, ctx);
+        self.write_op(Op::GetGlobal { name, });
     }
 
     fn compile_set_expr(&mut self, set: Set, ctx: &mut Context) {
         self.line = set.name.line;
 
-        let index = self.make_identifier_constant(set.name, ctx);
+        let name = self.make_identifier_constant(set.name, ctx);
         self.compile_expr(*set.value, ctx);
 
-        self.write_op(Op::SetGlobal { index, });
+        self.write_op(Op::SetGlobal { name, });
     }
 
     fn compile_super_expr(&mut self, _super: Super) {
@@ -341,14 +341,14 @@ impl Compiler {
 
     // Variables
 
-    fn emit_constant(&mut self, value: Value) -> usize {
+    fn emit_constant(&mut self, value: Value) -> BytecodeIndex {
         let index = self.current_chunk_mut().add_constant(value);
 
         self.write_op(Op::Constant { index, })
     }
 
-    fn emit_jump(&mut self, jump: JumpType) -> usize {
-        let max = usize::MAX;
+    fn emit_jump(&mut self, jump: JumpType) -> BytecodeIndex {
+        let max = Offset(usize::MAX);
 
         let op = match jump {
             JumpType::IfFalse => Op::JumpIfFalse { offset: max },
@@ -359,8 +359,11 @@ impl Compiler {
         self.write_op(op)
     }
 
-    fn patch_jump(&mut self, index: usize) {
+    fn patch_jump(&mut self, index: BytecodeIndex) {
+        let index = index.0;
+
         let new_offset = self.chunk.code.len() - index -1;
+        let new_offset = Offset(new_offset);
 
         let op = &mut self.chunk.code[index];
 
@@ -373,18 +376,22 @@ impl Compiler {
         };
     }
 
-    fn emit_loop(&mut self, loop_start: usize) -> usize {
+    fn emit_loop(&mut self, loop_start: BytecodeIndex) -> BytecodeIndex {
+        let loop_start = loop_start.0;
+
         let offset = self.current_chunk().code.len() - loop_start +1;
+        let offset = Offset(offset);
+
         self.write_op(Op::Loop { offset, })
     }
 
 
-    fn make_identifier_constant(&mut self, name: Token, ctx: &mut Context) -> usize {
+    fn make_identifier_constant(&mut self, name: Token, ctx: &mut Context) -> ConstIndex {
         let val = str_to_val(name.lexeme, ctx);
 
         let index = self.current_chunk_mut().add_constant(val);
 
-        self.write_op(Op::Constant { index, });
+        // self.write_op(Op::Constant { index, });
 
         index
     }
@@ -404,8 +411,8 @@ impl Compiler {
         self.add_local(name.clone());
     }
 
-    fn define_global(&mut self, index: usize) {
-        self.write_op(Op::DefGlobal { index, });
+    fn define_global(&mut self, index: ConstIndex) {
+        self.write_op(Op::DefGlobal { name: index, });
     }
 
     fn add_local(&mut self, name: Token) {
@@ -416,7 +423,7 @@ impl Compiler {
         });
     }
 
-    fn resolve_local(&self, name: &Token) -> Option<usize> {
+    fn resolve_local(&self, name: &Token) -> Option<StackIndex> {
         for (i, local) in self.locals.iter().enumerate().rev() {
 
             if local.name.lexeme == name.lexeme {
@@ -425,7 +432,7 @@ impl Compiler {
                     panic!("Can't read local variable in its own initializer")
                 }
 
-                return Some(i);
+                return Some(StackIndex(i));
             }
         }
 
@@ -449,18 +456,18 @@ impl Compiler {
         &mut self.chunk
     }
 
-    fn write_op(&mut self, op: OpCode) -> usize {
+    fn write_op(&mut self, op: OpCode) -> BytecodeIndex {
         let line = self.line;
         self.current_chunk_mut().write_op(op, line)
     }
-    fn write_ops(&mut self, op1: OpCode, op2: OpCode) -> usize {
+    fn write_ops(&mut self, op1: OpCode, op2: OpCode) -> BytecodeIndex {
         let line = self.line;
         let chunk = self.current_chunk_mut();
         chunk.write_op(op1, line);
         chunk.write_op(op2, line)
     }
 
-    fn write_pop(&mut self) -> usize {
+    fn write_pop(&mut self) -> BytecodeIndex {
         self.write_op(Op::Pop)
     }
 

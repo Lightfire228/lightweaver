@@ -1,5 +1,3 @@
-use std::{fmt::Display};
-
 use crate::script::vm::gc::Context;
 
 use super::object::{Obj, ObjType};

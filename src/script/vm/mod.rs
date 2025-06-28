@@ -4,7 +4,7 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
-use crate::script::vm::{debug::print_stack, object::ObjString};
+use crate::script::vm::{chunk::{ConstIndex, Offset, StackIndex}, debug::print_stack, object::ObjString};
 
 pub mod chunk;
 pub mod debug;
@@ -74,8 +74,6 @@ impl Vm {
     fn run(&mut self) -> RuntimeResult<()> {
 
         println!(">>>>>>>>>>>>>>>>>>>>> ");
-        dbg!(&self.chunk.constants);
-        dbg!(&self.ctx);
 
         loop {
 
@@ -89,9 +87,9 @@ impl Vm {
             match *self.get_instruction() {
                 O::Constant    { index }  => self.op_constant  (index),
 
-                O::DefGlobal   { index }  => self.op_def_global(index),
-                O::GetGlobal   { index }  => self.op_get_global(index)?,
-                O::SetGlobal   { index }  => self.op_set_global(index)?,
+                O::DefGlobal   { name }   => self.op_def_global(name),
+                O::GetGlobal   { name }   => self.op_get_global(name)?,
+                O::SetGlobal   { name }   => self.op_set_global(name)?,
 
                 O::GetLocal    { index }  => self.op_get_local (index),
                 O::SetLocal    { index }  => self.op_set_local (index),
@@ -135,8 +133,8 @@ impl Vm {
         &self.chunk.code[self.ip -1]
     }
 
-    fn get_constant(&self, index: usize) -> &Value {
-        &self.chunk.constants[index]
+    fn get_constant(&self, index: ConstIndex) -> &Value {
+        &self.chunk.constants[index.0]
     }
 
     fn pop_stack(&mut self) -> Value {
@@ -164,20 +162,20 @@ impl Vm {
 
     // op codes
 
-    fn op_constant(&mut self, index: usize) {
+    fn op_constant(&mut self, index: ConstIndex) {
         let constant = self.get_constant(index);
 
         self.push_stack(constant.clone());
     }
 
-    fn op_def_global(&mut self, index: usize) {
-        let name = self.get_constant_as_str(index, &self.ctx);
+    fn op_def_global(&mut self, name: ConstIndex) {
+        let name = self.get_constant_as_str(name, &self.ctx);
         let val  = self.pop_stack();
 
         self.globals.insert(name, val);
     }
 
-    fn op_get_global(&mut self, index: usize) -> RuntimeResult<()> {
+    fn op_get_global(&mut self, index: ConstIndex) -> RuntimeResult<()> {
         let name  = self.get_constant_as_str(index, &self.ctx);
 
         let value = match self.globals.get(&name) {
@@ -193,7 +191,7 @@ impl Vm {
         Ok(())
     }
 
-    fn op_set_global(&mut self, index: usize) -> RuntimeResult<()> {
+    fn op_set_global(&mut self, index: ConstIndex) -> RuntimeResult<()> {
         let name = self.get_constant_as_str(index, &self.ctx);
 
         if self.globals.get(&name).is_none() {
@@ -206,16 +204,22 @@ impl Vm {
         Ok(())
     }
 
-    fn op_get_local(&mut self, index: usize) {
+    fn op_get_local(&mut self, index: StackIndex) {
+        let index = index.0;
+
         self.push_stack(self.stack[index +1].clone());
     }
 
-    fn op_set_local(&mut self, index: usize) {
+    fn op_set_local(&mut self, index: StackIndex) {
+        let index = index.0;
+
         let value = self.peek_stack(0).clone();
         self.stack[index +1] = value;
     }
 
-    fn op_jump_if(&mut self, jump_type: JumpType, offset: usize) {
+    fn op_jump_if(&mut self, jump_type: JumpType, offset: Offset) {
+        let offset = offset.0;
+
         let is_falsey = self.peek_stack(0).is_falsey();
 
         let jump_on_false = match jump_type {
@@ -228,11 +232,15 @@ impl Vm {
         }
     }
 
-    fn op_jump(&mut self, offset: usize) {
+    fn op_jump(&mut self, offset: Offset) {
+        let offset = offset.0;
+
         self.ip += offset;
     }
 
-    fn op_loop(&mut self, offset: usize) {
+    fn op_loop(&mut self, offset: Offset) {
+        let offset = offset.0;
+
         self.ip -= offset;
     }
 
@@ -333,8 +341,8 @@ impl Vm {
         }
     }
 
-    fn get_constant_as_str(&self, index: usize, ctx: &Context) -> String {
-        self.chunk.constants[index]
+    fn get_constant_as_str(&self, index: ConstIndex, ctx: &Context) -> String {
+        self.chunk.constants[index.0]
             .to_str(ctx)
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
