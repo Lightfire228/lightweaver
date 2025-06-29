@@ -4,7 +4,21 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
-use crate::script::vm::{chunk::{ConstIndex, Offset, StackIndex}, debug::print_stack, object::ObjString};
+use crate::script::{
+    vm::{
+        chunk::{
+            ConstIndex,
+            Offset,
+            StackIndex
+        },
+        debug ::print_stack,
+        gc    ::ObjectId,
+        object::{
+            ObjFunction,
+            ObjString,
+        }
+    }
+};
 
 pub mod chunk;
 pub mod debug;
@@ -16,13 +30,27 @@ pub mod gc;
 
 static DEBUG_TRACE_EXECUTION: bool = true;
 
+pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
+
+    let mut vm  = Vm::new(ctx, script_func);
+
+    let     val = Value::Obj(script_func);
+
+    vm.push_stack(val);
+
+    vm.get_chunk().disassemble(&[], &vm.ctx);
+    println!();
+
+    vm.run()
+}
+
 // TODO: String interning
 pub struct Vm {
-    chunk:   Chunk,
-    ip:      usize,
-    stack:   Vec<Value>,
-    globals: HashMap<String, Value>,
-    ctx:     Context,
+    function: ObjectId,
+    ip:       usize,
+    stack:    Vec<Value>,
+    globals:  HashMap<String, Value>,
+    ctx:      Context,
 }
 
 pub struct RuntimeError {
@@ -46,29 +74,14 @@ enum JumpType {
 }
 
 impl Vm {
-    pub fn new(ctx: Context) -> Self {
+    pub fn new(ctx: Context, script_func: ObjectId) -> Self {
         Self {
-            chunk:   Chunk::new("null chunk".to_owned()),
-            ip:      0,
-            stack:   vec![],
-            globals: HashMap::new(),
+            function: script_func,
+            ip:       0,
+            stack:    vec![],
+            globals:  HashMap::new(),
             ctx,
         }
-    }
-
-    pub fn interpret(&mut self, mut chunks: Vec<Chunk>) -> RuntimeResult<()> {
-
-
-        let str = self.ctx.add_string("<script>");
-        let val = Value::Obj(str);
-
-        self.push_stack(val);
-        self.chunk = chunks.remove(0);
-
-        self.chunk.disassemble(&[], &self.ctx);
-        println!();
-
-        self.run()
     }
 
     fn run(&mut self) -> RuntimeResult<()> {
@@ -78,7 +91,8 @@ impl Vm {
         loop {
 
             if DEBUG_TRACE_EXECUTION {
-                self.chunk.code[self.ip].disassemble(&self.chunk, self.ip, &self.ctx);
+                let chunk = self.get_chunk();
+                chunk.code[self.ip].disassemble(&chunk, self.ip, &self.ctx);
                 print_stack(&self.stack, &self.ctx);
                 println!();
             }
@@ -130,11 +144,11 @@ impl Vm {
     fn get_instruction(&mut self) -> &OpCode {
         self.ip += 1;
 
-        &self.chunk.code[self.ip -1]
+        &self.get_chunk().code[self.ip -1]
     }
 
     fn get_constant(&self, index: ConstIndex) -> &Value {
-        &self.chunk.constants[index.0]
+        &self.get_chunk().constants[index.0]
     }
 
     fn pop_stack(&mut self) -> Value {
@@ -337,15 +351,26 @@ impl Vm {
     fn runtime_error(&self, msg: &str) -> RuntimeError {
         RuntimeError {
             msg:  msg.to_owned(),
-            line: self.chunk.lines[self.ip -1],
+            line: self.get_chunk().lines[self.ip -1],
         }
     }
 
     fn get_constant_as_str(&self, index: ConstIndex, ctx: &Context) -> String {
-        self.chunk.constants[index.0]
+        self.get_chunk().constants[index.0]
             .to_str(ctx)
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
+    }
+
+    fn get_chunk(&self) -> &Chunk {
+        // TODO: this is a stupid amount of dereferencing each time chunk is accessed,
+        //       which is a lot
+
+        let obj = self.ctx.get(self.function);
+
+        let obj: &ObjFunction = obj.into();
+
+        &obj.chunk
     }
 
 }

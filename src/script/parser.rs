@@ -805,7 +805,6 @@ impl Logger {
         }
     }
 
-
     fn log<Func, OkVal>(&self, name: &str, token: Token, mut f: Func) -> ParseResult<OkVal>
         where Func: FnMut() -> ParseResult<OkVal>
     {
@@ -819,22 +818,24 @@ impl Logger {
         println!("{ind}{name} ({token}) {{");
 
 
-        self.depth.set(depth +1);
-        let mut res = f();
-        self.depth.set(depth);
+        self.enter();
+        let res = f();
+        self.exit(depth);
 
-        if res.is_err() {
-            let err = res.err().unwrap();
-            println!("{ind}}} /{name} (ERR: ({:?}))", err);
-
-            res = Err(err);
-
-        }
-        else {
-            println!("{ind}}} /{name}");
+        match &res {
+            Err(err) => println!("{ind}}} /{name} (ERR: ({:?}))", err),
+            Ok (_)   => println!("{ind}}} /{name}"),
         }
 
         res
+    }
+
+    fn enter(&self) {
+        self.depth.set(self.depth.get() +1)
+    }
+
+    fn exit(&self, depth: usize) {
+        self.depth.set(depth)
     }
 
     fn log_no_children(&self, name: &str, token: &Token){

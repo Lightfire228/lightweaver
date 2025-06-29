@@ -14,7 +14,7 @@ pub mod vm;
 
 mod test;
 
-use vm::{compiler::Compiler, RuntimeError, Vm};
+use vm::{compiler::Compiler, RuntimeError};
 
 use crate::script::vm::gc::Context;
 
@@ -45,10 +45,9 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
 
         display_ast(&ast);
-        let chunks  = Compiler::compile(ast, &mut ctx) .unwrap();
+        let func   = Compiler::compile(ast, &mut ctx) .unwrap();
 
-        let mut vm = Vm::new(ctx);
-        vm.interpret(chunks).map_err(|err| Re::RuntimeError(err))?;
+        vm::interpret(ctx, func).map_err(|err| Re::RuntimeError(err))?;
 
         Ok("test")
     })() {

@@ -1,16 +1,18 @@
 
-use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::Context}};
+use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::{ObjFunction}}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
 type Op = OpCode;
 
+type Func = (FuncType, ObjectId);
+
 
 pub struct Compiler {
-    chunk:       Chunk,
     line:        usize,
     locals:      Vec<Local>,
     scope_depth: usize,
+    functions:   Vec<Func>
 }
 
 #[derive(Debug)]
@@ -23,6 +25,11 @@ struct Local {
 enum VariableType {
     Global,
     Local,
+}
+
+enum FuncType {
+    Function,
+    Script,
 }
 
 #[derive(Debug)]
@@ -41,28 +48,31 @@ enum JumpType {
 
 impl Compiler {
 
-    fn new() -> Self {
-        let name = "script".to_owned();
+    fn new(ctx: &mut Context) -> Self {
+        let name = "script";
+
+        let func  = ObjFunction::new(name.to_owned(), ctx.add_string(name));
+        let id    = ctx.add(func.into());
 
         Self {
-            chunk:       Chunk::new(name),
             line:        0,
             locals:      vec![],
             scope_depth: 0,
+            functions:   vec![(FuncType::Script, id)]
         }
     }
 
-    pub fn compile(ast: Ast, ctx: &mut Context) -> CompilerResult<Vec<Chunk>> {
+    pub fn compile(ast: Ast, ctx: &mut Context) -> CompilerResult<ObjectId> {
 
-        let mut compiler = Self::new();
+        let mut compiler = Self::new(ctx);
 
         for stmt in ast.stmts {
             compiler.compile_stmt(stmt, ctx)?;
         }
 
-        compiler.write_op(Op::Return);
+        compiler.write_op(Op::Return, ctx);
 
-        Ok(vec![compiler.chunk])
+        Ok(compiler.functions.first().expect("Function stack cannot be empty").1)
 
     }
 
@@ -94,7 +104,7 @@ impl Compiler {
             self.compile_stmt(stmt, ctx)?;
         }
 
-        self.end_scope();
+        self.end_scope(ctx);
         Ok(())
     }
 
@@ -104,7 +114,7 @@ impl Compiler {
 
     fn compile_expr_stmt(&mut self, expr_stmt: ExpressionStmt, ctx: &mut Context) {
         self.compile_expr(expr_stmt.expr, ctx);
-        self.write_pop();
+        self.write_pop(ctx);
     }
 
     fn compile_func_decl(&mut self, _func: FunctionStmt) {
@@ -113,19 +123,19 @@ impl Compiler {
 
     fn compile_if_stmt(&mut self, if_stmt: IfStmt, ctx: &mut Context) -> CompilerResult<()> {
         self.compile_expr(if_stmt.condition, ctx);
-        let jump_then_op = self.emit_jump(JumpType::IfFalse);
-        self.write_pop(); // Pop the condition temporary if no jump
+        let jump_then_op = self.emit_jump(JumpType::IfFalse, ctx);
+        self.write_pop(ctx); // Pop the condition temporary if no jump
 
         self.compile_stmt(*if_stmt.then_branch, ctx)?;
-        let jump_else_op = self.emit_jump(JumpType::Always);
+        let jump_else_op = self.emit_jump(JumpType::Always, ctx);
 
-        self.patch_jump(jump_then_op);
-        self.write_pop(); // Pop the condition temporary if jump
+        self.patch_jump(jump_then_op, ctx);
+        self.write_pop(ctx); // Pop the condition temporary if jump
         if let Some(stmt) = if_stmt.else_branch {
             self.compile_stmt(*stmt, ctx)?;
         }
 
-        self.patch_jump(jump_else_op);
+        self.patch_jump(jump_else_op, ctx);
 
         Ok(())
     }
@@ -133,7 +143,7 @@ impl Compiler {
 
     fn compile_print_stmt(&mut self, expr: Expr, ctx: &mut Context) {
         self.compile_expr(expr, ctx);
-        self.write_op(Op::Print);
+        self.write_op(Op::Print, ctx);
     }
 
     fn compile_return_stmt(&mut self, _return: ReturnStmt) {
@@ -155,7 +165,7 @@ impl Compiler {
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr, ctx),
-            None       => { self.write_op(Op::Nil); }
+            None       => { self.write_op(Op::Nil, ctx); }
         }
 
         if local {
@@ -163,7 +173,7 @@ impl Compiler {
             // Local delcarations are allowed to leave stack locals
         }
         else {
-            self.define_global(index);
+            self.define_global(index, ctx);
             // Global declarations must not
         }
         Ok(())
@@ -171,18 +181,18 @@ impl Compiler {
     }
 
     fn compile_while_stmt(&mut self, while_: WhileStmt, ctx: &mut Context) -> CompilerResult<()> {
-        let loop_start = BytecodeIndex(self.current_chunk().code.len());
+        let loop_start = BytecodeIndex(self.current_chunk(ctx).code.len());
 
         self.compile_expr(while_.condition, ctx);
 
-        let exit_jump_op = self.emit_jump(JumpType::IfFalse);
-        self.write_pop();
+        let exit_jump_op = self.emit_jump(JumpType::IfFalse, ctx);
+        self.write_pop(ctx);
 
         self.compile_stmt(*while_.body, ctx)?;
-        self.emit_loop(loop_start);
+        self.emit_loop(loop_start, ctx);
 
-        self.patch_jump(exit_jump_op);
-        self.write_pop();
+        self.patch_jump(exit_jump_op, ctx);
+        self.write_pop(ctx);
 
         Ok(())
     }
@@ -214,17 +224,17 @@ impl Compiler {
         match literal.type_ {
             LiteralType::Number => {
                 let value = Value::Number(to_number(&value.lexeme));
-                self.emit_constant(value);
+                self.emit_constant(value, ctx);
             },
             LiteralType::String => {
                 let obj   = ctx.add_string(&value.lexeme);
                 let value = Value::new_obj(obj);
 
-                self.emit_constant(value);
+                self.emit_constant(value, ctx);
             },
-            LiteralType::True   => { self.write_op(Op::True);  },
-            LiteralType::False  => { self.write_op(Op::False); },
-            LiteralType::Nil    => { self.write_op(Op::Nil);   },
+            LiteralType::True   => { self.write_op(Op::True,  ctx); },
+            LiteralType::False  => { self.write_op(Op::False, ctx); },
+            LiteralType::Nil    => { self.write_op(Op::Nil,   ctx); },
         };
     }
 
@@ -237,12 +247,12 @@ impl Compiler {
     }
 
     fn compile_logical_jump(&mut self, right: Expr, jump_type: JumpType, ctx: &mut Context) {
-        let jump_op = self.emit_jump(jump_type);
-        self.write_pop();
+        let jump_op = self.emit_jump(jump_type, ctx);
+        self.write_pop(ctx);
 
         self.compile_expr(right, ctx);
 
-        self.patch_jump(jump_op);
+        self.patch_jump(jump_op, ctx);
     }
 
     fn compile_assign_expr(&mut self, assign: Assign, ctx: &mut Context) {
@@ -257,7 +267,7 @@ impl Compiler {
             }
         };
 
-        self.write_op(set_op);
+        self.write_op(set_op, ctx);
     }
 
 
@@ -269,17 +279,17 @@ impl Compiler {
 
         type B = BinaryOpType;
         match binary.type_ {
-            B::NotEqual     => self.write_ops(Op::Equal,   Op::Not),
-            B::Equal        => self.write_op (Op::Equal),
-            B::Greater      => self.write_op (Op::Greater),
-            B::GreaterEqual => self.write_ops(Op::Less,    Op::Not),
-            B::Less         => self.write_op (Op::Less),
-            B::LessEqual    => self.write_ops(Op::Greater, Op::Not),
+            B::NotEqual     => self.write_ops(Op::Equal,   Op::Not, ctx),
+            B::Equal        => self.write_op (Op::Equal,            ctx),
+            B::Greater      => self.write_op (Op::Greater,          ctx),
+            B::GreaterEqual => self.write_ops(Op::Less,    Op::Not, ctx),
+            B::Less         => self.write_op (Op::Less,             ctx),
+            B::LessEqual    => self.write_ops(Op::Greater, Op::Not, ctx),
 
-            B::Add          => self.write_op (Op::Add),
-            B::Subtract     => self.write_op (Op::Subtract),
-            B::Multiply     => self.write_op (Op::Multiply),
-            B::Divide       => self.write_op (Op::Divide),
+            B::Add          => self.write_op (Op::Add,      ctx),
+            B::Subtract     => self.write_op (Op::Subtract, ctx),
+            B::Multiply     => self.write_op (Op::Multiply, ctx),
+            B::Divide       => self.write_op (Op::Divide,   ctx),
         };
     }
 
@@ -294,8 +304,8 @@ impl Compiler {
 
         type U = UnaryOpType;
         match unary.type_ {
-            U::Negate     => self.write_op(Op::Negate),
-            U::LogicalNot => self.write_op(Op::Not),
+            U::Negate     => self.write_op(Op::Negate, ctx),
+            U::LogicalNot => self.write_op(Op::Not,    ctx),
         };
     }
 
@@ -305,10 +315,10 @@ impl Compiler {
         let local = self.resolve_local(&var.name);
 
         match local {
-            Some(index) => self.write_op(Op::GetLocal { index, }),
+            Some(index) => self.write_op(Op::GetLocal { index, }, ctx),
             None        => {
                 let name = self.make_identifier_constant(var.name, ctx);
-                self.write_op(Op::GetGlobal { name, })
+                self.write_op(Op::GetGlobal { name }, ctx)
             }
         };
 
@@ -318,7 +328,7 @@ impl Compiler {
         self.line = get.name.line;
 
         let name = self.make_identifier_constant(get.name, ctx);
-        self.write_op(Op::GetGlobal { name, });
+        self.write_op(Op::GetGlobal { name, }, ctx);
     }
 
     fn compile_set_expr(&mut self, set: Set, ctx: &mut Context) {
@@ -327,7 +337,7 @@ impl Compiler {
         let name = self.make_identifier_constant(set.name, ctx);
         self.compile_expr(*set.value, ctx);
 
-        self.write_op(Op::SetGlobal { name, });
+        self.write_op(Op::SetGlobal { name, }, ctx);
     }
 
     fn compile_super_expr(&mut self, _super: Super) {
@@ -341,13 +351,13 @@ impl Compiler {
 
     // Variables
 
-    fn emit_constant(&mut self, value: Value) -> BytecodeIndex {
-        let index = self.current_chunk_mut().add_constant(value);
+    fn emit_constant(&mut self, value: Value, ctx: &mut Context) -> BytecodeIndex {
+        let index = self.current_chunk_mut(ctx).add_constant(value);
 
-        self.write_op(Op::Constant { index, })
+        self.write_op(Op::Constant { index, }, ctx)
     }
 
-    fn emit_jump(&mut self, jump: JumpType) -> BytecodeIndex {
+    fn emit_jump(&mut self, jump: JumpType, ctx: &mut Context) -> BytecodeIndex {
         let max = Offset(usize::MAX);
 
         let op = match jump {
@@ -356,16 +366,18 @@ impl Compiler {
             JumpType::Always  => Op::Jump        { offset: max },
         };
 
-        self.write_op(op)
+        self.write_op(op, ctx)
     }
 
-    fn patch_jump(&mut self, index: BytecodeIndex) {
+    fn patch_jump(&mut self, index: BytecodeIndex, ctx: &mut Context) {
         let index = index.0;
 
-        let new_offset = self.chunk.code.len() - index -1;
+        let chunk = self.current_chunk_mut(ctx);
+
+        let new_offset = chunk.code.len() - index -1;
         let new_offset = Offset(new_offset);
 
-        let op = &mut self.chunk.code[index];
+        let op = &mut chunk.code[index];
 
         match op {
             Op::JumpIfTrue  { offset } => *offset = new_offset,
@@ -376,20 +388,20 @@ impl Compiler {
         };
     }
 
-    fn emit_loop(&mut self, loop_start: BytecodeIndex) -> BytecodeIndex {
+    fn emit_loop(&mut self, loop_start: BytecodeIndex, ctx: &mut Context) -> BytecodeIndex {
         let loop_start = loop_start.0;
 
-        let offset = self.current_chunk().code.len() - loop_start +1;
+        let offset = self.current_chunk(ctx).code.len() - loop_start +1;
         let offset = Offset(offset);
 
-        self.write_op(Op::Loop { offset, })
+        self.write_op(Op::Loop { offset, }, ctx)
     }
 
 
     fn make_identifier_constant(&mut self, name: Token, ctx: &mut Context) -> ConstIndex {
         let val = str_to_val(name.lexeme, ctx);
 
-        let index = self.current_chunk_mut().add_constant(val);
+        let index = self.current_chunk_mut(ctx).add_constant(val);
 
         // self.write_op(Op::Constant { index, });
 
@@ -411,8 +423,8 @@ impl Compiler {
         self.add_local(name.clone());
     }
 
-    fn define_global(&mut self, index: ConstIndex) {
-        self.write_op(Op::DefGlobal { name: index, });
+    fn define_global(&mut self, index: ConstIndex, ctx: &mut Context) {
+        self.write_op(Op::DefGlobal { name: index, }, ctx);
     }
 
     fn add_local(&mut self, name: Token) {
@@ -448,40 +460,52 @@ impl Compiler {
 
     // utils
 
-    fn current_chunk(&self) -> &Chunk {
-        &self.chunk
+    fn current_chunk<'a>(&self, ctx: &'a Context) -> &'a Chunk {
+        let func_id = self.functions.last().expect("Function stack must not be empty").1;
+
+        let func = ctx.get(func_id);
+
+        let func: &ObjFunction = func.into();
+
+        &func.chunk
     }
 
-    fn current_chunk_mut<'b>(&'b mut self) -> &'b mut Chunk {
-        &mut self.chunk
+    fn current_chunk_mut<'b>(&mut self, ctx: &'b mut Context) -> &'b mut Chunk {
+        let func_id = self.functions.last_mut().expect("Function stack must not be empty").1;
+
+        let func = ctx.get_mut(func_id);
+
+        let func: &'b mut ObjFunction = func.into();
+
+        &mut func.chunk
     }
 
-    fn write_op(&mut self, op: OpCode) -> BytecodeIndex {
+    fn write_op(&mut self, op: OpCode, ctx: &mut Context) -> BytecodeIndex {
         let line = self.line;
-        self.current_chunk_mut().write_op(op, line)
+        self.current_chunk_mut(ctx).write_op(op, line)
     }
-    fn write_ops(&mut self, op1: OpCode, op2: OpCode) -> BytecodeIndex {
+    fn write_ops(&mut self, op1: OpCode, op2: OpCode, ctx: &mut Context) -> BytecodeIndex {
         let line = self.line;
-        let chunk = self.current_chunk_mut();
+        let chunk = self.current_chunk_mut(ctx);
         chunk.write_op(op1, line);
         chunk.write_op(op2, line)
     }
 
-    fn write_pop(&mut self) -> BytecodeIndex {
-        self.write_op(Op::Pop)
+    fn write_pop(&mut self, ctx: &mut Context) -> BytecodeIndex {
+        self.write_op(Op::Pop, ctx)
     }
 
     fn begin_scope(&mut self) {
         self.scope_depth += 1;
     }
 
-    fn end_scope(&mut self) {
+    fn end_scope(&mut self, ctx: &mut Context) {
         self.scope_depth -= 1;
 
         let pop_count = self.locals.iter().filter(|l| l.depth > self.scope_depth).count();
 
         for _ in 0..pop_count {
-            self.write_pop();
+            self.write_pop(ctx);
             self.locals.pop();
         }
     }

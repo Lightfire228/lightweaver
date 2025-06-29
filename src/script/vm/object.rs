@@ -23,7 +23,7 @@ pub struct ObjString {
 pub struct ObjFunction {
     pub arity: usize,
     pub chunk: Chunk,
-    pub name:  String,
+    pub name:  ObjectId,
 }
 
 impl Obj {
@@ -70,9 +70,54 @@ impl From<ObjString> for Obj {
     }
 }
 
+impl<'a> From<&'a Obj> for &'a ObjString {
+    fn from(value: &'a Obj) -> Self {
+        match &value.type_ {
+            ObjType::String(obj) => &obj,
+            _                    => panic!("Unable to cast {:?} as String", value.type_)
+        }
+    }
+}
+
 impl PartialEq for ObjFunction {
     fn eq(&self, other: &Self) -> bool {
         self == other
+    }
+}
+
+impl ObjFunction {
+    pub fn new(chunk_name: String, func_name: ObjectId) -> Self {
+        Self {
+            arity: 0,
+            chunk: Chunk::new(chunk_name),
+            name:  func_name,
+        }
+    }
+}
+
+impl From<ObjFunction> for Obj {
+    fn from(value: ObjFunction) -> Self {
+        Self::new(ObjType::Function(value))
+    }
+}
+
+impl<'a> From<&'a Obj> for &'a ObjFunction {
+    fn from(value: &'a Obj) -> Self {
+        match &value.type_ {
+            ObjType::Function(obj) => &obj,
+            _                      => panic!("Unable to cast {:?} as Function", value.type_)
+        }
+    }
+}
+
+impl<'a> From<&'a mut Obj> for &'a mut ObjFunction {
+    fn from(value: &'a mut Obj) -> Self {
+        let typename = format!("{:?}", &value.type_);
+
+        match &mut value.type_ {
+            ObjType::Function(obj) => obj,
+            _                      => panic!("Unable to cast {typename} as Function")
+        }
     }
 }
 
