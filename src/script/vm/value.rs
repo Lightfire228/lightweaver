@@ -3,7 +3,7 @@ use crate::script::vm::gc::{Context, ObjectId};
 use super::object::{Obj, ObjType};
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Value {
     Number(f64),
     Bool  (bool),

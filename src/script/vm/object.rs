@@ -23,7 +23,7 @@ pub struct ObjString {
 pub struct ObjFunction {
     pub arity: usize,
     pub chunk: Chunk,
-    pub name:  ObjectId,
+    pub name:  String,
 }
 
 impl Obj {
@@ -86,11 +86,11 @@ impl PartialEq for ObjFunction {
 }
 
 impl ObjFunction {
-    pub fn new(chunk_name: String, func_name: ObjectId) -> Self {
+    pub fn new(name: String) -> Self {
         Self {
             arity: 0,
-            chunk: Chunk::new(chunk_name),
-            name:  func_name,
+            chunk: Chunk::new(name.clone()),
+            name:  name,
         }
     }
 }

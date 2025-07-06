@@ -147,8 +147,8 @@ impl Vm {
         &self.get_chunk().code[self.ip -1]
     }
 
-    fn get_constant(&self, index: ConstIndex) -> &Value {
-        &self.get_chunk().constants[index.0]
+    fn get_constant(&self, index: ConstIndex) -> Value {
+        self.get_chunk().constants[index.0]
     }
 
     fn pop_stack(&mut self) -> Value {
@@ -169,9 +169,9 @@ impl Vm {
         )
     }
 
-    fn peek_stack(&self, index: usize) -> &Value {
+    fn peek_stack(&self, index: usize) -> Value {
         let index = self.stack.len() - index -1;
-        &self.stack[index]
+        self.stack[index]
     }
 
     // op codes
@@ -179,7 +179,7 @@ impl Vm {
     fn op_constant(&mut self, index: ConstIndex) {
         let constant = self.get_constant(index);
 
-        self.push_stack(constant.clone());
+        self.push_stack(constant);
     }
 
     fn op_def_global(&mut self, name: ConstIndex) {
@@ -200,7 +200,7 @@ impl Vm {
             },
         };
 
-        self.push_stack(value.clone());
+        self.push_stack(*value);
 
         Ok(())
     }
@@ -213,7 +213,7 @@ impl Vm {
             Err(self.runtime_error(&msg))?
         }
 
-        *self.globals.get_mut(&name).unwrap() = self.peek_stack(0).clone();
+        *self.globals.get_mut(&name).unwrap() = self.peek_stack(0);
 
         Ok(())
     }
@@ -221,14 +221,14 @@ impl Vm {
     fn op_get_local(&mut self, index: StackIndex) {
         let index = index.0;
 
-        self.push_stack(self.stack[index +1].clone());
+        self.push_stack(self.stack[index]);
     }
 
     fn op_set_local(&mut self, index: StackIndex) {
         let index = index.0;
 
-        let value = self.peek_stack(0).clone();
-        self.stack[index +1] = value;
+        let value = self.peek_stack(0);
+        self.stack[index] = value;
     }
 
     fn op_jump_if(&mut self, jump_type: JumpType, offset: Offset) {

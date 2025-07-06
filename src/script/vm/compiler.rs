@@ -1,16 +1,15 @@
 
-use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::Token, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::{ObjFunction}}};
+use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::ObjFunction}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
 type Op = OpCode;
 
-type Func = (FuncType, ObjectId);
+// type Func = (FuncType, ObjectId);
 
 
 pub struct Compiler {
     line:        usize,
-    locals:      Vec<Local>,
     scope_depth: usize,
     functions:   Vec<Func>
 }
@@ -32,6 +31,13 @@ enum FuncType {
     Script,
 }
 
+struct Func {
+    pub type_:    FuncType,
+    pub locals:   Vec<Local>,
+    pub func_obj: ObjectId,
+}
+
+
 #[derive(Debug)]
 pub struct CompileError {
     pub msg: String
@@ -46,19 +52,36 @@ enum JumpType {
     Always,
 }
 
+impl Func {
+    pub fn new(type_: FuncType, func_obj: ObjectId, first_slot: Local) -> Self {
+        Self {
+            type_,
+            func_obj,
+            locals: vec![first_slot],
+        }
+    }
+}
+
 impl Compiler {
 
     fn new(ctx: &mut Context) -> Self {
         let name = "script";
 
-        let func  = ObjFunction::new(name.to_owned(), ctx.add_string(name));
+        let func  = ObjFunction::new(name.to_owned());
         let id    = ctx.add(func.into());
+
+        let script_local = Local {
+            name:        Token::new(TokenType::Identifier, "", 0, 0),
+            depth:       0,
+            initialized: true,
+        };
+
+        let func = Func::new(FuncType::Script, id, script_local);
 
         Self {
             line:        0,
-            locals:      vec![],
             scope_depth: 0,
-            functions:   vec![(FuncType::Script, id)]
+            functions:   vec![func],
         }
     }
 
@@ -72,7 +95,7 @@ impl Compiler {
 
         compiler.write_op(Op::Return, ctx);
 
-        Ok(compiler.functions.first().expect("Function stack cannot be empty").1)
+        Ok(compiler.functions.first().expect("Function stack cannot be empty").func_obj)
 
     }
 
@@ -410,7 +433,7 @@ impl Compiler {
 
     fn declare_local(&mut self, name: &Token) {
         // TODO: allow locals to shadow each other?
-        for local in self.locals.iter().rev() {
+        for local in self.current_func().locals.iter().rev() {
             if local.initialized && local.depth < self.scope_depth {
                 break;
             }
@@ -428,15 +451,17 @@ impl Compiler {
     }
 
     fn add_local(&mut self, name: Token) {
-        self.locals.push(Local {
+        let depth = self.scope_depth;
+
+        self.current_func_mut().locals.push(Local {
             name,
-            depth:       self.scope_depth,
+            depth,
             initialized: false,
         });
     }
 
     fn resolve_local(&self, name: &Token) -> Option<StackIndex> {
-        for (i, local) in self.locals.iter().enumerate().rev() {
+        for (i, local) in self.current_func().locals.iter().enumerate().rev() {
 
             if local.name.lexeme == name.lexeme {
 
@@ -452,7 +477,7 @@ impl Compiler {
     }
 
     fn mark_initialized(&mut self) {
-        let local = self.locals.last_mut().expect("No Local to mark initialized");
+        let local = self.current_func_mut().locals.last_mut().expect("No Local to mark initialized");
 
         local.initialized = true;
     }
@@ -461,7 +486,7 @@ impl Compiler {
     // utils
 
     fn current_chunk<'a>(&self, ctx: &'a Context) -> &'a Chunk {
-        let func_id = self.functions.last().expect("Function stack must not be empty").1;
+        let func_id = self.current_func().func_obj;
 
         let func = ctx.get(func_id);
 
@@ -471,13 +496,29 @@ impl Compiler {
     }
 
     fn current_chunk_mut<'b>(&mut self, ctx: &'b mut Context) -> &'b mut Chunk {
-        let func_id = self.functions.last_mut().expect("Function stack must not be empty").1;
+        let func_id = self.current_func().func_obj;
 
         let func = ctx.get_mut(func_id);
 
         let func: &'b mut ObjFunction = func.into();
 
         &mut func.chunk
+    }
+
+    fn current_func(&self) -> &Func {
+        self.functions.last().expect("Function stack must not be empty")
+    }
+
+    fn current_func_mut(&mut self) -> &mut Func {
+        self.functions.last_mut().expect("Function stack must not be empty")
+    }
+
+    fn push_func(&mut self, func_type: FuncType, func_id: ObjectId, first_slot: Local) {
+        self.functions.push(Func::new(func_type, func_id, first_slot));
+    }
+
+    fn pop_func(&mut self) {
+        self.functions.pop();
     }
 
     fn write_op(&mut self, op: OpCode, ctx: &mut Context) -> BytecodeIndex {
@@ -502,13 +543,20 @@ impl Compiler {
     fn end_scope(&mut self, ctx: &mut Context) {
         self.scope_depth -= 1;
 
-        let pop_count = self.locals.iter().filter(|l| l.depth > self.scope_depth).count();
+        let depth  = self.scope_depth;
+        let locals = &mut self.current_func_mut().locals;
+
+        let pop_count = locals.iter().filter(|l| l.depth > depth).count();
+
+        for _ in 0..pop_count {
+            locals.pop();
+        }
 
         for _ in 0..pop_count {
             self.write_pop(ctx);
-            self.locals.pop();
         }
     }
+
 
 }
 
