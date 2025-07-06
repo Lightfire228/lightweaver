@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::{Deref, DerefMut}};
 
 use super::value::Value;
 
@@ -108,5 +108,19 @@ impl Display for OpCode {
             OpCode::Print                        => format!("Print"),
             OpCode::Return                       => format!("Return"),
         })
+    }
+}
+
+impl Deref for BytecodeIndex {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BytecodeIndex {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

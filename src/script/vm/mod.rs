@@ -4,12 +4,9 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
-use crate::script::{
-    vm::{
+use crate::script::vm::{
         chunk::{
-            ConstIndex,
-            Offset,
-            StackIndex
+            BytecodeIndex, ConstIndex, Offset, StackIndex
         },
         debug ::print_stack,
         gc    ::ObjectId,
@@ -17,8 +14,7 @@ use crate::script::{
             ObjFunction,
             ObjString,
         }
-    }
-};
+    };
 
 pub mod chunk;
 pub mod debug;
@@ -34,10 +30,6 @@ pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
 
     let mut vm  = Vm::new(ctx, script_func);
 
-    let     val = Value::Obj(script_func);
-
-    vm.push_stack(val);
-
     vm.get_chunk().disassemble(&[], &vm.ctx);
     println!();
 
@@ -46,11 +38,17 @@ pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
 
 // TODO: String interning
 pub struct Vm {
-    function: ObjectId,
-    ip:       usize,
-    stack:    Vec<Value>,
-    globals:  HashMap<String, Value>,
-    ctx:      Context,
+    ip:         BytecodeIndex,
+    stack:      Vec<Value>,
+    call_stack: Vec<CallFrame>,
+    globals:    HashMap<String, Value>,
+    ctx:        Context,
+}
+
+struct CallFrame {
+    pub stack_offset: StackIndex,
+    pub ip:           BytecodeIndex,
+    pub func_obj:     ObjectId,
 }
 
 pub struct RuntimeError {
@@ -75,12 +73,23 @@ enum JumpType {
 
 impl Vm {
     pub fn new(ctx: Context, script_func: ObjectId) -> Self {
+        let call_frame = CallFrame {
+           stack_offset: StackIndex   (0),
+           ip:           BytecodeIndex(0),
+           func_obj:     script_func,
+        };
+
         Self {
-            function: script_func,
-            ip:       0,
-            stack:    vec![],
             globals:  HashMap::new(),
             ctx,
+            ip:       BytecodeIndex(0),
+
+            stack: vec![
+                Value::new_obj(script_func)
+            ],
+            call_stack: vec![
+                call_frame
+            ],
         }
     }
 
@@ -92,7 +101,7 @@ impl Vm {
 
             if DEBUG_TRACE_EXECUTION {
                 let chunk = self.get_chunk();
-                chunk.code[self.ip].disassemble(&chunk, self.ip, &self.ctx);
+                chunk.code[*self.ip].disassemble(&chunk, *self.ip, &self.ctx);
                 print_stack(&self.stack, &self.ctx);
                 println!();
             }
@@ -142,9 +151,9 @@ impl Vm {
     }
 
     fn get_instruction(&mut self) -> &OpCode {
-        self.ip += 1;
+        *self.ip += 1;
 
-        &self.get_chunk().code[self.ip -1]
+        &self.get_chunk().code[*self.ip -1]
     }
 
     fn get_constant(&self, index: ConstIndex) -> Value {
@@ -242,20 +251,20 @@ impl Vm {
         };
 
         if is_falsey == jump_on_false {
-            self.ip += offset;
+            *self.ip += offset;
         }
     }
 
     fn op_jump(&mut self, offset: Offset) {
         let offset = offset.0;
 
-        self.ip += offset;
+        *self.ip += offset;
     }
 
     fn op_loop(&mut self, offset: Offset) {
         let offset = offset.0;
 
-        self.ip -= offset;
+        *self.ip -= offset;
     }
 
 
@@ -351,7 +360,7 @@ impl Vm {
     fn runtime_error(&self, msg: &str) -> RuntimeError {
         RuntimeError {
             msg:  msg.to_owned(),
-            line: self.get_chunk().lines[self.ip -1],
+            line: self.get_chunk().lines[*self.ip -1],
         }
     }
 
@@ -366,7 +375,9 @@ impl Vm {
         // TODO: this is a stupid amount of dereferencing each time chunk is accessed,
         //       which is a lot
 
-        let obj = self.ctx.get(self.function);
+        let obj = self.call_stack.last().expect("Call stack must not be empty");
+
+        let obj = self.ctx.get(obj.func_obj);
 
         let obj: &ObjFunction = obj.into();
 
