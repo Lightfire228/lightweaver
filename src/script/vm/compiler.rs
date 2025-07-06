@@ -67,7 +67,7 @@ impl Compiler {
     fn new(ctx: &mut Context) -> Self {
         let name = "script";
 
-        let func  = ObjFunction::new(name.to_owned());
+        let func  = ObjFunction::new(name.to_owned(), 0);
         let id    = ctx.add(func.into());
 
         let script_local = Local {
@@ -106,7 +106,7 @@ impl Compiler {
             Stmt::Block      (stmt) => self.compile_block_stmt (stmt,      ctx)?,
             Stmt::Class      (stmt) => self.compile_class_decl (stmt),
             Stmt::Expression (stmt) => self.compile_expr_stmt  (stmt,      ctx),
-            Stmt::Function   (stmt) => self.compile_func_decl  (stmt),
+            Stmt::Function   (stmt) => self.compile_func_decl  (stmt,      ctx)?,
             Stmt::If         (stmt) => self.compile_if_stmt    (stmt,      ctx)?,
             Stmt::Print      (stmt) => self.compile_print_stmt (stmt.expr, ctx),
             Stmt::Return     (stmt) => self.compile_return_stmt(stmt),
@@ -139,8 +139,42 @@ impl Compiler {
         self.write_pop(ctx);
     }
 
-    fn compile_func_decl(&mut self, _func: FunctionStmt) {
-        todo!()
+    fn compile_func_decl(&mut self, func: FunctionStmt, ctx: &mut Context) -> CompilerResult<()> {
+
+        let index = self.declare_variable(func.name.clone(), ctx);
+        self.mark_initialized();
+
+        for arg in func.params.iter() {
+            self.declare_local(arg);
+        }
+
+        self.make_function(func.name, func.params.len(), *func.body, FuncType::Function, ctx)?;
+
+        if self.scope_depth == 0 {
+            self.define_global(index, ctx);
+        }
+
+        Ok(())
+    }
+
+    fn make_function(&mut self, name: Token, arity: usize, body: Vec<Stmt>, func_type: FuncType, ctx: &mut Context) -> CompilerResult<ObjectId> {
+        let obj  = ObjFunction::new(name.lexeme.clone(), arity);
+        let obj  = ctx.add(obj.into());
+
+        self.push_func(func_type, obj, Local {
+            name,
+            depth:       self.scope_depth +1,
+            initialized: true,
+        });
+
+        self.compile_block_stmt(Block { stmts: Box::new(body) }, ctx)?;
+
+        let func = self.pop_func();
+
+        self.emit_constant(Value::Obj(func.func_obj), ctx);
+
+        Ok(obj)
+
     }
 
     fn compile_if_stmt(&mut self, if_stmt: IfStmt, ctx: &mut Context) -> CompilerResult<()> {
@@ -173,17 +207,8 @@ impl Compiler {
     }
 
     fn compile_var_decl(&mut self, stmt: VarStmt, ctx: &mut Context) -> CompilerResult<()> {
-        self.line = stmt.name.line;
-
-        let     local = self.scope_depth > 0;
-        let mut index = ConstIndex(0);
-
-        if local {
-            self.declare_local(&stmt.name);
-        }
-        else {
-            index = self.make_identifier_constant(stmt.name.clone(), ctx);
-        }
+        let index = self.declare_variable(stmt.name, ctx);
+        let local = self.scope_depth > 0;
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr, ctx),
@@ -199,7 +224,20 @@ impl Compiler {
             // Global declarations must not
         }
         Ok(())
+    }
 
+    fn declare_variable(&mut self, name: Token, ctx: &mut Context) -> ConstIndex {
+        self.line = name.line;
+
+        let local = self.scope_depth > 0;
+
+        if local {
+            self.declare_local(&name);
+            ConstIndex(0)
+        }
+        else {
+            self.make_identifier_constant(name.clone(), ctx)
+        }
     }
 
     fn compile_while_stmt(&mut self, while_: WhileStmt, ctx: &mut Context) -> CompilerResult<()> {
@@ -474,6 +512,10 @@ impl Compiler {
     }
 
     fn mark_initialized(&mut self) {
+        if self.scope_depth == 0 {
+            return;
+        }
+
         let local = self.current_func_mut().locals.last_mut().expect("No Local to mark initialized");
 
         local.initialized = true;
@@ -514,8 +556,8 @@ impl Compiler {
         self.functions.push(Func::new(func_type, func_id, first_slot));
     }
 
-    fn pop_func(&mut self) {
-        self.functions.pop();
+    fn pop_func(&mut self) -> Func {
+        self.functions.pop().expect("Function stack must not be empty")
     }
 
     fn write_op(&mut self, op: OpCode, ctx: &mut Context) -> BytecodeIndex {

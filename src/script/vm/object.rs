@@ -50,8 +50,8 @@ impl Eq for Obj {}
 impl Display for Obj {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\"{}\"", match &self.type_ {
-            ObjType::String  (str)  => &str.string,
-            ObjType::Function(_unc) => "<fn>",
+            ObjType::String  (str)  => str.string.clone(),
+            ObjType::Function(func) => format!("<fn {}>", func.name),
         })
     }
 }
@@ -86,9 +86,9 @@ impl PartialEq for ObjFunction {
 }
 
 impl ObjFunction {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, arity: usize) -> Self {
         Self {
-            arity: 0,
+            arity,
             chunk: Chunk::new(name.clone()),
             name:  name,
         }
