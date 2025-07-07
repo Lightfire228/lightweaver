@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::{Add, AddAssign, Deref, DerefMut, SubAssign}};
+use std::{fmt::Display, ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign}};
 
 use super::value::Value;
 
@@ -137,6 +137,22 @@ impl AddAssign for BytecodeIndex {
 impl SubAssign for BytecodeIndex {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
+    }
+}
+
+impl Add for BytecodeIndex {
+    type Output = usize;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.0 + rhs.0
+    }
+}
+
+impl Sub for BytecodeIndex {
+    type Output = usize;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.0 - rhs.0
     }
 }
 

@@ -37,7 +37,6 @@ pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
 
 // TODO: String interning
 pub struct Vm {
-    ip:         BytecodeIndex,
     stack:      Vec<Value>,
     call_stack: Vec<CallFrame>,
     globals:    HashMap<String, Value>,
@@ -47,7 +46,6 @@ pub struct Vm {
 struct CallFrame {
     pub stack_offset: StackIndex,
     pub ip:           BytecodeIndex,
-    pub return_addr:  BytecodeIndex,
     pub func_obj:     ObjectId,
     pub arity:        usize,
 }
@@ -77,7 +75,6 @@ impl Vm {
         let call_frame = CallFrame {
            stack_offset: StackIndex   (0),
            ip:           BytecodeIndex(0),
-           return_addr:  BytecodeIndex(0),
            func_obj:     script_func,
            arity:        0,
         };
@@ -85,7 +82,6 @@ impl Vm {
         Self {
             globals:  HashMap::new(),
             ctx,
-            ip:       BytecodeIndex(0),
 
             stack: vec![
                 Value::new_obj(script_func)
@@ -104,7 +100,7 @@ impl Vm {
 
             if DEBUG_TRACE_EXECUTION {
                 let chunk = self.get_chunk();
-                chunk.code[*self.ip].disassemble(&chunk, *self.ip, &self.ctx);
+                chunk.code[**self.ip()].disassemble(&chunk, **self.ip(), &self.ctx);
                 print_stack(&self.stack, &self.ctx);
                 println!();
             }
@@ -150,7 +146,6 @@ impl Vm {
                 O::Return                       => {
                     let result = self.pop_stack();
                     let frame  = self.pop_call_stack();
-                    self.ip = frame.return_addr;
 
                     if self.call_stack.len() == 0 {
                         return Ok(())
@@ -167,9 +162,9 @@ impl Vm {
     }
 
     fn get_instruction(&mut self) -> &OpCode {
-        *self.ip += 1;
+        **self.ip_mut() += 1;
 
-        &self.get_chunk().code[*self.ip -1]
+        &self.get_chunk().code[**self.ip() -1]
     }
 
     fn get_constant(&self, index: ConstIndex) -> Value {
@@ -269,20 +264,20 @@ impl Vm {
         };
 
         if is_falsey == jump_on_false {
-            *self.ip += offset;
+            **self.ip_mut() += offset;
         }
     }
 
     fn op_jump(&mut self, offset: Offset) {
         let offset = offset.0;
 
-        *self.ip += offset;
+        **self.ip_mut() += offset;
     }
 
     fn op_loop(&mut self, offset: Offset) {
         let offset = offset.0;
 
-        *self.ip -= offset;
+        **self.ip_mut() -= offset;
     }
 
     fn op_call(&mut self, arg_count: usize) -> RuntimeResult<()> {
@@ -382,14 +377,11 @@ impl Vm {
 
     fn runtime_error(&self, msg: String) -> RuntimeError {
 
-        // TODO: stack trace
-        // for frame in self.call_stack.iter().rev() {
-
-        // }
+        self.print_stack_trace();
 
         RuntimeError {
             msg:  msg,
-            line: self.get_chunk().lines[*self.ip -1],
+            line: self.get_chunk().lines[**self.ip() -1],
         }
     }
 
@@ -404,7 +396,7 @@ impl Vm {
         // TODO: this is a stupid amount of dereferencing each time chunk is accessed,
         //       which is a lot
 
-        let obj = self.call_stack.last().expect("Call stack must not be empty");
+        let obj = self.call_frame();
 
         let obj = self.ctx.get(obj.func_obj);
 
@@ -413,8 +405,24 @@ impl Vm {
         &obj.chunk
     }
 
+    fn ip(&self) -> &BytecodeIndex {
+        &self.call_frame().ip
+    }
+
+    fn ip_mut(&mut self) -> &mut BytecodeIndex {
+        &mut self.call_frame_mut().ip
+    }
+
+    fn call_frame(&self) -> &CallFrame {
+        self.call_stack.last().expect("Call stack must not be empty")
+    }
+
+    fn call_frame_mut(&mut self) -> &mut CallFrame {
+        self.call_stack.last_mut().expect("Call stack must not be empty")
+    }
+
     fn get_local(&self, index: StackIndex) -> Value {
-        let frame = self.call_stack.last().expect("Call stack must not be empty");
+        let frame = self.call_frame();
 
         self.stack[*frame.stack_offset + *index]
     }
@@ -456,19 +464,27 @@ impl Vm {
 
         self.call_stack.push(CallFrame {
             stack_offset: StackIndex   (offset),
-            return_addr:  self.ip,
             ip:           BytecodeIndex(0),
             func_obj,
             arity:        func_arity,
         });
 
-        self.ip = BytecodeIndex(0);
-
         Ok(())
     }
 
+    fn print_stack_trace(&self) {
 
+
+
+        let top = self.call_frame();
+
+        for frame in self.call_stack.iter().rev().skip(1) {
+
+        }
+    }
 }
+
+
 
 fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
 
@@ -478,3 +494,9 @@ fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
 
     Value::new_obj(id)
 }
+
+
+
+// TODO:
+// - stack trace
+// - native funcs
