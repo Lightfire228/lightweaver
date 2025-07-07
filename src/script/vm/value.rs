@@ -92,6 +92,15 @@ impl Value {
             Value::Nil       => "nil".to_owned(),
         }
     }
+
+    pub fn display_type(&self) -> String {
+        match self {
+            Value::Obj   (_) => "Object" .to_owned(),
+            Value::Number(_) => "Number" .to_owned(),
+            Value::Bool  (_) => "Boolean".to_owned(),
+            Value::Nil       => "Nil"    .to_owned(),
+        }
+    }
 }
 
 

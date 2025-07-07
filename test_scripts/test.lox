@@ -76,8 +76,16 @@
 // }
 
 
-fun areWeHavingItYet() {
-  print "Yes we are!";
+// fun areWeHavingItYet() {
+//   print "Yes we are!";
+// }
+
+// areWeHavingItYet();
+// // print areWeHavingItYet;
+
+fun fib(n) {
+  if (n < 2) return n;
+  return fib(n - 2) + fib(n - 1);
 }
 
-print areWeHavingItYet;
+print fib(10);

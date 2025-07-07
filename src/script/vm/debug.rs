@@ -40,6 +40,8 @@ impl OpCode {
             O::Jump        { offset }    => jump_instruction    ("OP_JUMP",          ip, offset.0,  1),
             O::Loop        { offset }    => jump_instruction    ("OP_LOOP",          ip, offset.0, -1),
 
+            O::Call        { arg_count } => byte_instruction    ("OP_CALL",          *arg_count),
+
             O::Nil                       => simple_instruction  ("OP_NIL"),
             O::True                      => simple_instruction  ("OP_TRUE"),
             O::False                     => simple_instruction  ("OP_FALSE"),

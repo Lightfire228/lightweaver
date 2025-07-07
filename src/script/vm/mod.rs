@@ -12,7 +12,7 @@ use crate::script::vm::{
         gc    ::ObjectId,
         object::{
             ObjFunction,
-            ObjString,
+            ObjString, ObjType,
         }
     };
 
@@ -26,12 +26,11 @@ pub mod gc;
 
 static DEBUG_TRACE_EXECUTION: bool = true;
 
+static STACK_FRAMES_MAX: usize = 10000; // ¯\_(ツ)_/¯
+
 pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
 
     let mut vm  = Vm::new(ctx, script_func);
-
-    vm.get_chunk().disassemble(&[], &vm.ctx);
-    println!();
 
     vm.run()
 }
@@ -48,7 +47,9 @@ pub struct Vm {
 struct CallFrame {
     pub stack_offset: StackIndex,
     pub ip:           BytecodeIndex,
+    pub return_addr:  BytecodeIndex,
     pub func_obj:     ObjectId,
+    pub arity:        usize,
 }
 
 pub struct RuntimeError {
@@ -76,7 +77,9 @@ impl Vm {
         let call_frame = CallFrame {
            stack_offset: StackIndex   (0),
            ip:           BytecodeIndex(0),
+           return_addr:  BytecodeIndex(0),
            func_obj:     script_func,
+           arity:        0,
         };
 
         Self {
@@ -108,43 +111,56 @@ impl Vm {
 
             type O = OpCode;
             match *self.get_instruction() {
-                O::Constant    { index }  => self.op_constant  (index),
+                O::Constant    { index }        => self.op_constant  (index),
 
-                O::DefGlobal   { name }   => self.op_def_global(name),
-                O::GetGlobal   { name }   => self.op_get_global(name)?,
-                O::SetGlobal   { name }   => self.op_set_global(name)?,
+                O::DefGlobal   { name }         => self.op_def_global(name),
+                O::GetGlobal   { name }         => self.op_get_global(name)?,
+                O::SetGlobal   { name }         => self.op_set_global(name)?,
 
-                O::GetLocal    { index }  => self.op_get_local (index),
-                O::SetLocal    { index }  => self.op_set_local (index),
+                O::GetLocal    { index }        => self.op_get_local (index),
+                O::SetLocal    { index }        => self.op_set_local (index),
 
-                O::JumpIfFalse { offset } => self.op_jump_if(JumpType::IfFalsey, offset),
-                O::JumpIfTrue  { offset } => self.op_jump_if(JumpType::IfTruthy, offset),
-                O::Jump        { offset } => self.op_jump   (offset),
+                O::JumpIfFalse { offset }       => self.op_jump_if(JumpType::IfFalsey, offset),
+                O::JumpIfTrue  { offset }       => self.op_jump_if(JumpType::IfTruthy, offset),
+                O::Jump        { offset }       => self.op_jump   (offset),
 
-                O::Loop        { offset } => self.op_loop   (offset),
+                O::Loop        { offset }       => self.op_loop   (offset),
 
-                O::Nil                    => self.push_stack(Value::Nil),
-                O::True                   => self.push_stack(Value::Bool(true)),
-                O::False                  => self.push_stack(Value::Bool(false)),
+                O::Call        { arg_count }    => self.op_call   (arg_count)?,
 
-                O::Pop                    => self.op_pop(),
+                O::Nil                          => self.push_stack(Value::Nil),
+                O::True                         => self.push_stack(Value::Bool(true)),
+                O::False                        => self.push_stack(Value::Bool(false)),
 
-                O::Equal                  => self.op_equal(),
-                O::Greater                => self.op_binary(BinaryOp::Greater)?,
-                O::Less                   => self.op_binary(BinaryOp::Less)?,
+                O::Pop                          => self.op_pop(),
 
-                O::Add                    => self.op_add()?,
-                O::Subtract               => self.op_binary(BinaryOp::Sub)?,
-                O::Multiply               => self.op_binary(BinaryOp::Mul)?,
-                O::Divide                 => self.op_binary(BinaryOp::Div)?,
+                O::Equal                        => self.op_equal(),
+                O::Greater                      => self.op_binary(BinaryOp::Greater)?,
+                O::Less                         => self.op_binary(BinaryOp::Less)?,
 
-                O::Not                    => self.op_not    (),
+                O::Add                          => self.op_add()?,
+                O::Subtract                     => self.op_binary(BinaryOp::Sub)?,
+                O::Multiply                     => self.op_binary(BinaryOp::Mul)?,
+                O::Divide                       => self.op_binary(BinaryOp::Div)?,
 
-                O::Print                  => self.op_print(),
-                O::Negate                 => self.op_negate ()?,
-                O::Return                 => {
-                    self.op_return();
-                    return Ok(());
+                O::Not                          => self.op_not    (),
+
+                O::Print                        => self.op_print(),
+                O::Negate                       => self.op_negate ()?,
+                O::Return                       => {
+                    let result = self.pop_stack();
+                    let frame  = self.pop_call_stack();
+                    self.ip = frame.return_addr;
+
+                    if self.call_stack.len() == 0 {
+                        return Ok(())
+                    }
+
+                    for _ in 0..frame.arity +1 {
+                        self.pop_stack();
+                    }
+
+                    self.push_stack(result);
                 }
             }
         }
@@ -164,6 +180,10 @@ impl Vm {
         self.stack.pop().expect("Stack cannot be empty")
     }
 
+    fn pop_call_stack(&mut self) -> CallFrame {
+        self.call_stack.pop().expect("Call stack cannot be empty")
+    }
+
     fn push_stack(&mut self, val: Value) {
         self.stack.push(val);
     }
@@ -173,7 +193,7 @@ impl Vm {
             .pop_stack()
             .as_number()
             .ok_or_else(||
-                self.runtime_error("Operand must be a number")
+                self.runtime_error("Operand must be a number".to_owned())
             )?
         )
     }
@@ -205,7 +225,7 @@ impl Vm {
             Some(value) => value,
             None        => {
                 let msg = format!("Undefined variable '{name}'");
-                Err(self.runtime_error(&msg))?
+                Err(self.runtime_error(msg))?
             },
         };
 
@@ -219,7 +239,7 @@ impl Vm {
 
         if self.globals.get(&name).is_none() {
             let msg = format!("Undefined variable '{name}'");
-            Err(self.runtime_error(&msg))?
+            Err(self.runtime_error(msg))?
         }
 
         *self.globals.get_mut(&name).unwrap() = self.peek_stack(0);
@@ -228,9 +248,7 @@ impl Vm {
     }
 
     fn op_get_local(&mut self, index: StackIndex) {
-        let index = index.0;
-
-        self.push_stack(self.stack[index]);
+        self.push_stack(self.get_local(index));
     }
 
     fn op_set_local(&mut self, index: StackIndex) {
@@ -265,6 +283,11 @@ impl Vm {
         let offset = offset.0;
 
         *self.ip -= offset;
+    }
+
+    fn op_call(&mut self, arg_count: usize) -> RuntimeResult<()> {
+        let val = self.peek_stack(arg_count);
+        self.call_value(val, arg_count)
     }
 
 
@@ -307,7 +330,7 @@ impl Vm {
             self.push_stack(Value::Number(a + b));
         }
         else {
-            return Err(self.runtime_error("Operands must be two numbers or two strings"))
+            return Err(self.runtime_error("Operands must be two numbers or two strings".to_owned()))
         }
 
         Ok(())
@@ -357,9 +380,15 @@ impl Vm {
 
     // utils
 
-    fn runtime_error(&self, msg: &str) -> RuntimeError {
+    fn runtime_error(&self, msg: String) -> RuntimeError {
+
+        // TODO: stack trace
+        // for frame in self.call_stack.iter().rev() {
+
+        // }
+
         RuntimeError {
-            msg:  msg.to_owned(),
+            msg:  msg,
             line: self.get_chunk().lines[*self.ip -1],
         }
     }
@@ -383,6 +412,61 @@ impl Vm {
 
         &obj.chunk
     }
+
+    fn get_local(&self, index: StackIndex) -> Value {
+        let frame = self.call_stack.last().expect("Call stack must not be empty");
+
+        self.stack[*frame.stack_offset + *index]
+    }
+
+    fn call_value(&mut self, value: Value, arg_count: usize) -> RuntimeResult<()> {
+
+        let obj = match value {
+            Value::Obj(obj) => obj,
+
+            _ => Err(self.runtime_error(
+                format!("Value of type '{}' is not callable", value.display_type())
+            ))?
+        };
+
+        let obj = self.ctx.get(obj);
+        match &obj.type_ {
+
+            ObjType::Function(func) => self.call(obj.id, func.arity, arg_count)?,
+
+            _ => Err(self.runtime_error(
+                format!("Object of type '{:?}' is not callable", obj.type_)
+            ))?
+        }
+
+        Ok(())
+    }
+
+    fn call(&mut self, func_obj: ObjectId, func_arity: usize, arg_count: usize) -> RuntimeResult<()> {
+
+        if func_arity != arg_count {
+            Err(self.runtime_error(format!("Expected {} arguments but got {}", func_arity, arg_count)))?
+        }
+
+        if self.call_stack.len() > STACK_FRAMES_MAX {
+            Err(self.runtime_error("Stack overflow".to_owned()))?
+        }
+
+        let offset = self.stack.len() - (arg_count + 1);
+
+        self.call_stack.push(CallFrame {
+            stack_offset: StackIndex   (offset),
+            return_addr:  self.ip,
+            ip:           BytecodeIndex(0),
+            func_obj,
+            arity:        func_arity,
+        });
+
+        self.ip = BytecodeIndex(0);
+
+        Ok(())
+    }
+
 
 }
 

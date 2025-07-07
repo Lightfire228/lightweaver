@@ -1,4 +1,6 @@
 
+use std::usize;
+
 use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::ObjFunction}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
@@ -11,7 +13,8 @@ type Op = OpCode;
 pub struct Compiler {
     line:        usize,
     scope_depth: usize,
-    functions:   Vec<Func>
+    functions:   Vec<Func>,
+    fns:         Vec<ObjectId>,
 }
 
 #[derive(Debug)]
@@ -82,10 +85,11 @@ impl Compiler {
             line:        0,
             scope_depth: 0,
             functions:   vec![func],
+            fns:         vec![id],
         }
     }
 
-    pub fn compile(ast: Ast, ctx: &mut Context) -> CompilerResult<ObjectId> {
+    pub fn compile(ast: Ast, ctx: &mut Context) -> CompilerResult<Vec<ObjectId>> {
 
         let mut compiler = Self::new(ctx);
 
@@ -95,7 +99,7 @@ impl Compiler {
 
         compiler.write_op(Op::Return, ctx);
 
-        Ok(compiler.functions.first().expect("Function stack cannot be empty").func_obj)
+        Ok(compiler.fns)
 
     }
 
@@ -109,7 +113,7 @@ impl Compiler {
             Stmt::Function   (stmt) => self.compile_func_decl  (stmt,      ctx)?,
             Stmt::If         (stmt) => self.compile_if_stmt    (stmt,      ctx)?,
             Stmt::Print      (stmt) => self.compile_print_stmt (stmt.expr, ctx),
-            Stmt::Return     (stmt) => self.compile_return_stmt(stmt),
+            Stmt::Return     (stmt) => self.compile_return_stmt(stmt,      ctx),
             Stmt::Var        (stmt) => self.compile_var_decl   (stmt,      ctx)?,
             Stmt::While      (stmt) => self.compile_while_stmt (stmt,      ctx)?,
         };
@@ -141,24 +145,25 @@ impl Compiler {
 
     fn compile_func_decl(&mut self, func: FunctionStmt, ctx: &mut Context) -> CompilerResult<()> {
 
-        let index = self.declare_variable(func.name.clone(), ctx);
+        let global = self.declare_variable(func.name.clone(), ctx);
         self.mark_initialized();
 
-        for arg in func.params.iter() {
-            self.declare_local(arg);
-        }
+        self.begin_scope();
 
-        self.make_function(func.name, func.params.len(), *func.body, FuncType::Function, ctx)?;
+        let func_id = self.make_function(func.name, &func.params, *func.body, FuncType::Function, ctx)?;
+        self.fns.push(func_id);
 
-        if self.scope_depth == 0 {
+        if let Some(index) = global {
             self.define_global(index, ctx);
         }
+
+        self.end_scope(ctx);
 
         Ok(())
     }
 
-    fn make_function(&mut self, name: Token, arity: usize, body: Vec<Stmt>, func_type: FuncType, ctx: &mut Context) -> CompilerResult<ObjectId> {
-        let obj  = ObjFunction::new(name.lexeme.clone(), arity);
+    fn make_function(&mut self, name: Token, arguments: &[Token], body: Vec<Stmt>, func_type: FuncType, ctx: &mut Context) -> CompilerResult<ObjectId> {
+        let obj  = ObjFunction::new(name.lexeme.clone(), arguments.len());
         let obj  = ctx.add(obj.into());
 
         self.push_func(func_type, obj, Local {
@@ -167,9 +172,25 @@ impl Compiler {
             initialized: true,
         });
 
-        self.compile_block_stmt(Block { stmts: Box::new(body) }, ctx)?;
+        self.begin_scope();
+        for arg in arguments {
+            self.add_local(arg.clone());
+            self.mark_initialized();
+        }
+
+        for stmt in body.into_iter() {
+            self.compile_stmt(stmt, ctx)?;
+        }
+
+        let implicit_return = ReturnStmt::new(
+            Token::new(
+                TokenType::Return, "return", 0, 0),
+            None,
+        );
+        self.compile_stmt(implicit_return, ctx)?;
 
         let func = self.pop_func();
+        self.end_scope(ctx);
 
         self.emit_constant(Value::Obj(func.func_obj), ctx);
 
@@ -202,41 +223,47 @@ impl Compiler {
         self.write_op(Op::Print, ctx);
     }
 
-    fn compile_return_stmt(&mut self, _return: ReturnStmt) {
-        todo!()
+    fn compile_return_stmt(&mut self, return_: ReturnStmt, ctx: &mut Context) {
+        if let Some(val) = return_.value {
+            self.compile_expr(val, ctx);
+        }
+        else {
+            self.write_op(Op::Nil, ctx);
+        }
+
+        self.write_op(Op::Return, ctx);
     }
 
     fn compile_var_decl(&mut self, stmt: VarStmt, ctx: &mut Context) -> CompilerResult<()> {
-        let index = self.declare_variable(stmt.name, ctx);
-        let local = self.scope_depth > 0;
+        let global = self.declare_variable(stmt.name, ctx);
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr, ctx),
             None       => { self.write_op(Op::Nil, ctx); }
         }
 
-        if local {
-            self.mark_initialized();
-            // Local delcarations are allowed to leave stack locals
-        }
-        else {
+        if let Some(index) = global {
             self.define_global(index, ctx);
             // Global declarations must not
+        }
+        else {
+            self.mark_initialized();
+            // Local delcarations are allowed to leave stack locals
         }
         Ok(())
     }
 
-    fn declare_variable(&mut self, name: Token, ctx: &mut Context) -> ConstIndex {
+    fn declare_variable(&mut self, name: Token, ctx: &mut Context) -> Option<ConstIndex> {
         self.line = name.line;
 
         let local = self.scope_depth > 0;
 
         if local {
             self.declare_local(&name);
-            ConstIndex(0)
+            None
         }
         else {
-            self.make_identifier_constant(name.clone(), ctx)
+            Some(self.make_identifier_constant(name.clone(), ctx))
         }
     }
 
@@ -264,7 +291,7 @@ impl Compiler {
         match expr {
             Expr::Assign   (expr) => self.compile_assign_expr (expr,       ctx),
             Expr::Binary   (expr) => self.compile_binary_expr (expr,       ctx),
-            Expr::Call     (expr) => self.compile_call_expr   (expr),
+            Expr::Call     (expr) => self.compile_call_expr   (expr,       ctx),
             Expr::Get      (expr) => self.compile_get_expr    (expr,       ctx),
             Expr::Grouping (expr) => self.compile_expr        (*expr.expr, ctx),
             Expr::Literal  (expr) => self.compile_literal_expr(expr,       ctx),
@@ -353,8 +380,16 @@ impl Compiler {
         };
     }
 
-    fn compile_call_expr(&mut self, _call: Call) {
-        todo!()
+    fn compile_call_expr(&mut self, call: Call, ctx: &mut Context) {
+
+        let arity = call.args.len();
+
+        self.compile_expr(*call.callee, ctx);
+        for arg in call.args.into_iter() {
+            self.compile_expr(arg, ctx);
+        }
+
+        self.write_op(Op::Call { arg_count: arity }, ctx);
     }
 
     fn compile_unary_expr(&mut self, unary: UnaryOperator, ctx: &mut Context) {
