@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign}};
+use std::{fmt::Display, ops::{Deref, DerefMut}};
 
 use super::value::Value;
 
@@ -128,46 +128,10 @@ impl DerefMut for BytecodeIndex {
     }
 }
 
-impl AddAssign for BytecodeIndex {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 += rhs.0;
-    }
-}
-
-impl SubAssign for BytecodeIndex {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.0 -= rhs.0;
-    }
-}
-
-impl Add for BytecodeIndex {
-    type Output = usize;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        self.0 + rhs.0
-    }
-}
-
-impl Sub for BytecodeIndex {
-    type Output = usize;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        self.0 - rhs.0
-    }
-}
 
 impl From<usize> for BytecodeIndex {
     fn from(value: usize) -> Self {
         Self(value)
-    }
-}
-
-
-impl Add for StackIndex {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
     }
 }
 

@@ -1,4 +1,5 @@
 use std::{collections::HashMap};
+use std::fmt::Write;
 
 use chunk::{Chunk, OpCode};
 use value::Value;
@@ -51,8 +52,9 @@ struct CallFrame {
 }
 
 pub struct RuntimeError {
-    pub msg:  String,
-    pub line: usize,
+    pub stack_trace: String,
+    pub msg:         String,
+    pub line:        usize,
 }
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -377,11 +379,10 @@ impl Vm {
 
     fn runtime_error(&self, msg: String) -> RuntimeError {
 
-        self.print_stack_trace();
-
         RuntimeError {
-            msg:  msg,
-            line: self.get_chunk().lines[**self.ip() -1],
+            msg:         msg,
+            stack_trace: self.stack_trace(),
+            line:        self.get_chunk().lines[**self.ip() -1],
         }
     }
 
@@ -472,15 +473,19 @@ impl Vm {
         Ok(())
     }
 
-    fn print_stack_trace(&self) {
+    fn stack_trace(&self) -> String {
 
+        let mut results = String::new();
 
+        for frame in self.call_stack.iter().rev() {
 
-        let top = self.call_frame();
+            let func: &ObjFunction = self.ctx.get(frame.func_obj).into();
+            let line = func.chunk.lines[*frame.ip -1];
 
-        for frame in self.call_stack.iter().rev().skip(1) {
-
+            writeln!(results, "  [line {}] in {}", line, func.name).unwrap();
         }
+
+        results
     }
 }
 

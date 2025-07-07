@@ -83,9 +83,18 @@
 // areWeHavingItYet();
 // // print areWeHavingItYet;
 
-fun fib(n) {
-  if (n < 2) return n;
-  return fib(n - 2) + fib(n - 1);
+// fun fib(n) {
+//   if (n < 2) return n;
+//   return fib(n - 2) + fib(n - 1);
+// }
+
+// print fib(10);
+
+
+fun a() { b(); }
+fun b() { c(); }
+fun c() {
+  c("too", "many");
 }
 
-print fib(10);
+a();

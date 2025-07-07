@@ -210,6 +210,7 @@ impl Parser {
             (Tt::Nil,          ParseRule::new(Some(Self::parse_literal_expr),  None,                           Prec::None)),
             (Tt::Super,        ParseRule::new(Some(Self::parse_super_expr),    None,                           Prec::None)),
             (Tt::This,         ParseRule::new(Some(Self::parse_this_expr),     None,                           Prec::None)),
+            (Tt::Comma,        ParseRule::new(None,                            None,                           Prec::None)),
             (Tt::Semicolon,    ParseRule::new(None,                            None,                           Prec::None)),
             (Tt::RightBrace,   ParseRule::new(None,                            None,                           Prec::None)),
             (Tt::RightParen,   ParseRule::new(None,                            None,                           Prec::None)),
