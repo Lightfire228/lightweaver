@@ -1,6 +1,6 @@
 use std::{fmt::Display};
 
-use crate::script::vm::{chunk::Chunk, gc::ObjectId};
+use crate::script::vm::{chunk::Chunk, gc::ObjectId, value::Value};
 
 #[derive(Debug, Clone)]
 pub struct Obj {
@@ -12,7 +12,17 @@ pub struct Obj {
 pub enum ObjType {
     String  (ObjString),
     Function(ObjFunction),
+    NativeFn(ObjNative)
 }
+
+pub type NativeFn = fn(&[Value]) -> Value;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObjNative {
+    pub func: NativeFn,
+    pub name: String,
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjString {
@@ -51,7 +61,8 @@ impl Display for Obj {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\"{}\"", match &self.type_ {
             ObjType::String  (str)  => str.string.clone(),
-            ObjType::Function(func) => format!("<fn {}>", func.name),
+            ObjType::Function(func) => format!("<fn {}>",        func.name),
+            ObjType::NativeFn(func) => format!("<native fn {}>", func.name),
         })
     }
 }
@@ -122,3 +133,19 @@ impl<'a> From<&'a mut Obj> for &'a mut ObjFunction {
 }
 
 impl Eq for ObjFunction {}
+
+
+impl ObjNative {
+    pub fn new(name: String, func: NativeFn) -> Self {
+        Self {
+            func,
+            name,
+        }
+    }
+}
+
+impl From<ObjNative> for Obj {
+    fn from(value: ObjNative) -> Self {
+        Obj::new(ObjType::NativeFn(value))
+    }
+}

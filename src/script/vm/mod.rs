@@ -1,3 +1,4 @@
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap};
 use std::fmt::Write;
 
@@ -5,6 +6,7 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
+use crate::script::vm::object::{NativeFn, ObjNative};
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -73,7 +75,7 @@ enum JumpType {
 }
 
 impl Vm {
-    pub fn new(ctx: Context, script_func: ObjectId) -> Self {
+    pub fn new(mut ctx: Context, script_func: ObjectId) -> Self {
         let call_frame = CallFrame {
            stack_offset: StackIndex   (0),
            ip:           BytecodeIndex(0),
@@ -81,8 +83,11 @@ impl Vm {
            arity:        0,
         };
 
+        let mut globals = HashMap::new();
+        def_natives(&mut globals, &mut ctx);
+
         Self {
-            globals:  HashMap::new(),
+            globals,
             ctx,
 
             stack: vec![
@@ -441,7 +446,8 @@ impl Vm {
         let obj = self.ctx.get(obj);
         match &obj.type_ {
 
-            ObjType::Function(func) => self.call(obj.id, func.arity, arg_count)?,
+            ObjType::Function(func) => self.call       (obj.id, func.arity, arg_count)?,
+            ObjType::NativeFn(func) => self.call_native(arg_count, func.func),
 
             _ => Err(self.runtime_error(
                 format!("Object of type '{:?}' is not callable", obj.type_)
@@ -473,6 +479,18 @@ impl Vm {
         Ok(())
     }
 
+    fn call_native(&mut self, func_arity: usize, func: NativeFn) {
+        let stack_top = self.stack.len() - func_arity;
+        let result    = func(&self.stack[stack_top..]);
+
+        for _ in 0..func_arity {
+            self.stack.pop();
+        }
+
+        self.stack.pop();
+        self.push_stack(result);
+    }
+
     fn stack_trace(&self) -> String {
 
         let mut results = String::new();
@@ -500,8 +518,22 @@ fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
     Value::new_obj(id)
 }
 
+fn def_natives(globals: &mut HashMap<String, Value>, ctx: &mut Context) {
 
+    let mut make_global = |name: &str, func| {
+        let obj = ObjNative::new(name.to_owned(), func);
+        let obj = ctx.add(obj.into());
 
-// TODO:
-// - stack trace
-// - native funcs
+        globals.insert(name.to_owned(), Value::Obj(obj))
+    };
+
+    make_global("clock", clock_native);
+}
+
+fn clock_native(_: &[Value]) -> Value {
+    let start = SystemTime::now();
+
+    let time_since = start.duration_since(UNIX_EPOCH).unwrap();
+
+    Value::Number(time_since.as_millis() as f64 / 1000.0)
+}
