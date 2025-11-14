@@ -15,9 +15,10 @@ impl Chunk {
 
         println!("addr line instruction");
 
-        for i in 0..self.code.len() {
-            self.code[i].disassemble(data, i);
-            print_stack(&data);
+        for (i, op) in self.code.iter().enumerate() {
+            op.disassemble(data, i);
+            print_stack(data);
+
             println!("");
         }
     }
@@ -72,10 +73,6 @@ impl OpCode {
 
 fn print_line_info(data: &DisassembleData, offset: usize) {
 
-    if data.lines.is_empty() {
-        return;
-    }
-
     if offset > 0 && data.lines[offset] == data.lines[offset -1] {
         print!("   | ");
     }
@@ -99,7 +96,6 @@ fn simple_instruction(name: &str) {
 
 fn constant_instruction(name: &str, data: &DisassembleData, index: usize) {
     let msg = format!("{:16} {:4} {:30} ", name, index, &data.constants[index].display(data.ctx));
-    // let msg = format!("{:16} {:4} {:30} ", name, index, "");
     let msg = right_adjust(&msg);
     print!("{msg}");
 }

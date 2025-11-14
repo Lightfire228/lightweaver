@@ -16,7 +16,7 @@ mod test;
 
 use vm::{compiler::Compiler, RuntimeError};
 
-use crate::script::vm::{debug::DisassembleData, gc::{Context, ObjectId}, object::ObjFunction};
+use crate::script::vm::{debug::DisassembleData, gc::{Context, ObjectId}, object::ObjFunction, value::Value};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
@@ -46,12 +46,7 @@ pub fn run_file(path: &Path) -> &str {
         display_ast(&ast);
 
         let (funcs, constants) = Compiler::compile(ast, &mut ctx).unwrap();
-        dbg_funcs(&funcs, &DisassembleData {
-            ctx:       &ctx,
-            lines:     &[],
-            stack:     &[],
-            constants: &constants,
-        });
+        dbg_funcs(&funcs, &ctx, &constants);
 
         let func    = funcs.first().expect("Function stack cannot be empty");
         vm::interpret(ctx, *func, constants).map_err(|err| Re::RuntimeError(err))?;
@@ -64,13 +59,18 @@ pub fn run_file(path: &Path) -> &str {
     }
 }
 
-fn dbg_funcs(funcs: &[ObjectId], data: &DisassembleData) {
+fn dbg_funcs(funcs: &[ObjectId], ctx: &Context, constants: &[Value]) {
     for f_id in funcs {
-        let obj = data.ctx.get(*f_id);
+        let obj = ctx.get(*f_id);
 
         let func: &ObjFunction = obj.into();
 
-        func.chunk.disassemble(data);
+        func.chunk.disassemble(&DisassembleData {
+            ctx:       &ctx,
+            lines:     &func.chunk.lines,
+            stack:     &[],
+            constants: &constants,
+        });
     }
 }
 
