@@ -15,6 +15,8 @@ pub struct Compiler {
     scope_depth: usize,
     functions:   Vec<Func>,
     fns:         Vec<ObjectId>,
+
+    constants:   Vec<Value>,
 }
 
 #[derive(Debug)]
@@ -71,7 +73,7 @@ impl Compiler {
         let name = "script";
 
         let func  = ObjFunction::new(name.to_owned(), 0);
-        let id    = ctx.add(func.into());
+        let id    = ctx.new_obj(func.into());
 
         let script_local = Local {
             name:        Token::new(TokenType::Identifier, "", 0, 0),
@@ -86,10 +88,18 @@ impl Compiler {
             scope_depth: 0,
             functions:   vec![func],
             fns:         vec![id],
+
+            constants:   Vec::new(),
         }
     }
 
-    pub fn compile(ast: Ast, ctx: &mut Context) -> CompilerResult<Vec<ObjectId>> {
+
+    pub fn compile(ast: Ast, ctx: &mut Context)
+        -> CompilerResult<(
+            Vec<ObjectId>,
+            Vec<Value>
+        )>
+    {
 
         let mut compiler = Self::new(ctx);
 
@@ -99,7 +109,7 @@ impl Compiler {
 
         compiler.write_op(Op::Return, ctx);
 
-        Ok(compiler.fns)
+        Ok((compiler.fns, compiler.constants))
 
     }
 
@@ -164,7 +174,7 @@ impl Compiler {
 
     fn make_function(&mut self, name: Token, arguments: &[Token], body: Vec<Stmt>, func_type: FuncType, ctx: &mut Context) -> CompilerResult<ObjectId> {
         let obj  = ObjFunction::new(name.lexeme.clone(), arguments.len());
-        let obj  = ctx.add(obj.into());
+        let obj  = ctx.new_obj(obj.into());
 
         self.push_func(func_type, obj, Local {
             name,
@@ -349,8 +359,8 @@ impl Compiler {
         let set_op = match self.resolve_local(&assign.target.name) {
             Some(index) => Op::SetLocal { index },
             None        => {
-                let name = self.make_identifier_constant(assign.target.name, ctx);
-                Op::SetGlobal { name, }
+                let name_idx = self.make_identifier_constant(assign.target.name, ctx);
+                Op::SetGlobal { name_idx, }
             }
         };
 
@@ -412,8 +422,8 @@ impl Compiler {
         match local {
             Some(index) => self.write_op(Op::GetLocal { index, }, ctx),
             None        => {
-                let name = self.make_identifier_constant(var.name, ctx);
-                self.write_op(Op::GetGlobal { name }, ctx)
+                let name_idx = self.make_identifier_constant(var.name, ctx);
+                self.write_op(Op::GetGlobal { name_idx }, ctx)
             }
         };
 
@@ -422,17 +432,17 @@ impl Compiler {
     fn compile_get_expr(&mut self, get: Get, ctx: &mut Context) {
         self.line = get.name.line;
 
-        let name = self.make_identifier_constant(get.name, ctx);
-        self.write_op(Op::GetGlobal { name, }, ctx);
+        let name_idx = self.make_identifier_constant(get.name, ctx);
+        self.write_op(Op::GetGlobal { name_idx, }, ctx);
     }
 
     fn compile_set_expr(&mut self, set: Set, ctx: &mut Context) {
         self.line = set.name.line;
 
-        let name = self.make_identifier_constant(set.name, ctx);
+        let name_idx = self.make_identifier_constant(set.name, ctx);
         self.compile_expr(*set.value, ctx);
 
-        self.write_op(Op::SetGlobal { name, }, ctx);
+        self.write_op(Op::SetGlobal { name_idx, }, ctx);
     }
 
     fn compile_super_expr(&mut self, _super: Super) {
@@ -447,9 +457,9 @@ impl Compiler {
     // Variables
 
     fn emit_constant(&mut self, value: Value, ctx: &mut Context) -> BytecodeIndex {
-        let index = self.current_chunk_mut(ctx).add_constant(value);
+        let index = self.add_constant(value);
 
-        self.write_op(Op::Constant { index, }, ctx)
+        self.write_op(Op::GetConstant { index, }, ctx)
     }
 
     fn emit_jump(&mut self, jump: JumpType, ctx: &mut Context) -> BytecodeIndex {
@@ -496,7 +506,7 @@ impl Compiler {
     fn make_identifier_constant(&mut self, name: Token, ctx: &mut Context) -> ConstIndex {
         let val = str_to_val(name.lexeme, ctx);
 
-        let index = self.current_chunk_mut(ctx).add_constant(val);
+        let index = self.add_constant(val);
 
         index
     }
@@ -517,7 +527,7 @@ impl Compiler {
     }
 
     fn define_global(&mut self, index: ConstIndex, ctx: &mut Context) {
-        self.write_op(Op::DefGlobal { name: index, }, ctx);
+        self.write_op(Op::DefGlobal { name_idx: index, }, ctx);
     }
 
     fn add_local(&mut self, name: Token) {
@@ -558,6 +568,14 @@ impl Compiler {
 
 
     // utils
+
+    pub fn add_constant(&mut self, value: Value) -> ConstIndex {
+        let index = self.constants.len();
+
+        self.constants.push(value);
+
+        ConstIndex(index)
+    }
 
     fn current_chunk<'a>(&self, ctx: &'a Context) -> &'a Chunk {
         let func_id = self.current_func().func_obj;

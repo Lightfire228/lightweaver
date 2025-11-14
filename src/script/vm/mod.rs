@@ -6,6 +6,7 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
+use crate::script::vm::debug::DisassembleData;
 use crate::script::vm::object::{NativeFn, ObjNative};
 use crate::script::vm::{
         chunk::{
@@ -15,7 +16,7 @@ use crate::script::vm::{
         gc    ::ObjectId,
         object::{
             ObjFunction,
-            ObjString, ObjType,
+            ObjType,
         }
     };
 
@@ -31,9 +32,9 @@ static DEBUG_TRACE_EXECUTION: bool = true;
 
 static STACK_FRAMES_MAX: usize = 10000; // ¯\_(ツ)_/¯
 
-pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
+pub fn interpret(ctx: Context, script_func: ObjectId, constants: Vec<Value>) -> RuntimeResult<()> {
 
-    let mut vm  = Vm::new(ctx, script_func);
+    let mut vm  = Vm::new(ctx, script_func, constants);
 
     vm.run()
 }
@@ -42,6 +43,7 @@ pub fn interpret(ctx: Context, script_func: ObjectId) -> RuntimeResult<()> {
 pub struct Vm {
     stack:      Vec<Value>,
     call_stack: Vec<CallFrame>,
+    constants:  Vec<Value>,
     globals:    HashMap<String, Value>,
     ctx:        Context,
 }
@@ -75,7 +77,7 @@ enum JumpType {
 }
 
 impl Vm {
-    pub fn new(mut ctx: Context, script_func: ObjectId) -> Self {
+    pub fn new(mut ctx: Context, script_func: ObjectId, constants: Vec<Value>) -> Self {
         let call_frame = CallFrame {
            stack_offset: StackIndex   (0),
            ip:           BytecodeIndex(0),
@@ -90,9 +92,12 @@ impl Vm {
             globals,
             ctx,
 
+            constants,
+
             stack: vec![
                 Value::new_obj(script_func)
             ],
+
             call_stack: vec![
                 call_frame
             ],
@@ -107,18 +112,25 @@ impl Vm {
 
             if DEBUG_TRACE_EXECUTION {
                 let chunk = self.get_chunk();
-                chunk.code[**self.ip()].disassemble(&chunk, **self.ip(), &self.ctx);
-                print_stack(&self.stack, &self.ctx);
+                let data  = DisassembleData {
+                    ctx:       &self.ctx,
+                    lines:     &chunk.lines,
+                    stack:     &self.stack,
+                    constants: &self.constants,
+                };
+
+                chunk.code[**self.ip()].disassemble(&data, **self.ip());
+                print_stack(&data);
                 println!();
             }
 
             type O = OpCode;
             match *self.get_instruction() {
-                O::Constant    { index }        => self.op_constant  (index),
+                O::GetConstant { index }        => self.op_constant  (index),
 
-                O::DefGlobal   { name }         => self.op_def_global(name),
-                O::GetGlobal   { name }         => self.op_get_global(name)?,
-                O::SetGlobal   { name }         => self.op_set_global(name)?,
+                O::DefGlobal   { name_idx }     => self.op_def_global(name_idx),
+                O::GetGlobal   { name_idx }     => self.op_get_global(name_idx)?,
+                O::SetGlobal   { name_idx }     => self.op_set_global(name_idx)?,
 
                 O::GetLocal    { index }        => self.op_get_local (index),
                 O::SetLocal    { index }        => self.op_set_local (index),
@@ -175,7 +187,7 @@ impl Vm {
     }
 
     fn get_constant(&self, index: ConstIndex) -> Value {
-        self.get_chunk().constants[*index]
+        self.constants[*index]
     }
 
     fn pop_stack(&mut self) -> Value {
@@ -383,7 +395,7 @@ impl Vm {
     }
 
     fn get_constant_as_str(&self, index: ConstIndex, ctx: &Context) -> String {
-        self.get_chunk().constants[*index]
+        self.constants[*index]
             .to_str(ctx)
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
@@ -501,7 +513,7 @@ fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
 
     let str = format!("{val1}{val2}");
 
-    let id  = ctx.add(ObjString::new(str).into());
+    let id  = ctx.new_obj(str.into());
 
     Value::new_obj(id)
 }
@@ -510,7 +522,7 @@ fn def_natives(globals: &mut HashMap<String, Value>, ctx: &mut Context) {
 
     let mut make_global = |name: &str, func| {
         let obj = ObjNative::new(name.to_owned(), func);
-        let obj = ctx.add(obj.into());
+        let obj = ctx.new_obj(obj.into());
 
         globals.insert(name.to_owned(), Value::Obj(obj))
     };

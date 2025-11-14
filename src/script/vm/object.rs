@@ -36,10 +36,12 @@ pub struct ObjFunction {
     pub name:  String,
 }
 
+
+
 impl Obj {
-    fn new(type_: ObjType) -> Obj {
+    pub fn new(type_: ObjType, id: ObjectId) -> Obj {
         Self {
-            id:    usize::MAX.into(),
+            id,
             type_,
         }
     }
@@ -75,9 +77,15 @@ impl ObjString {
     }
 }
 
-impl From<ObjString> for Obj {
+impl From<ObjString> for ObjType {
     fn from(value: ObjString) -> Self {
-        Self::new(ObjType::String(value))
+        ObjType::String(value)
+    }
+}
+
+impl From<String> for ObjType {
+    fn from(value: String) -> Self {
+        ObjType::String(ObjString::new(value))
     }
 }
 
@@ -106,9 +114,9 @@ impl ObjFunction {
     }
 }
 
-impl From<ObjFunction> for Obj {
+impl From<ObjFunction> for ObjType {
     fn from(value: ObjFunction) -> Self {
-        Self::new(ObjType::Function(value))
+        ObjType::Function(value)
     }
 }
 
@@ -144,8 +152,8 @@ impl ObjNative {
     }
 }
 
-impl From<ObjNative> for Obj {
+impl From<ObjNative> for ObjType {
     fn from(value: ObjNative) -> Self {
-        Obj::new(ObjType::NativeFn(value))
+        ObjType::NativeFn(value)
     }
 }

@@ -1,7 +1,5 @@
 use std::{fmt::Display, ops::{Deref, DerefMut}};
 
-use super::value::Value;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct GlobalIndex  (pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct ConstIndex   (pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct StackIndex   (pub usize);
@@ -10,11 +8,11 @@ use super::value::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpCode {
-    Constant    { index:     ConstIndex },
+    GetConstant { index:     ConstIndex },
 
-    DefGlobal   { name:      ConstIndex },
-    GetGlobal   { name:      ConstIndex },
-    SetGlobal   { name:      ConstIndex },
+    DefGlobal   { name_idx:  ConstIndex },
+    GetGlobal   { name_idx:  ConstIndex },
+    SetGlobal   { name_idx:  ConstIndex },
 
     GetLocal    { index:     StackIndex },
     SetLocal    { index:     StackIndex },
@@ -48,7 +46,6 @@ pub enum OpCode {
 pub struct Chunk {
     pub name:      String,
     pub code:      Vec<OpCode>,
-    pub constants: Vec<Value>,
     pub lines:     Vec<usize>,
 }
 
@@ -56,9 +53,8 @@ impl Chunk {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            code:      vec![],
-            constants: vec![],
-            lines:     vec![],
+            code:  vec![],
+            lines: vec![],
         }
     }
 
@@ -71,30 +67,23 @@ impl Chunk {
         BytecodeIndex(index)
     }
 
-    pub fn add_constant(&mut self, value: Value) -> ConstIndex {
-        let index = self.constants.len();
-
-        self.constants.push(value);
-
-        ConstIndex(index)
-    }
 }
 
 impl Display for OpCode {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            OpCode::Constant    { index }        => format!("Constant {}",      index .0),
-            OpCode::DefGlobal   { name }         => format!("DefGlobal {}",     name  .0),
-            OpCode::GetGlobal   { name }         => format!("GetGlobal {}",     name  .0),
-            OpCode::SetGlobal   { name }         => format!("SetGlobal {}",     name  .0),
-            OpCode::GetLocal    { index }        => format!("GetLocal {}",      index .0),
-            OpCode::SetLocal    { index }        => format!("SetLocal {}",      index .0),
-            OpCode::JumpIfFalse { offset }       => format!("JumpIfFalse {}",   offset.0),
-            OpCode::JumpIfTrue  { offset }       => format!("JumpIfTrue {}",    offset.0),
-            OpCode::Jump        { offset }       => format!("Jump {}",          offset.0),
-            OpCode::Loop        { offset }       => format!("Loop {}",          offset.0),
-            OpCode::Call        { arg_count }    => format!("Call (args: {})",  arg_count),
+            OpCode::GetConstant { index }        => format!("Constant {}",      **index   ),
+            OpCode::DefGlobal   { name_idx }     => format!("DefGlobal {}",     **name_idx),
+            OpCode::GetGlobal   { name_idx }     => format!("GetGlobal {}",     **name_idx),
+            OpCode::SetGlobal   { name_idx }     => format!("SetGlobal {}",     **name_idx),
+            OpCode::GetLocal    { index }        => format!("GetLocal {}",      **index   ),
+            OpCode::SetLocal    { index }        => format!("SetLocal {}",      **index   ),
+            OpCode::JumpIfFalse { offset }       => format!("JumpIfFalse {}",   **offset  ),
+            OpCode::JumpIfTrue  { offset }       => format!("JumpIfTrue {}",    **offset  ),
+            OpCode::Jump        { offset }       => format!("Jump {}",          **offset  ),
+            OpCode::Loop        { offset }       => format!("Loop {}",          **offset  ),
+            OpCode::Call        { arg_count }    => format!("Call (args: {})",  arg_count ),
             OpCode::Nil                          => format!("Nil"),
             OpCode::True                         => format!("True"),
             OpCode::False                        => format!("False"),

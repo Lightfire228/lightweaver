@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::script::vm::object::{Obj, ObjString};
+use crate::script::vm::object::{Obj, ObjString, ObjType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ObjectId(pub usize);
@@ -20,10 +20,10 @@ impl Context {
         }
     }
 
-    pub fn add(&mut self, mut obj: Obj) -> ObjectId {
+    pub fn new_obj(&mut self, type_: ObjType) -> ObjectId {
 
-        let id = self.next_id();
-        obj.id = id;
+        let id  = self.next_id();
+        let obj = Obj::new(type_, id);
 
         self.objs.push(Box::new(obj));
 
@@ -33,7 +33,7 @@ impl Context {
     pub fn add_string(&mut self, str: &str) -> ObjectId {
         let obj = ObjString::new(str.to_owned()).into();
 
-        self.add(obj)
+        self.new_obj(obj)
     }
 
     pub fn get(&self, id: ObjectId) -> &Obj {
