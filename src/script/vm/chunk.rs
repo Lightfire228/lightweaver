@@ -148,3 +148,19 @@ impl DerefMut for StackIndex {
         &mut self.0
     }
 }
+
+impl Deref for Offset {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Deref for ConstIndex {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}

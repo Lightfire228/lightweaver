@@ -175,7 +175,7 @@ impl Vm {
     }
 
     fn get_constant(&self, index: ConstIndex) -> Value {
-        self.get_chunk().constants[index.0]
+        self.get_chunk().constants[*index]
     }
 
     fn pop_stack(&mut self) -> Value {
@@ -254,15 +254,11 @@ impl Vm {
     }
 
     fn op_set_local(&mut self, index: StackIndex) {
-        let index = index.0;
-
         let value = self.peek_stack(0);
-        self.stack[index] = value;
+        self.stack[*index] = value;
     }
 
     fn op_jump_if(&mut self, jump_type: JumpType, offset: Offset) {
-        let offset = offset.0;
-
         let is_falsey = self.peek_stack(0).is_falsey();
 
         let jump_on_false = match jump_type {
@@ -271,27 +267,22 @@ impl Vm {
         };
 
         if is_falsey == jump_on_false {
-            **self.ip_mut() += offset;
+            **self.ip_mut() += *offset;
         }
     }
 
     fn op_jump(&mut self, offset: Offset) {
-        let offset = offset.0;
-
-        **self.ip_mut() += offset;
+        **self.ip_mut() += *offset;
     }
 
     fn op_loop(&mut self, offset: Offset) {
-        let offset = offset.0;
-
-        **self.ip_mut() -= offset;
+        **self.ip_mut() -= *offset;
     }
 
     fn op_call(&mut self, arg_count: usize) -> RuntimeResult<()> {
         let val = self.peek_stack(arg_count);
         self.call_value(val, arg_count)
     }
-
 
     fn op_binary(&mut self, op: BinaryOp) -> RuntimeResult<()> {
         let b = self.pop_number()?;
@@ -392,16 +383,13 @@ impl Vm {
     }
 
     fn get_constant_as_str(&self, index: ConstIndex, ctx: &Context) -> String {
-        self.get_chunk().constants[index.0]
+        self.get_chunk().constants[*index]
             .to_str(ctx)
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
     }
 
     fn get_chunk(&self) -> &Chunk {
-        // TODO: this is a stupid amount of dereferencing each time chunk is accessed,
-        //       which is a lot
-
         let obj = self.call_frame();
 
         let obj = self.ctx.get(obj.func_obj);
@@ -487,7 +475,7 @@ impl Vm {
             self.stack.pop();
         }
 
-        self.stack.pop();
+        self.stack.pop(); // remove the callee temporary
         self.push_stack(result);
     }
 
