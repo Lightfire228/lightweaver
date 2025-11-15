@@ -9,12 +9,11 @@ pub mod tokens;
 pub mod scanner;
 pub mod ast;
 pub mod parser;
-pub mod interpreter;
 pub mod vm;
 
 mod test;
 
-use vm::{compiler::Compiler, RuntimeError};
+use vm::{compiler::compile, RuntimeError};
 
 use crate::script::vm::{debug::DisassembleData, gc::{Context, ObjectId}, object::ObjFunction, value::Value};
 
@@ -45,7 +44,7 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
         display_ast(&ast);
 
-        let (funcs, constants) = Compiler::compile(ast, &mut ctx).unwrap();
+        let (funcs, constants) = compile(ast, &mut ctx).unwrap();
         dbg_funcs(&funcs, &ctx, &constants);
 
         let func    = funcs.first().expect("Function stack cannot be empty");
