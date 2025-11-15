@@ -306,7 +306,6 @@ impl Parser {
             let name = self.consume(Tt::Identifier, Pe::MissingVariableIdentifier)?;
 
             let initializer = if self.match_(&[Tt::Equal]) {
-
                 Some(self.parse_expression(None, logger)?)
             } else {
                 None

@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::{Assign, Ast, BinaryOpType, BinaryOperator, Block, Call, Class, Expr, ExpressionStmt, FunctionStmt, Get, IfStmt, Literal, LiteralType, Logical, LogicalType, ReturnStmt, Set, Stmt, Super, This, UnaryOpType, UnaryOperator, VarStmt, Variable, WhileStmt}, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::ObjFunction}};
+use crate::script::{ast::*, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::ObjFunction}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
@@ -10,10 +10,7 @@ type Op = OpCode;
 // type Func = (FuncType, ObjectId);
 
 pub fn compile(ast: Ast, ctx: &mut Context) ->
-    CompilerResult<(
-        Vec<ObjectId>,
-        Vec<Value>
-    )>
+    CompilerResult<CompilerOut>
 {
 
     let mut compiler = Compiler::new(ctx);
@@ -24,13 +21,16 @@ pub fn compile(ast: Ast, ctx: &mut Context) ->
 
     compiler.write_op(Op::Return);
 
-    Ok((compiler.fns, compiler.constants))
+    Ok(CompilerOut {
+        function_ids: compiler.fns,
+        constants:    compiler.constants,
+    })
 
 }
 
 
 
-pub struct Compiler<'a> {
+struct Compiler<'a> {
     line:        usize,
     scope_depth: usize,
     functions:   Vec<Func>,
@@ -39,6 +39,11 @@ pub struct Compiler<'a> {
     constants:   Vec<Value>,
 
     ctx:         &'a mut Context
+}
+
+pub struct CompilerOut {
+    pub function_ids: Vec<ObjectId>,
+    pub constants:    Vec<Value>,
 }
 
 #[derive(Debug)]
@@ -176,15 +181,23 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn make_function(&mut self, name: Token, arguments: &[Token], body: Vec<Stmt>, func_type: FuncType) -> CompilerResult<ObjectId> {
-        let obj  = ObjFunction::new(name.lexeme.clone(), arguments.len());
-        let obj  = self.ctx.new_obj(obj.into());
+    fn make_function(&mut self,
+        name:      Token,
+        arguments: &[Token],
+        body:      Vec<Stmt>,
+        func_type: FuncType,
+    )
+        -> CompilerResult<ObjectId>
+    {
+        let obj    = ObjFunction::new(name.lexeme.clone(), arguments.len());
+        let obj_id = self.ctx.new_obj(obj.into());
 
-        self.push_func(func_type, obj, Local {
+        let func = Func::new(func_type, obj_id, Local {
             name,
             depth:       self.scope_depth +1,
             initialized: true,
         });
+        self.functions.push(func);
 
         self.begin_scope();
         for arg in arguments {
@@ -208,24 +221,33 @@ impl<'a> Compiler<'a> {
 
         self.emit_constant(Value::Obj(func.func_obj));
 
-        Ok(obj)
+        Ok(obj_id)
 
     }
 
     fn compile_if_stmt(&mut self, if_stmt: IfStmt) -> CompilerResult<()> {
+
         self.compile_expr(if_stmt.condition);
-        let jump_then_op = self.emit_jump(JumpType::IfFalse);
-        self.write_pop(); // Pop the condition temporary if no jump
 
+        let jump_then_op = self.emit_jump(JumpType::IfFalse); // goto: Else
+
+        // Pop the condition temporary if no jump
+        self.write_pop();
         self.compile_stmt(*if_stmt.then_branch)?;
-        let jump_else_op = self.emit_jump(JumpType::Always);
+        let jump_else_op = self.emit_jump(JumpType::Always);  // goto: End
 
+
+        // Else:
         self.patch_jump(jump_then_op);
-        self.write_pop(); // Pop the condition temporary if jump
+
+        // Pop the condition temporary if jump
+        self.write_pop();
         if let Some(stmt) = if_stmt.else_branch {
             self.compile_stmt(*stmt)?;
         }
 
+
+        // End:
         self.patch_jump(jump_else_op);
 
         Ok(())
@@ -238,11 +260,9 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_return_stmt(&mut self, return_: ReturnStmt) {
-        if let Some(val) = return_.value {
-            self.compile_expr(val);
-        }
-        else {
-            self.write_op(Op::Nil);
+        match return_.value {
+            Some(val) => { self.compile_expr(val); },
+            None      => { self.write_op(Op::Nil); },
         }
 
         self.write_op(Op::Return);
@@ -256,14 +276,11 @@ impl<'a> Compiler<'a> {
             None       => { self.write_op(Op::Nil); }
         }
 
-        if let Some(index) = global {
-            self.define_global(index);
-            // Global declarations must not
+        match global {
+            Some(index) => self.define_global(index),
+            None        => self.mark_initialized(),
         }
-        else {
-            self.mark_initialized();
-            // Local delcarations are allowed to leave stack locals
-        }
+
         Ok(())
     }
 
@@ -282,7 +299,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_while_stmt(&mut self, while_: WhileStmt) -> CompilerResult<()> {
-        let loop_start = BytecodeIndex(self.current_chunk().code.len());
+        let loop_start = self.current_bytecode_index();
 
         self.compile_expr(while_.condition);
 
@@ -518,13 +535,12 @@ impl<'a> Compiler<'a> {
     fn declare_local(&mut self, name: &Token) {
         // TODO: allow locals to shadow each other?
         for local in self.current_func().locals.iter().rev() {
+
             if local.initialized && local.depth < self.scope_depth {
                 break;
             }
 
-            if local.name.lexeme == name.lexeme {
-                panic!("todo, make this a compiler error")
-            }
+            assert_ne!(local.name.lexeme, name.lexeme, "todo, make this a compiler error");
         }
 
         self.add_local(name.clone());
@@ -548,10 +564,7 @@ impl<'a> Compiler<'a> {
         for (i, local) in self.current_func().locals.iter().enumerate().rev() {
 
             if local.name.lexeme == name.lexeme {
-
-                if !local.initialized {
-                    panic!("Can't read local variable in its own initializer")
-                }
+                assert!(local.initialized, "Can't read local variable in its own initializer");
 
                 return Some(StackIndex(i));
             }
@@ -609,8 +622,8 @@ impl<'a> Compiler<'a> {
         self.functions.last_mut().expect("Function stack must not be empty")
     }
 
-    fn push_func(&mut self, func_type: FuncType, func_id: ObjectId, first_slot: Local) {
-        self.functions.push(Func::new(func_type, func_id, first_slot));
+    fn current_bytecode_index(&self) -> BytecodeIndex {
+        BytecodeIndex(self.current_chunk().code.len())
     }
 
     fn pop_func(&mut self) -> Func {

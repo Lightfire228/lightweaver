@@ -15,7 +15,7 @@ mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
-use crate::script::vm::{debug::DisassembleData, gc::{Context, ObjectId}, object::ObjFunction, value::Value};
+use crate::script::vm::{compiler::CompilerOut, debug::DisassembleData, gc::{Context}, object::ObjFunction};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
@@ -44,11 +44,13 @@ pub fn run_file(path: &Path) -> &str {
         let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
         display_ast(&ast);
 
-        let (funcs, constants) = compile(ast, &mut ctx).unwrap();
-        dbg_funcs(&funcs, &ctx, &constants);
 
-        let func    = funcs.first().expect("Function stack cannot be empty");
-        vm::interpret(ctx, *func, constants).map_err(|err| Re::RuntimeError(err))?;
+        let out = compile(ast, &mut ctx).unwrap();
+        dbg_funcs(&out, &ctx);
+
+
+        let func = out.function_ids.first().expect("Function stack cannot be empty");
+        vm::interpret(ctx, *func, out.constants).map_err(|err| Re::RuntimeError(err))?;
 
         Ok("test")
     })() {
@@ -58,8 +60,8 @@ pub fn run_file(path: &Path) -> &str {
     }
 }
 
-fn dbg_funcs(funcs: &[ObjectId], ctx: &Context, constants: &[Value]) {
-    for f_id in funcs {
+fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
+    for f_id in &out.function_ids {
         let obj = ctx.get(*f_id);
 
         let func: &ObjFunction = obj.into();
@@ -68,7 +70,7 @@ fn dbg_funcs(funcs: &[ObjectId], ctx: &Context, constants: &[Value]) {
             ctx:       &ctx,
             lines:     &func.chunk.lines,
             stack:     &[],
-            constants: &constants,
+            constants: &out.constants,
         });
     }
 }
@@ -76,7 +78,7 @@ fn dbg_funcs(funcs: &[ObjectId], ctx: &Context, constants: &[Value]) {
 
 fn display_error(err: RunError) -> ! {
     match err {
-        Re::IOError => panic!("Unable to read source file"),
+        Re::IOError           => panic!("Unable to read source file"),
         Re::ScannerError(err) => display_scanner_err(err),
         Re::ParserError (err) => display_parser_err (err),
         Re::RuntimeError(err) => display_runtime_err(err),

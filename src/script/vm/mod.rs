@@ -30,7 +30,8 @@ pub mod gc;
 
 static DEBUG_TRACE_EXECUTION: bool = true;
 
-static STACK_FRAMES_MAX: usize = 10000; // ¯\_(ツ)_/¯
+static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
+static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
 
 pub fn interpret(ctx: Context, script_func: ObjectId, constants: Vec<Value>) -> RuntimeResult<()> {
 
@@ -88,15 +89,16 @@ impl Vm {
         let mut globals = HashMap::new();
         def_natives(&mut globals, &mut ctx);
 
+        let mut stack = Vec::with_capacity(INITIAL_STACK_CAPACITY);
+        stack.push(Value::new_obj(script_func));
+
         Self {
             globals,
             ctx,
 
             constants,
 
-            stack: vec![
-                Value::new_obj(script_func)
-            ],
+            stack,
 
             call_stack: vec![
                 call_frame
