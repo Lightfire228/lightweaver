@@ -1,6 +1,14 @@
 use std::{fmt::Display};
 
-use crate::script::vm::{chunk::Chunk, gc::ObjectId, value::Value};
+use crate::script::vm::gc::ObjectId;
+
+mod obj_native;
+mod obj_string;
+mod obj_function;
+
+pub use obj_native  ::*;
+pub use obj_string  ::*;
+pub use obj_function::*;
 
 #[derive(Debug, Clone)]
 pub struct Obj {
@@ -14,28 +22,6 @@ pub enum ObjType {
     Function(ObjFunction),
     NativeFn(ObjNative)
 }
-
-pub type NativeFn = fn(&[Value]) -> Value;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ObjNative {
-    pub func: NativeFn,
-    pub name: String,
-}
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ObjString {
-    pub string: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct ObjFunction {
-    pub arity: usize,
-    pub chunk: Chunk,
-    pub name:  String,
-}
-
 
 
 impl Obj {
@@ -66,94 +52,5 @@ impl Display for Obj {
             ObjType::Function(func) => format!("<fn {}>",        func.name),
             ObjType::NativeFn(func) => format!("<native fn {}>", func.name),
         })
-    }
-}
-
-impl ObjString {
-    pub fn new(string: String) -> ObjString {
-        Self {
-            string,
-        }
-    }
-}
-
-impl From<ObjString> for ObjType {
-    fn from(value: ObjString) -> Self {
-        ObjType::String(value)
-    }
-}
-
-impl From<String> for ObjType {
-    fn from(value: String) -> Self {
-        ObjType::String(ObjString::new(value))
-    }
-}
-
-impl<'a> From<&'a Obj> for &'a ObjString {
-    fn from(value: &'a Obj) -> Self {
-        match &value.type_ {
-            ObjType::String(obj) => &obj,
-            _                    => panic!("Unable to cast {:?} as String", value.type_)
-        }
-    }
-}
-
-impl PartialEq for ObjFunction {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
-
-impl ObjFunction {
-    pub fn new(name: String, arity: usize) -> Self {
-        Self {
-            arity,
-            chunk: Chunk::new(name.clone()),
-            name:  name,
-        }
-    }
-}
-
-impl From<ObjFunction> for ObjType {
-    fn from(value: ObjFunction) -> Self {
-        ObjType::Function(value)
-    }
-}
-
-impl<'a> From<&'a Obj> for &'a ObjFunction {
-    fn from(value: &'a Obj) -> Self {
-        match &value.type_ {
-            ObjType::Function(obj) => &obj,
-            _                      => panic!("Unable to cast {:?} as Function", value.type_)
-        }
-    }
-}
-
-impl<'a> From<&'a mut Obj> for &'a mut ObjFunction {
-    fn from(value: &'a mut Obj) -> Self {
-        let typename = format!("{:?}", &value.type_);
-
-        match &mut value.type_ {
-            ObjType::Function(obj) => obj,
-            _                      => panic!("Unable to cast {typename} as Function")
-        }
-    }
-}
-
-impl Eq for ObjFunction {}
-
-
-impl ObjNative {
-    pub fn new(name: String, func: NativeFn) -> Self {
-        Self {
-            func,
-            name,
-        }
-    }
-}
-
-impl From<ObjNative> for ObjType {
-    fn from(value: ObjNative) -> Self {
-        ObjType::NativeFn(value)
     }
 }
