@@ -154,7 +154,17 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_class_decl(&mut self, _class: Class) {
-        todo!()
+
+        let is_global = self.declare_variable(&_class.name);
+
+        // declare variable doesn't create a name constant, if the variable is a local
+        let name_idx  = is_global.unwrap_or_else(|| self.make_identifier_constant(_class.name));
+
+        self.write_op(Op::Class { name_idx });
+
+        if is_global.is_some() {
+            self.define_global(name_idx);
+        }
     }
 
     fn compile_expr_stmt(&mut self, expr_stmt: ExpressionStmt) {
@@ -164,7 +174,7 @@ impl<'a> Compiler<'a> {
 
     fn compile_func_decl(&mut self, func: FunctionStmt) -> CompilerResult<()> {
 
-        let global = self.declare_variable(func.name.clone());
+        let global_idx = self.declare_variable(&func.name);
         self.mark_initialized();
 
         self.begin_scope();
@@ -172,7 +182,7 @@ impl<'a> Compiler<'a> {
         let func_id = self.make_function(func.name, &func.params, *func.body, FuncType::Function)?;
         self.fns.push(func_id);
 
-        if let Some(index) = global {
+        if let Some(index) = global_idx {
             self.define_global(index);
         }
 
@@ -269,7 +279,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_var_decl(&mut self, stmt: VarStmt) -> CompilerResult<()> {
-        let global = self.declare_variable(stmt.name);
+        let global = self.declare_variable(&stmt.name);
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr),
@@ -284,7 +294,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn declare_variable(&mut self, name: Token) -> Option<ConstIndex> {
+    fn declare_variable(&mut self, name: &Token) -> Option<ConstIndex> {
         self.line = name.line;
 
         let local = self.scope_depth > 0;

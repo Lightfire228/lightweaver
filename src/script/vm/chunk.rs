@@ -24,6 +24,7 @@ pub enum OpCode {
     Loop        { offset:    Offset },
 
     Call        { arg_count: usize },
+    Class       { name_idx:  ConstIndex },
 
     Nil,
     True,
@@ -40,6 +41,7 @@ pub enum OpCode {
     Negate,
     Print,
     Return,
+
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +86,7 @@ impl Display for OpCode {
             OpCode::Jump        { offset }       => format!("Jump {}",          **offset  ),
             OpCode::Loop        { offset }       => format!("Loop {}",          **offset  ),
             OpCode::Call        { arg_count }    => format!("Call (args: {})",  arg_count ),
+            OpCode::Class       { name_idx }     => format!("Class {}",         **name_idx),
             OpCode::Nil                          => format!("Nil"),
             OpCode::True                         => format!("True"),
             OpCode::False                        => format!("False"),

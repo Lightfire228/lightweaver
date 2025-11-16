@@ -7,7 +7,7 @@ use value::Value;
 use gc::Context;
 
 use crate::script::vm::debug::DisassembleData;
-use crate::script::vm::object::{NativeFn, ObjNative};
+use crate::script::vm::object::{NativeFn, ObjClass, ObjNative};
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -144,6 +144,7 @@ impl Vm {
                 O::Loop        { offset }       => self.op_loop   (offset),
 
                 O::Call        { arg_count }    => self.op_call   (arg_count)?,
+                O::Class       { name_idx }     => self.op_class  (name_idx),
 
                 O::Nil                          => self.push_stack(Value::Nil),
                 O::True                         => self.push_stack(Value::Bool(true)),
@@ -296,6 +297,14 @@ impl Vm {
     fn op_call(&mut self, arg_count: usize) -> RuntimeResult<()> {
         let val = self.peek_stack(arg_count);
         self.call_value(val, arg_count)
+    }
+
+    fn op_class(&mut self, name_idx: ConstIndex) {
+        let name = self.get_constant_as_str(name_idx, &self.ctx);
+        let obj  = ObjClass::new(name);
+        let id   = self.ctx.new_obj(obj.into());
+
+        self.push_stack(Value::Obj(id));
     }
 
     fn op_binary(&mut self, op: BinaryOp) -> RuntimeResult<()> {

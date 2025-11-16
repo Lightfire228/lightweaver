@@ -5,10 +5,14 @@ use crate::script::vm::gc::ObjectId;
 mod obj_native;
 mod obj_string;
 mod obj_function;
+mod obj_class;
+mod obj_instance;
 
 pub use obj_native  ::*;
 pub use obj_string  ::*;
 pub use obj_function::*;
+pub use obj_class   ::*;
+pub use obj_instance::*;
 
 #[derive(Debug, Clone)]
 pub struct Obj {
@@ -20,7 +24,9 @@ pub struct Obj {
 pub enum ObjType {
     String  (ObjString),
     Function(ObjFunction),
-    NativeFn(ObjNative)
+    NativeFn(ObjNative),
+    Class   (ObjClass),
+    Instance(ObjInstance),
 }
 
 
@@ -48,9 +54,11 @@ impl Eq for Obj {}
 impl Display for Obj {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\"{}\"", match &self.type_ {
-            ObjType::String  (str)  => str.string.clone(),
-            ObjType::Function(func) => format!("<fn {}>",        func.name),
-            ObjType::NativeFn(func) => format!("<native fn {}>", func.name),
+            ObjType::String  (str)   => str.string.clone(),
+            ObjType::Function(func)  => format!("<fn {}>",        func .name),
+            ObjType::NativeFn(func)  => format!("<native fn {}>", func .name),
+            ObjType::Class   (class) => format!("<class {}>",     class.name),
+            ObjType::Instance(inst)  => format!("<{} instance>",  inst.class_name),
         })
     }
 }

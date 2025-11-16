@@ -1,4 +1,4 @@
-use crate::script::vm::{gc::Context, value::Value};
+use crate::script::vm::{chunk::{ConstIndex, Offset}, gc::Context, value::Value};
 
 use super::chunk::{Chunk, OpCode};
 
@@ -33,21 +33,22 @@ impl OpCode {
 
         type O = OpCode;
         match &self {
-            O::GetConstant  { index }     => constant_instruction("OP_CONSTANT",      data, **index),
+            O::GetConstant  { index }     => constant_instruction("OP_CONSTANT",      data, index),
 
-            O::DefGlobal    { name_idx }  => constant_instruction("OP_DEF_GLOBAL",    data, **name_idx),
-            O::GetGlobal    { name_idx }  => constant_instruction("OP_GET_GLOBAL",    data, **name_idx),
-            O::SetGlobal    { name_idx }  => constant_instruction("OP_SET_GLOBAL",    data, **name_idx),
+            O::DefGlobal    { name_idx }  => constant_instruction("OP_DEF_GLOBAL",    data, name_idx),
+            O::GetGlobal    { name_idx }  => constant_instruction("OP_GET_GLOBAL",    data, name_idx),
+            O::SetGlobal    { name_idx }  => constant_instruction("OP_SET_GLOBAL",    data, name_idx),
 
             O::GetLocal     { index }     => byte_instruction    ("OP_GET_LOCAL",     **index),
             O::SetLocal     { index }     => byte_instruction    ("OP_SET_LOCAL",     **index),
 
-            O::JumpIfFalse  { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, **offset,  1),
-            O::JumpIfTrue   { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, **offset,  1),
-            O::Jump         { offset }    => jump_instruction    ("OP_JUMP",          ip, **offset,  1),
-            O::Loop         { offset }    => jump_instruction    ("OP_LOOP",          ip, **offset, -1),
+            O::JumpIfFalse  { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, offset,  1),
+            O::JumpIfTrue   { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, offset,  1),
+            O::Jump         { offset }    => jump_instruction    ("OP_JUMP",          ip, offset,  1),
+            O::Loop         { offset }    => jump_instruction    ("OP_LOOP",          ip, offset, -1),
 
             O::Call         { arg_count } => byte_instruction    ("OP_CALL",          *arg_count),
+            O::Class        { name_idx }  => constant_instruction("OP_CLASS",         data, name_idx),
 
             O::Nil                        => simple_instruction  ("OP_NIL"),
             O::True                       => simple_instruction  ("OP_TRUE"),
@@ -72,7 +73,6 @@ impl OpCode {
 }
 
 fn print_line_info(data: &DisassembleData, offset: usize) {
-
     if offset > 0 && data.lines[offset] == data.lines[offset -1] {
         print!("   | ");
     }
@@ -94,8 +94,8 @@ fn simple_instruction(name: &str) {
     print!("{msg}")
 }
 
-fn constant_instruction(name: &str, data: &DisassembleData, index: usize) {
-    let msg = format!("{:16} {:4} {:30} ", name, index, &data.constants[index].display(data.ctx));
+fn constant_instruction(name: &str, data: &DisassembleData, index: &ConstIndex) {
+    let msg = format!("{:16} {:4} {:30} ", name, **index, &data.constants[**index].display(data.ctx));
     let msg = right_adjust(&msg);
     print!("{msg}");
 }
@@ -106,11 +106,11 @@ fn byte_instruction(name: &str, index: usize) {
     print!("{msg}");
 }
 
-fn jump_instruction(name: &str, ip: usize, offset: usize, sign: isize) {
-    let delta = offset as isize * sign;
+fn jump_instruction(name: &str, ip: usize, offset: &Offset, sign: isize) {
+    let delta = **offset as isize * sign;
     let dest  = (ip as isize + delta) as usize;
 
-    let msg = format!("{:16} {:4} -> {}", name, offset, dest);
+    let msg = format!("{:16} {:4} -> {}", name, **offset, dest);
     let msg = right_adjust(&msg);
     print!("{msg}")
 }
