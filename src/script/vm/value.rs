@@ -42,7 +42,7 @@ impl Value {
         }
     }
 
-    pub fn as_obj_mut<'a>(&'a mut self, ctx: &'a mut Context) -> Option<&'a Obj> {
+    pub fn as_obj_mut<'a>(&'a mut self, ctx: &'a mut Context) -> Option<&'a mut Obj> {
 
         match self {
             Value::Obj(o) => {

@@ -7,7 +7,7 @@ use value::Value;
 use gc::Context;
 
 use crate::script::vm::debug::DisassembleData;
-use crate::script::vm::object::{NativeFn, ObjClass, ObjNative};
+use crate::script::vm::object::{NativeFn, ObjClass, ObjInstance, ObjNative};
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -134,6 +134,9 @@ impl Vm {
                 O::GetGlobal   { name_idx }     => self.op_get_global(name_idx)?,
                 O::SetGlobal   { name_idx }     => self.op_set_global(name_idx)?,
 
+                O::GetProperty { name_idx }     => self.op_get_property(name_idx)?,
+                O::SetProperty { name_idx }     => self.op_get_property(name_idx)?,
+
                 O::GetLocal    { index }        => self.op_get_local (index),
                 O::SetLocal    { index }        => self.op_set_local (index),
 
@@ -238,13 +241,13 @@ impl Vm {
     fn op_get_global(&mut self, index: ConstIndex) -> RuntimeResult<()> {
         let name  = self.get_constant_as_str(index, &self.ctx);
 
-        let value = match self.globals.get(&name) {
-            Some(value) => value,
-            None        => {
-                let msg = format!("Undefined variable '{name}'");
-                Err(self.runtime_error(msg))?
-            },
-        };
+        let value = self.globals
+            .get(&name)
+            .ok_or_else(|| {
+                self.runtime_error(format!("Undefined variable '{name}'"))
+            })
+            ?
+        ;
 
         self.push_stack(*value);
 
@@ -253,16 +256,59 @@ impl Vm {
 
     fn op_set_global(&mut self, index: ConstIndex) -> RuntimeResult<()> {
         let name = self.get_constant_as_str(index, &self.ctx);
+        let val  = self.peek_stack(0);
 
-        if self.globals.get(&name).is_none() {
-            let msg = format!("Undefined variable '{name}'");
-            Err(self.runtime_error(msg))?
-        }
+        self.globals
+            .get_mut ( &name )
+            .and_then( |global| {
+                *global = val;
+                Some(())
+            })
+            .ok_or_else(|| {
+                self.runtime_error(format!("Undefined variable '{name}'"))
+            })
+    }
 
-        *self.globals.get_mut(&name).unwrap() = self.peek_stack(0);
+    fn op_get_property(&mut self, index: ConstIndex) -> RuntimeResult<()> {
+        let name     = self.get_constant_as_str(index, &self.ctx);
+        let val      = self.pop_stack();
+
+        let obj      = val.as_obj(&self.ctx).unwrap();
+        let instance = obj.to_instance()    .unwrap();
+        
+        let value = instance.fields
+            .get(&name)
+            .ok_or_else(|| {
+                self.runtime_error(format!("Undefined property '.{name}'"))
+            })
+            ?
+        ;
+
+        self.push_stack(*value);
 
         Ok(())
     }
+
+    fn op_set_property(&mut self, index: ConstIndex) -> RuntimeResult<()> {
+        let     name = self.get_constant_as_str(index, &self.ctx);
+        let     val  = self.pop_stack();
+        let mut obj  = self.pop_stack();
+
+        let obj      = obj.as_obj_mut(&mut self.ctx).unwrap();
+        let instance = obj.to_instance_mut()        .unwrap();
+
+        instance.fields
+            .get_mut ( &name )
+            .and_then(|field| {
+                *field = val;
+                Some(())
+            })
+            .ok_or_else(|| {
+                self.runtime_error(format!("Undefined property '.{name}'"))
+            })
+        
+    }
+
 
     fn op_get_local(&mut self, index: StackIndex) {
         self.push_stack(self.get_local(index));

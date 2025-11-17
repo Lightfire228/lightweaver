@@ -464,7 +464,8 @@ impl<'a> Compiler<'a> {
         self.line = get.name.line;
 
         let name_idx = self.make_identifier_constant(get.name);
-        self.write_op(Op::GetGlobal { name_idx, });
+
+        self.write_op(Op::GetProperty { name_idx, });
     }
 
     fn compile_set_expr(&mut self, set: Set) {
@@ -473,7 +474,7 @@ impl<'a> Compiler<'a> {
         let name_idx = self.make_identifier_constant(set.name);
         self.compile_expr(*set.value);
 
-        self.write_op(Op::SetGlobal { name_idx, });
+        self.write_op(Op::SetProperty { name_idx, });
     }
 
     fn compile_super_expr(&mut self, _super: Super) {

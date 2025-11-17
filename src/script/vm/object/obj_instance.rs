@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::script::vm::{gc::ObjectId, object::ObjType};
+use crate::script::vm::{gc::ObjectId, object::{Obj, ObjType}, value::Value};
 
-pub type Fields = HashMap<String, ObjectId>;
+pub type Fields = HashMap<String, Value>;
 
 #[derive(Debug, Clone)]
 pub struct ObjInstance {
@@ -24,5 +24,26 @@ impl ObjInstance {
 impl From<ObjInstance> for ObjType {
     fn from(value: ObjInstance) -> Self {
         Self::Instance(value)
+    }
+}
+
+
+impl Obj {
+    pub fn to_instance(&self) -> Option<&'_ ObjInstance> {
+        type T = ObjType;
+
+        match &self.type_ {
+            T::Instance(inst) => Some(inst),
+            _                 => None,
+        }
+    }
+
+    pub fn to_instance_mut(&mut self) -> Option<&'_ mut ObjInstance> {
+        type T = ObjType;
+
+        match &mut self.type_ {
+            T::Instance(inst) => Some(inst),
+            _                 => None,
+        }
     }
 }

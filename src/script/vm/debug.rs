@@ -39,6 +39,9 @@ impl OpCode {
             O::GetGlobal    { name_idx }  => constant_instruction("OP_GET_GLOBAL",    data, name_idx),
             O::SetGlobal    { name_idx }  => constant_instruction("OP_SET_GLOBAL",    data, name_idx),
 
+            O::GetProperty  { name_idx }  => constant_instruction("OP_GET_PROPERTY",  data, name_idx),
+            O::SetProperty  { name_idx }  => constant_instruction("OP_SET_PROPERTY",  data, name_idx),
+
             O::GetLocal     { index }     => byte_instruction    ("OP_GET_LOCAL",     **index),
             O::SetLocal     { index }     => byte_instruction    ("OP_SET_LOCAL",     **index),
 
