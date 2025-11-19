@@ -69,12 +69,18 @@ pub enum ParseErrorType {
     MissingWhileCloseParen,
     MissingExpressionStmtSemicolon,
     MissingBlockCloseBrace,
-    InvalidAssignmentTarget,
+    InvalidAssignmentTarget(AssignmentTarget),
     MissingPropertyIdentifier,
     MissingSuperDot,
     MissingSuperPropertyIdentifier,
     MissingGroupingCloseParen,
     MissingExpression(Token),
+}
+
+#[derive(Debug)]
+pub enum AssignmentTarget {
+    Dot,
+    Expr,
 }
 
 type Prec = Precidence;
@@ -509,7 +515,8 @@ impl Parser {
             }
 
             if can_assign && self.match_(&[Tt::Equal]) {
-                return Err(self.error(Pe::InvalidAssignmentTarget))
+                type T = AssignmentTarget;
+                return Err(self.error(Pe::InvalidAssignmentTarget(T::Expr)))
             }
 
             Ok(target)
@@ -552,7 +559,11 @@ impl Parser {
                 match value {
                     Expr::Variable(_)   => Ok(Assign::new(Variable::new(name), value)),
                     Expr::Get     (get) => Ok(Set   ::new(target, name, *get.expr)),
-                    _                   => Err(self.error(Pe::InvalidAssignmentTarget))
+                    Expr::Literal (val) => Ok(Set   ::new(target, name, Expr::Literal(val))),
+
+                    _                   => {
+                        Err(self.error(Pe::InvalidAssignmentTarget(AssignmentTarget::Dot)))
+                    }
                 }
 
             }
@@ -813,7 +824,7 @@ impl Logger {
         }
 
         let depth = self.depth.get();
-        let ind   = " ".repeat(depth);
+        let ind   = "| ".repeat(depth);
 
         println!("{ind}{name} ({token}) {{");
 
@@ -844,7 +855,7 @@ impl Logger {
         }
 
         let depth = self.depth.get();
-        let ind   = " ".repeat(depth);
+        let ind   = "| ".repeat(depth);
 
         println!("{ind}{name} ({token});");
     }

@@ -135,7 +135,7 @@ impl Vm {
                 O::SetGlobal   { name_idx }     => self.op_set_global(name_idx)?,
 
                 O::GetProperty { name_idx }     => self.op_get_property(name_idx)?,
-                O::SetProperty { name_idx }     => self.op_get_property(name_idx)?,
+                O::SetProperty { name_idx }     => self.op_set_property(name_idx),
 
                 O::GetLocal    { index }        => self.op_get_local (index),
                 O::SetLocal    { index }        => self.op_set_local (index),
@@ -275,7 +275,7 @@ impl Vm {
 
         let obj      = val.as_obj(&self.ctx).unwrap();
         let instance = obj.to_instance()    .unwrap();
-        
+
         let value = instance.fields
             .get(&name)
             .ok_or_else(|| {
@@ -289,24 +289,19 @@ impl Vm {
         Ok(())
     }
 
-    fn op_set_property(&mut self, index: ConstIndex) -> RuntimeResult<()> {
+    fn op_set_property(&mut self, index: ConstIndex) {
         let     name = self.get_constant_as_str(index, &self.ctx);
         let     val  = self.pop_stack();
         let mut obj  = self.pop_stack();
+        let     obj  = obj.as_obj_mut(&mut self.ctx);
 
-        let obj      = obj.as_obj_mut(&mut self.ctx).unwrap();
-        let instance = obj.to_instance_mut()        .unwrap();
+        let instance = obj.unwrap().to_instance_mut()        .unwrap();
 
         instance.fields
-            .get_mut ( &name )
-            .and_then(|field| {
-                *field = val;
-                Some(())
-            })
-            .ok_or_else(|| {
-                self.runtime_error(format!("Undefined property '.{name}'"))
-            })
-        
+            .insert(name, val)
+        ;
+
+        self.push_stack(val);
     }
 
 
@@ -493,7 +488,7 @@ impl Vm {
     fn call_value(&mut self, value: Value, arg_count: usize) -> RuntimeResult<()> {
 
         let obj = match value {
-            Value::Obj(obj) => obj,
+            Value::Obj  (obj)   => obj,
 
             _ => Err(self.runtime_error(
                 format!("Value of type '{}' is not callable", value.display_type())
@@ -503,8 +498,9 @@ impl Vm {
         let obj = self.ctx.get(obj);
         match &obj.type_ {
 
-            ObjType::Function(func) => self.call       (obj.id, func.arity, arg_count)?,
-            ObjType::NativeFn(func) => self.call_native(arg_count, func.func),
+            ObjType::Function(func)  => self.call       (obj.id, func.arity, arg_count)?,
+            ObjType::NativeFn(func)  => self.call_native(arg_count, func.func),
+            ObjType::Class   (class) => self.call_class (class.name.clone(), obj.id, arg_count)?,
 
             _ => Err(self.runtime_error(
                 format!("Object of type '{:?}' is not callable", obj.type_)
@@ -546,6 +542,19 @@ impl Vm {
 
         self.stack.pop(); // remove the callee temporary
         self.push_stack(result);
+    }
+
+
+    fn call_class(&mut self, class_name: String, class_id: ObjectId, arg_count: usize) -> RuntimeResult<()> {
+        
+            let obj = ObjInstance::new(class_id, class_name);
+            let id  = self.ctx.new_obj(obj.into());
+
+            self.stack.pop();
+            self.stack.push(Value::Obj(id));
+
+
+        Ok(())
     }
 
     fn stack_trace(&self) -> String {

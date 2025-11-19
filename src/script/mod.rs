@@ -15,7 +15,7 @@ mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
-use crate::script::vm::{compiler::CompilerOut, debug::DisassembleData, gc::{Context}, object::ObjFunction};
+use crate::script::{parser::AssignmentTarget, vm::{compiler::CompilerOut, debug::DisassembleData, gc::Context, object::ObjFunction}};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
@@ -130,22 +130,28 @@ fn display_parser_err(err: ParseErrorList) -> ! {
             Pe::MissingWhileCloseParen                  => eprintln!("Expect ')' after condition"),
             Pe::MissingExpressionStmtSemicolon          => eprintln!("Expect ';' after expression"),
             Pe::MissingBlockCloseBrace                  => eprintln!("Expect '}}' after block"),
-            Pe::InvalidAssignmentTarget                 => eprintln!("Invalid assignment target"),
             Pe::MissingPropertyIdentifier               => eprintln!("Expect property name after '.'"),
             Pe::MissingSuperDot                         => eprintln!("Expect '.' after super"),
             Pe::MissingSuperPropertyIdentifier          => eprintln!("Expect superclass method name"),
             Pe::MissingGroupingCloseParen               => eprintln!("Expect ')' after expression"),
             Pe::MissingExpression(token)                => eprintln!("Expect expression ({})", token),
+            Pe::InvalidAssignmentTarget(target)         => {
+                type T = AssignmentTarget;
+                match target {
+                    T::Dot  => eprintln!("Invalid assignment target for '.'"),
+                    T::Expr => eprintln!("Invalid assignment target for expression"),
+                }
+            },
         }
     }
 
     panic!()
 }
 
+
 fn display_runtime_err(err: RuntimeError) -> ! {
     panic!("Runtime error: [line {}] {} \n{}", err.line, err.msg, err.stack_trace)
 }
-
 
 
 fn display_ast(ast: &Ast) {

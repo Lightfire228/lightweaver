@@ -100,9 +100,9 @@
 // print fib(10);
 // print clock() - start;
 
-class Brioche {}
+// class Brioche {}
 
-print Brioche;
+// print Brioche;
 
 
 class Toast {}

@@ -165,6 +165,9 @@ impl<'a> Compiler<'a> {
         if is_global.is_some() {
             self.define_global(name_idx);
         }
+        
+        self.write_op(Op::Pop);
+
     }
 
     fn compile_expr_stmt(&mut self, expr_stmt: ExpressionStmt) {
@@ -431,6 +434,7 @@ impl<'a> Compiler<'a> {
         }
 
         self.write_op(Op::Call { arg_count: arity });
+
     }
 
     fn compile_unary_expr(&mut self, unary: UnaryOperator) {
@@ -557,8 +561,11 @@ impl<'a> Compiler<'a> {
         self.add_local(name.clone());
     }
 
-    fn define_global(&mut self, index: ConstIndex) {
-        self.write_op(Op::DefGlobal { name_idx: index, });
+    fn define_global(&mut self, name_idx: ConstIndex) {
+        self.write_ops(
+            Op::DefGlobal { name_idx, },
+            Op::GetGlobal { name_idx, },
+        );
     }
 
     fn add_local(&mut self, name: Token) {
