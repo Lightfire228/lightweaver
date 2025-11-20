@@ -28,6 +28,7 @@ pub enum OpCode {
 
     Call        { arg_count: usize },
     Class       { name_idx:  ConstIndex },
+    Closure     { func_idx:  ConstIndex },
 
     Nil,
     True,
@@ -92,6 +93,7 @@ impl Display for OpCode {
             OpCode::Loop        { offset }                     => format!("Loop {}",          **offset  ),
             OpCode::Call        { arg_count }                  => format!("Call (args: {})",  arg_count ),
             OpCode::Class       { name_idx }                   => format!("Class {}",         **name_idx),
+            OpCode::Closure     { func_idx }                   => format!("Closure {}",       **func_idx),
             OpCode::Nil                                        => format!("Nil"),
             OpCode::True                                       => format!("True"),
             OpCode::False                                      => format!("False"),

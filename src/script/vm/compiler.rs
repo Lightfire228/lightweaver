@@ -165,7 +165,7 @@ impl<'a> Compiler<'a> {
         if is_global.is_some() {
             self.define_global(name_idx);
         }
-        
+
         self.write_op(Op::Pop);
 
     }
@@ -190,6 +190,8 @@ impl<'a> Compiler<'a> {
         }
 
         self.end_scope();
+        let func_idx = self.add_constant(Value::Obj(func_id));
+        self.write_op(Op::Closure { func_idx });
 
         Ok(())
     }

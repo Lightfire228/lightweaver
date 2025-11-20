@@ -1,0 +1,22 @@
+script:
+- [x] calls and functions
+  - https://craftinginterpreters.com/calls-and-functions.html
+
+- [ ] closures
+  - https://craftinginterpreters.com/closures.html
+
+- [ ] garbage collection
+  - https://craftinginterpreters.com/garbage-collection.html
+
+- [x] classes and instances
+  - https://craftinginterpreters.com/classes-and-instances.html
+
+- [ ] methods and initializers
+  - https://craftinginterpreters.com/methods-and-initializers.html
+
+- [ ] superclassing
+  - https://craftinginterpreters.com/superclasses.html
+
+
+vulkan:
+- [ ]

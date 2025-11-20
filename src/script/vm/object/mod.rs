@@ -7,12 +7,14 @@ mod obj_string;
 mod obj_function;
 mod obj_class;
 mod obj_instance;
+mod obj_closure;
 
 pub use obj_native  ::*;
 pub use obj_string  ::*;
 pub use obj_function::*;
 pub use obj_class   ::*;
 pub use obj_instance::*;
+pub use obj_closure ::*;
 
 #[derive(Debug, Clone)]
 pub struct Obj {
@@ -27,6 +29,7 @@ pub enum ObjType {
     NativeFn(ObjNative),
     Class   (ObjClass),
     Instance(ObjInstance),
+    Closure (ObjClosure),
 }
 
 
@@ -58,7 +61,8 @@ impl Display for Obj {
             ObjType::Function(func)  => format!("<fn {}>",        func .name),
             ObjType::NativeFn(func)  => format!("<native fn {}>", func .name),
             ObjType::Class   (class) => format!("<class {}>",     class.name),
-            ObjType::Instance(inst)  => format!("<{} instance>",  inst.class_name),
+            ObjType::Instance(inst)  => format!("<{} instance>",  inst .class_name),
+            ObjType::Closure (func)  => format!("<fn {}>",        func .func_name),
         })
     }
 }

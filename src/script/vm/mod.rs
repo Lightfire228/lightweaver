@@ -7,7 +7,7 @@ use value::Value;
 use gc::Context;
 
 use crate::script::vm::debug::DisassembleData;
-use crate::script::vm::object::{NativeFn, ObjClass, ObjInstance, ObjNative};
+use crate::script::vm::object::{NativeFn, ObjClass, ObjClosure, ObjInstance, ObjNative};
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -52,7 +52,7 @@ pub struct Vm {
 struct CallFrame {
     pub stack_offset: StackIndex,
     pub ip:           BytecodeIndex,
-    pub func_obj:     ObjectId,
+    pub closure:      ObjectId,
     pub arity:        usize,
 }
 
@@ -82,7 +82,7 @@ impl Vm {
         let call_frame = CallFrame {
            stack_offset: StackIndex   (0),
            ip:           BytecodeIndex(0),
-           func_obj:     script_func,
+           closure:      script_func,
            arity:        0,
         };
 
@@ -148,6 +148,7 @@ impl Vm {
 
                 O::Call        { arg_count }    => self.op_call   (arg_count)?,
                 O::Class       { name_idx }     => self.op_class  (name_idx),
+                O::Closure     { func_idx }     => self.op_closure(func_idx),
 
                 O::Nil                          => self.push_stack(Value::Nil),
                 O::True                         => self.push_stack(Value::Bool(true)),
@@ -348,6 +349,20 @@ impl Vm {
         self.push_stack(Value::Obj(id));
     }
 
+    fn op_closure(&mut self, func_idx: ConstIndex) {
+
+        let func_val           = self.get_constant(func_idx);
+        let obj                = func_val.as_obj(&self.ctx).unwrap();
+        let func: &ObjFunction = obj.into();
+
+        let closure = ObjClosure::new(obj.id, func.name.clone(), func.arity);
+
+        let id = self.ctx.new_obj(closure.into());
+
+        self.push_stack(Value::Obj(id));
+    }
+
+
     fn op_binary(&mut self, op: BinaryOp) -> RuntimeResult<()> {
         let b = self.pop_number()?;
         let a = self.pop_number()?;
@@ -456,7 +471,7 @@ impl Vm {
     fn get_chunk(&self) -> &Chunk {
         let obj = self.call_frame();
 
-        let obj = self.ctx.get(obj.func_obj);
+        let obj = self.ctx.get(obj.closure);
 
         let obj: &ObjFunction = obj.into();
 
@@ -498,9 +513,10 @@ impl Vm {
         let obj = self.ctx.get(obj);
         match &obj.type_ {
 
-            ObjType::Function(func)  => self.call       (obj.id, func.arity, arg_count)?,
-            ObjType::NativeFn(func)  => self.call_native(arg_count, func.func),
-            ObjType::Class   (class) => self.call_class (class.name.clone(), obj.id, arg_count)?,
+            ObjType::Function(func)    => self.call       (obj.id, func.arity, arg_count)?,
+            ObjType::NativeFn(func)    => self.call_native(arg_count, func.func),
+            ObjType::Class   (class)   => self.call_class (class.name.clone(), obj.id, arg_count)?,
+            ObjType::Closure (_)       => self.call       (obj.id, arg_count, arg_count)?,
 
             _ => Err(self.runtime_error(
                 format!("Object of type '{:?}' is not callable", obj.type_)
@@ -510,7 +526,7 @@ impl Vm {
         Ok(())
     }
 
-    fn call(&mut self, func_obj: ObjectId, func_arity: usize, arg_count: usize) -> RuntimeResult<()> {
+    fn call(&mut self, closure: ObjectId, func_arity: usize, arg_count: usize) -> RuntimeResult<()> {
 
         if func_arity != arg_count {
             Err(self.runtime_error(format!("Expected {} arguments but got {}", func_arity, arg_count)))?
@@ -525,7 +541,7 @@ impl Vm {
         self.call_stack.push(CallFrame {
             stack_offset: StackIndex   (offset),
             ip:           BytecodeIndex(0),
-            func_obj,
+            closure,
             arity:        func_arity,
         });
 
@@ -546,7 +562,7 @@ impl Vm {
 
 
     fn call_class(&mut self, class_name: String, class_id: ObjectId, arg_count: usize) -> RuntimeResult<()> {
-        
+
             let obj = ObjInstance::new(class_id, class_name);
             let id  = self.ctx.new_obj(obj.into());
 
@@ -563,7 +579,9 @@ impl Vm {
 
         for frame in self.call_stack.iter().rev() {
 
-            let func: &ObjFunction = self.ctx.get(frame.func_obj).into();
+            let closure: &ObjClosure  = self.ctx.get(frame  .closure) .into();
+            let func:    &ObjFunction = self.ctx.get(closure.function).into();
+
             let line = func.chunk.lines[*frame.ip -1];
 
             writeln!(results, "  [line {}] in {}", line, func.name).unwrap();
