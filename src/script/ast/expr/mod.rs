@@ -59,7 +59,6 @@ impl AstNode for Expr {
     }
 }
 
-
 impl Expr {
     pub fn as_ast(&self) -> Box<&dyn AstNode> {
         match self {

@@ -15,7 +15,7 @@ mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
-use crate::script::{parser::AssignmentTarget, vm::{compiler::CompilerOut, debug::DisassembleData, gc::Context, object::ObjFunction}};
+use crate::script::{parser::AssignmentTarget, vm::{compiler::CompilerOut, debug::DisassembleData, gc::Context, object::ObjFunction, resolver::resolve}};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
@@ -41,8 +41,10 @@ pub fn run_file(path: &Path) -> &str {
 
         let tokens = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
 
-        let ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
+        let mut ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
         display_ast(&ast);
+
+        resolve(&mut ast, &mut ctx);
 
 
         let out = compile(ast, &mut ctx).unwrap();

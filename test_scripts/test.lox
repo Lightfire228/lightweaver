@@ -1,6 +1,9 @@
 var x = "global";
 fun outer() {
   var x = "outer";
+  var y = "test";
+
+  y = y;
   fun inner() {
     print x;
   }
