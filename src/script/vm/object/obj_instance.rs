@@ -6,16 +6,14 @@ pub type Fields = HashMap<String, Value>;
 
 #[derive(Debug, Clone)]
 pub struct ObjInstance {
-    pub class:      ObjectId,
-    pub class_name: String, //TODO: this is stupid
-    pub fields:     Fields,
+    pub class:  ObjectId,
+    pub fields: Fields,
 }
 
 impl ObjInstance {
-    pub fn new(class: ObjectId, class_name: String) -> Self {
+    pub fn new(class: ObjectId) -> Self {
         Self {
             class,
-            class_name,
             fields: HashMap::new(),
         }
     }

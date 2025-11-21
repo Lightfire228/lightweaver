@@ -86,7 +86,7 @@ impl Value {
 
     pub fn display(&self, ctx: &Context) -> String {
         match self {
-            Value::Obj   (x) => ctx.get(*x).to_string(),
+            Value::Obj   (x) => ctx.get(*x).as_string(ctx),
             Value::Number(x) => x.to_string(),
             Value::Bool  (x) => x.to_string(),
             Value::Nil       => "nil".to_owned(),

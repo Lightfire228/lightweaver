@@ -23,6 +23,8 @@ struct Resolver<'a> {
     scope_depth: usize,
     ctx:         &'a mut Context,
     locals:      Vec<Local>,
+
+    bools:       Vec<&'a mut bool>
 }
 
 struct Local {
@@ -37,12 +39,13 @@ impl<'a> Resolver<'a> {
             scope_depth: 0,
             ctx,
             locals: Vec::new(),
+            bools:  Vec::new(),
         }
     }
 
     // Statements
 
-    fn resolve_stmt(&mut self, stmt: &mut Stmt) {
+    fn resolve_stmt(&mut self, stmt: &'a mut Stmt) {
         match stmt {
             Stmt::Block      (stmt) => self.resolve_block_stmt (stmt),
             Stmt::Class      (stmt) => self.resolve_class_decl (stmt),
@@ -56,7 +59,7 @@ impl<'a> Resolver<'a> {
         };
     }
 
-    fn resolve_block_stmt(&mut self, block: &mut Block) {
+    fn resolve_block_stmt(&mut self, block: &'a mut Block) {
         self.begin_scope();
 
         for stmt in block.stmts.iter_mut() {
@@ -78,11 +81,12 @@ impl<'a> Resolver<'a> {
         self.resolve_expr(&mut expr_stmt.expr);
     }
 
-    fn resolve_func_decl(&mut self, func: &mut FunctionStmt) {
+    fn resolve_func_decl(&mut self, func: &'a mut FunctionStmt) {
         self.begin_scope();
 
-        for arg in &func.params {
-            self.push_local(arg.lexeme.to_owned());
+        for arg in func.params.iter_mut() {
+            self.push_local(arg.name.lexeme.to_owned());
+            self.bools.push(&mut arg.is_closed);
         }
 
         for stmt in func.body.iter_mut() {
@@ -93,7 +97,7 @@ impl<'a> Resolver<'a> {
 
     }
 
-    fn resolve_if_stmt(&mut self, if_stmt: &mut IfStmt) {
+    fn resolve_if_stmt(&mut self, if_stmt: &'a mut IfStmt) {
 
         self.resolve_expr(&mut if_stmt.condition);
 
@@ -103,7 +107,6 @@ impl<'a> Resolver<'a> {
             self.resolve_stmt(stmt);
         }
     }
-
 
     fn resolve_print_stmt(&mut self, expr: &mut Expr) {
         self.resolve_expr(expr);
@@ -115,17 +118,16 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_var_decl(&mut self, stmt: &mut VarStmt) {
-        if self.scope_depth > 0 {
-            self.push_local(stmt.name.lexeme.to_owned());
-        }
+    fn resolve_var_decl(&mut self, stmt: &'a mut VarStmt) {
+        self.push_local(stmt.name.lexeme.to_owned());
+        self.bools.push(&mut stmt.is_closed);
 
         if let Some(val) = &mut stmt.initializer {
             self.resolve_expr(val);
         }
     }
 
-    fn resolve_while_stmt(&mut self, while_: &mut WhileStmt) {
+    fn resolve_while_stmt(&mut self, while_: &'a mut WhileStmt) {
         self.resolve_expr(&mut while_.condition);
 
         self.resolve_stmt(&mut while_.body);
@@ -183,11 +185,10 @@ impl<'a> Resolver<'a> {
 
     fn resolve_var_expr(&mut self, var: &mut Variable) {
 
-        for local in self.locals.iter().rev() {
+        for (i, local) in self.locals.iter().enumerate().rev() {
 
             if local.name == var.name.lexeme {
-                var.is_closed = local.scope_depth != self.scope_depth;
-                println!("isclosed: {}", var.is_closed);
+                *self.bools[i] = local.scope_depth != self.scope_depth;
                 break;
             }
         };
@@ -228,8 +229,9 @@ impl<'a> Resolver<'a> {
             if last.scope_depth <= self.scope_depth {
                 break;
             }
-            
+
             self.locals.pop();
+            self.bools .pop();
         }
     }
 

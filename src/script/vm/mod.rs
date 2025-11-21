@@ -7,7 +7,7 @@ use value::Value;
 use gc::Context;
 
 use crate::script::vm::debug::DisassembleData;
-use crate::script::vm::object::{NativeFn, ObjClass, ObjClosure, ObjInstance, ObjNative};
+use crate::script::vm::object::{NativeFn, ObjClass, ObjClosure, ObjInstance, ObjNative, ObjValue};
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -150,6 +150,8 @@ impl Vm {
                 O::Call        { arg_count }    => self.op_call   (arg_count)?,
                 O::Class       { name_idx }     => self.op_class  (name_idx),
                 O::Closure     { func_idx }     => self.op_closure(func_idx),
+
+                O::CloseVar                     => self.op_close_var(),
 
                 O::Nil                          => self.push_stack(Value::Nil),
                 O::True                         => self.push_stack(Value::Bool(true)),
@@ -356,11 +358,19 @@ impl Vm {
         let obj                = func_val.as_obj(&self.ctx).unwrap();
         let func: &ObjFunction = obj.into();
 
-        let closure = ObjClosure::new(obj.id, func.name.clone(), func.arity);
+        let closure = ObjClosure::new(obj.id, func.arity);
 
         let id = self.ctx.new_obj(closure.into());
 
         self.push_stack(Value::Obj(id));
+    }
+
+    fn op_close_var(&mut self) {
+
+        let val = self.pop_stack();
+        let obj = self.ctx.new_obj(ObjValue::new(val).into());
+
+        self.push_stack(Value::Obj(obj));
     }
 
 
@@ -516,7 +526,7 @@ impl Vm {
 
             ObjType::Function(func)    => self.call       (obj.id, func.arity, arg_count)?,
             ObjType::NativeFn(func)    => self.call_native(arg_count, func.func),
-            ObjType::Class   (class)   => self.call_class (class.name.clone(), obj.id, arg_count)?,
+            ObjType::Class   (_)       => self.call_class (obj.id, arg_count)?,
             ObjType::Closure (_)       => self.call       (obj.id, arg_count, arg_count)?,
 
             _ => Err(self.runtime_error(
@@ -562,9 +572,9 @@ impl Vm {
     }
 
 
-    fn call_class(&mut self, class_name: String, class_id: ObjectId, arg_count: usize) -> RuntimeResult<()> {
+    fn call_class(&mut self, class_id: ObjectId, arg_count: usize) -> RuntimeResult<()> {
 
-            let obj = ObjInstance::new(class_id, class_name);
+            let obj = ObjInstance::new(class_id);
             let id  = self.ctx.new_obj(obj.into());
 
             self.stack.pop();

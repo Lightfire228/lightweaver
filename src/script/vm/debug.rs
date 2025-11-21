@@ -53,7 +53,8 @@ impl OpCode {
             O::Call         { arg_count } => byte_instruction    ("OP_CALL",          *arg_count),
             O::Class        { name_idx }  => constant_instruction("OP_CLASS",         data, name_idx),
             O::Closure      { func_idx }  => closure_instruction ("OP_CLOSURE",       data, func_idx),
-
+            
+            O::CloseVar                   => simple_instruction  ("OP_CLOSE_VAR"),
             O::Nil                        => simple_instruction  ("OP_NIL"),
             O::True                       => simple_instruction  ("OP_TRUE"),
             O::False                      => simple_instruction  ("OP_FALSE"),

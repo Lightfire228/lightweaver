@@ -6,10 +6,15 @@ use super::Stmt;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FunctionStmt {
     pub name:   Token,
-    pub params: Vec<Token>,
+    pub params: Vec<FunctionParam>,
     pub body:   Box<Vec<Stmt>>
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FunctionParam {
+    pub name:      Token,
+    pub is_closed: bool,
+}
 
 impl FunctionStmt {
 
@@ -20,8 +25,17 @@ impl FunctionStmt {
     ) -> Self {
         Self {
             name,
-            params,
-            body: Box::new(body),
+            params: params.into_iter().map(|p| FunctionParam::new(p)).collect(),
+            body:   Box::new(body),
+        }
+    }
+}
+
+impl FunctionParam {
+    fn new(name: Token) -> Self {
+        Self {
+            name,
+            is_closed: false,
         }
     }
 }
@@ -45,3 +59,4 @@ impl AstNode for FunctionStmt {
         self.body.iter().map(Stmt::as_ast).collect()
     }
 }
+

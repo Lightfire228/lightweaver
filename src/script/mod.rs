@@ -42,9 +42,9 @@ pub fn run_file(path: &Path) -> &str {
         let tokens = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
 
         let mut ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
-        display_ast(&ast);
-
         resolve(&mut ast, &mut ctx);
+        
+        display_ast(&ast);
 
 
         let out = compile(ast, &mut ctx).unwrap();

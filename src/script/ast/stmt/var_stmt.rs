@@ -6,6 +6,7 @@ use super::Stmt;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarStmt {
     pub name:        Token,
+    pub is_closed:   bool,
     pub initializer: Option<Expr>,
 }
 
@@ -13,6 +14,7 @@ impl VarStmt {
     pub fn new(name: Token, initializer: Option<Expr>) -> Stmt {
         Stmt::Var(VarStmt {
             name,
+            is_closed: false,
             initializer,
         })
     }
@@ -20,7 +22,7 @@ impl VarStmt {
 
 impl AstNode for VarStmt {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
-        let msg = format!("Variable ({})", self.name.lexeme);
+        let msg = format!("Variable ({}, is closed: {})", self.name.lexeme, self.is_closed);
 
         AstDisplay {
             depth:   args.depth,

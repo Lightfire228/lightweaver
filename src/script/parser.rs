@@ -261,7 +261,7 @@ impl Parser {
 
                 self.consume(Tt::Identifier, Pe::MissingSuperclassIdentifier)?;
                 let name = self.previous();
-                superclass = Some(Variable { name, is_closed: false });
+                superclass = Some(Variable { name });
             }
 
             self.consume(Tt::LeftBrace, Pe::MissingClassOpenCurly)?;

@@ -182,7 +182,8 @@ impl<'a> Compiler<'a> {
 
         self.begin_scope();
 
-        let func_id = self.make_function(func.name, &func.params, *func.body, FuncType::Function)?;
+        let params: Vec<_> = func.params.into_iter().map(|p| p.name).collect();
+        let func_id = self.make_function(func.name, &params, *func.body, FuncType::Function)?;
         self.fns.push(func_id);
 
         if let Some(index) = global_idx {
@@ -196,6 +197,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    // TODO: close var for args
     fn make_function(&mut self,
         name:      Token,
         arguments: &[Token],
@@ -456,13 +458,14 @@ impl<'a> Compiler<'a> {
 
         let local = self.resolve_local(&var.name);
 
-        match local {
-            Some(index) => self.write_op(Op::GetLocal { index, }),
-            None        => {
-                let name_idx = self.make_identifier_constant(var.name);
-                self.write_op(Op::GetGlobal { name_idx })
-            }
-        };
+        if let Some(index) = local {
+            self.write_op(Op::GetLocal { index, });
+        }
+        else {
+            let name_idx = self.make_identifier_constant(var.name);
+            self.write_op(Op::GetGlobal { name_idx });
+        }
+
 
     }
 
@@ -580,7 +583,10 @@ impl<'a> Compiler<'a> {
         });
     }
 
-    fn resolve_local(&self, name: &Token) -> Option<StackIndex> {
+    fn  resolve_local(&self, name: &Token) -> Option<StackIndex> {
+
+        let locals = self.functions.iter().rev().flat_map(|f| f.locals.iter().rev())
+
         for (i, local) in self.current_func().locals.iter().enumerate().rev() {
 
             if local.name.lexeme == name.lexeme {

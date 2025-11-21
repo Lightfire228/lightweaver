@@ -3,19 +3,17 @@ use crate::script::vm::{gc::ObjectId, object::{ Obj, ObjType}};
 
 #[derive(Debug, Clone)]
 pub struct ObjClosure {
-    pub arity:     usize,
-    pub function:  ObjectId,
-    pub func_name: String,
+    pub arity:    usize,
+    pub function: ObjectId,
 }
 
 
 
 impl ObjClosure {
-    pub fn new(function: ObjectId, func_name: String, arity: usize) -> Self {
+    pub fn new(function: ObjectId, arity: usize) -> Self {
         Self {
             arity,
             function,
-            func_name,
         }
     }
 }
