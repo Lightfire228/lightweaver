@@ -182,8 +182,7 @@ impl<'a> Compiler<'a> {
 
         self.begin_scope();
 
-        let params: Vec<_> = func.params.into_iter().map(|p| p.name).collect();
-        let func_id = self.make_function(func.name, &params, *func.body, FuncType::Function)?;
+        let func_id = self.make_function(func.name, func.params, *func.body, FuncType::Function)?;
         self.fns.push(func_id);
 
         if let Some(index) = global_idx {
@@ -197,10 +196,9 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    // TODO: close var for args
     fn make_function(&mut self,
         name:      Token,
-        arguments: &[Token],
+        arguments: Vec<FunctionParam>,
         body:      Vec<Stmt>,
         func_type: FuncType,
     )
@@ -217,9 +215,13 @@ impl<'a> Compiler<'a> {
         self.functions.push(func);
 
         self.begin_scope();
-        for arg in arguments {
-            self.add_local(arg.clone());
+        for arg in arguments.iter() {
+            self.add_local(arg.name.clone());
             self.mark_initialized();
+        }
+
+        for (i, _) in arguments.iter().rev().enumerate().filter(|p| p.1.closed) {
+            self.write_op(Op::CloseVar { index: StackIndex(i) });
         }
 
         for stmt in body.into_iter() {
@@ -298,6 +300,10 @@ impl<'a> Compiler<'a> {
             None        => self.mark_initialized(),
         }
 
+        if stmt.is_closed {
+            self.write_op(Op::CloseVar { index: StackIndex(0) });
+        }
+
         Ok(())
     }
 
@@ -313,6 +319,8 @@ impl<'a> Compiler<'a> {
         else {
             Some(self.make_identifier_constant(name.clone()))
         }
+
+
     }
 
     fn compile_while_stmt(&mut self, while_: WhileStmt) -> CompilerResult<()> {
@@ -458,14 +466,13 @@ impl<'a> Compiler<'a> {
 
         let local = self.resolve_local(&var.name);
 
-        if let Some(index) = local {
-            self.write_op(Op::GetLocal { index, });
-        }
-        else {
-            let name_idx = self.make_identifier_constant(var.name);
-            self.write_op(Op::GetGlobal { name_idx });
-        }
-
+        match local {
+            Some(index) => self.write_op(Op::GetLocal { index, }),
+            None        => {
+                let name_idx = self.make_identifier_constant(var.name);
+                self.write_op(Op::GetGlobal { name_idx })
+            }
+        };
 
     }
 
@@ -583,10 +590,7 @@ impl<'a> Compiler<'a> {
         });
     }
 
-    fn  resolve_local(&self, name: &Token) -> Option<StackIndex> {
-
-        let locals = self.functions.iter().rev().flat_map(|f| f.locals.iter().rev())
-
+    fn resolve_local(&self, name: &Token) -> Option<StackIndex> {
         for (i, local) in self.current_func().locals.iter().enumerate().rev() {
 
             if local.name.lexeme == name.lexeme {

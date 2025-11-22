@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::*, vm::{gc::{Context}}};
+use crate::script::{ast::*, vm::{chunk::StackIndex, gc::Context}};
 
 use super::{chunk::{OpCode}};
 
@@ -86,7 +86,7 @@ impl<'a> Resolver<'a> {
 
         for arg in func.params.iter_mut() {
             self.push_local(arg.name.lexeme.to_owned());
-            self.bools.push(&mut arg.is_closed);
+            self.bools.push(&mut arg.closed);
         }
 
         for stmt in func.body.iter_mut() {
@@ -185,10 +185,13 @@ impl<'a> Resolver<'a> {
 
     fn resolve_var_expr(&mut self, var: &mut Variable) {
 
+        let stack_len = self.locals.len();
+
         for (i, local) in self.locals.iter().enumerate().rev() {
 
             if local.name == var.name.lexeme {
                 *self.bools[i] = local.scope_depth != self.scope_depth;
+                var.decl       = StackIndex(stack_len - i);
                 break;
             }
         };
@@ -208,8 +211,8 @@ impl<'a> Resolver<'a> {
     }
 
     fn push_local(&mut self, name: String) {
-        self.locals.push(Local { 
-            scope_depth: self.scope_depth, 
+        self.locals.push(Local {
+            scope_depth: self.scope_depth,
             name,
         });
     }
@@ -225,7 +228,7 @@ impl<'a> Resolver<'a> {
             let Some(last) = self.locals.last() else {
                 break;
             };
-            
+
             if last.scope_depth <= self.scope_depth {
                 break;
             }

@@ -1,16 +1,20 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token, vm::chunk::StackIndex};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Variable {
-    pub name: Token,
+    pub name:   Token,
+    pub closed: bool,
+    pub decl:   StackIndex,
 }
 
 
 impl Variable {
     pub fn new(name: Token) -> Variable {
-        Self { 
+        Self {
             name,
+            closed: false,
+            decl:   StackIndex(0),
         }
     }
 

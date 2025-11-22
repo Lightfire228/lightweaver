@@ -8,6 +8,7 @@ pub enum Value {
     Number(f64),
     Bool  (bool),
     Obj   (ObjectId),
+    Closed(ObjectId),
     Nil,
 }
 
@@ -87,6 +88,7 @@ impl Value {
     pub fn display(&self, ctx: &Context) -> String {
         match self {
             Value::Obj   (x) => ctx.get(*x).as_string(ctx),
+            Value::Closed(x) => ctx.get(*x).as_string(ctx),
             Value::Number(x) => x.to_string(),
             Value::Bool  (x) => x.to_string(),
             Value::Nil       => "nil".to_owned(),
@@ -96,6 +98,7 @@ impl Value {
     pub fn display_type(&self) -> String {
         match self {
             Value::Obj   (_) => "Object" .to_owned(),
+            Value::Closed(_) => "Closed" .to_owned(),
             Value::Number(_) => "Number" .to_owned(),
             Value::Bool  (_) => "Boolean".to_owned(),
             Value::Nil       => "Nil"    .to_owned(),
@@ -110,6 +113,7 @@ impl PartialEq for Value {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Bool  (a), Value::Bool  (b)) => a == b,
             (Value::Obj   (a), Value::Obj   (b)) => a == b,
+            (Value::Closed(a), Value::Closed(b)) => a == b,
             (Value::Nil,       Value::Nil)       => true,
             _                                    => false,
         }

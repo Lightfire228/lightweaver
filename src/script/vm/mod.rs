@@ -151,7 +151,7 @@ impl Vm {
                 O::Class       { name_idx }     => self.op_class  (name_idx),
                 O::Closure     { func_idx }     => self.op_closure(func_idx),
 
-                O::CloseVar                     => self.op_close_var(),
+                O::CloseVar    { index }        => self.op_close_var(index),
 
                 O::Nil                          => self.push_stack(Value::Nil),
                 O::True                         => self.push_stack(Value::Bool(true)),
@@ -225,6 +225,16 @@ impl Vm {
     fn peek_stack(&self, index: usize) -> Value {
         let index = self.stack.len() - index -1;
         self.stack[index]
+    }
+
+    fn stack_swap(&mut self, index: StackIndex, value: Value) -> Value {
+        let top   = self.stack.len();
+        let index = self.stack.len() - *index -1;
+
+        self.stack.push(value);
+        self.stack.swap(top, index);
+
+        self.pop_stack()
     }
 
     // op codes
@@ -358,19 +368,29 @@ impl Vm {
         let obj                = func_val.as_obj(&self.ctx).unwrap();
         let func: &ObjFunction = obj.into();
 
-        let closure = ObjClosure::new(obj.id, func.arity);
+        let closed_objs = self.stack.iter()
+            .filter_map(|v| match v {
+                Value::Closed(_) => Some(v.clone()),
+                _                => None,
+            })
+            .collect()
+        ;
+
+        let closure = ObjClosure::new(obj.id, func.arity, closed_objs);
 
         let id = self.ctx.new_obj(closure.into());
 
         self.push_stack(Value::Obj(id));
     }
 
-    fn op_close_var(&mut self) {
+    fn op_close_var(&mut self, index: StackIndex) {
+        let val = self.stack_swap(index, Value::Nil);
 
-        let val = self.pop_stack();
         let obj = self.ctx.new_obj(ObjValue::new(val).into());
 
-        self.push_stack(Value::Obj(obj));
+        let val = Value::Closed(obj);
+
+        self.stack_swap(index, val);
     }
 
 

@@ -1,19 +1,21 @@
-use crate::script::vm::{gc::ObjectId, object::{ Obj, ObjType}};
+use crate::script::vm::{gc::ObjectId, object::{ Obj, ObjType}, value::Value};
 
 
 #[derive(Debug, Clone)]
 pub struct ObjClosure {
-    pub arity:    usize,
-    pub function: ObjectId,
+    pub arity:       usize,
+    pub function:    ObjectId,
+    pub closed_vals: Vec<Value>,
 }
 
 
 
 impl ObjClosure {
-    pub fn new(function: ObjectId, arity: usize) -> Self {
+    pub fn new(function: ObjectId, arity: usize, closed_vals: Vec<Value>) -> Self {
         Self {
             arity,
             function,
+            closed_vals,
         }
     }
 }

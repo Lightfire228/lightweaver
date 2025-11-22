@@ -20,6 +20,8 @@ pub enum OpCode {
     GetLocal    { index:     StackIndex },
     SetLocal    { index:     StackIndex },
 
+    CloseVar    { index:     StackIndex },
+
     JumpIfFalse { offset:    Offset },
     JumpIfTrue  { offset:    Offset },
     Jump        { offset:    Offset },
@@ -30,7 +32,6 @@ pub enum OpCode {
     Class       { name_idx:  ConstIndex },
     Closure     { func_idx:  ConstIndex },
 
-    CloseVar,
 
     Nil,
     True,
@@ -96,7 +97,7 @@ impl Display for OpCode {
             OpCode::Call        { arg_count }                  => format!("Call (args: {})",  arg_count ),
             OpCode::Class       { name_idx }                   => format!("Class {}",         **name_idx),
             OpCode::Closure     { func_idx }                   => format!("Closure {}",       **func_idx),
-            OpCode::CloseVar                                   => format!("Close Var"),
+            OpCode::CloseVar    { index }                      => format!("CloseVar {}",      **index),
             OpCode::Nil                                        => format!("Nil"),
             OpCode::True                                       => format!("True"),
             OpCode::False                                      => format!("False"),

@@ -12,8 +12,8 @@ pub struct FunctionStmt {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FunctionParam {
-    pub name:      Token,
-    pub is_closed: bool,
+    pub name:   Token,
+    pub closed: bool,
 }
 
 impl FunctionStmt {
@@ -35,7 +35,7 @@ impl FunctionParam {
     fn new(name: Token) -> Self {
         Self {
             name,
-            is_closed: false,
+            closed: false,
         }
     }
 }
@@ -59,4 +59,3 @@ impl AstNode for FunctionStmt {
         self.body.iter().map(Stmt::as_ast).collect()
     }
 }
-
