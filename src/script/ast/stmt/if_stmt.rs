@@ -48,7 +48,7 @@ impl AstNode for IfStmt {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         let mut results = vec![
             self.condition  .as_ast(),
             self.then_branch.as_ast(),

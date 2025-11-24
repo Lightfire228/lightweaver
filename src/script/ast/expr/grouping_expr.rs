@@ -30,7 +30,7 @@ impl AstNode for Grouping {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![self.expr.as_ast()]
     }
 }

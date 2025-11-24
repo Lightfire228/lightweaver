@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::*, tokens::Token, vm::{chunk::{StackIndex, UpvalueIndex}, gc::Context}};
+use crate::script::{ast::*, vm::{chunk::{StackIndex, UpvalueIndex}, gc::Context}};
 
 use super::{chunk::{OpCode}};
 

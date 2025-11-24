@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarType, WalkArgs}, tokens::Token, vm::chunk::StackIndex};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarType, WalkArgs}, tokens::Token};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -37,7 +37,7 @@ impl AstNode for Variable {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![]
     }
 }

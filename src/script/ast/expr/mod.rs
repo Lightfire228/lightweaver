@@ -55,7 +55,7 @@ impl AstNode for Expr {
         self.as_ast().compile(args)
     }
 
-    fn walk   (&self, args: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, args: WalkArgs)    -> AstNodeList<'_> {
         self.as_ast().walk(args)
     }
 }

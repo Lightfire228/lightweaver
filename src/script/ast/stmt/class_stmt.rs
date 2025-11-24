@@ -43,7 +43,7 @@ impl AstNode for Class {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         let mut results: AstNodeList = vec![];
 
         if let Some(superclass) = &self.superclass {

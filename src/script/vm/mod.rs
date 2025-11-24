@@ -631,7 +631,7 @@ impl Vm {
     }
 
 
-    fn call_class(&mut self, class_id: ObjectId, arg_count: usize) -> RuntimeResult<()> {
+    fn call_class(&mut self, class_id: ObjectId, _arg_count: usize) -> RuntimeResult<()> {
 
             let obj = ObjInstance::new(class_id);
             let id  = self.ctx.new_obj(obj.into());

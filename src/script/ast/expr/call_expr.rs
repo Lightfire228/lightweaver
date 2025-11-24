@@ -44,7 +44,7 @@ impl AstNode for Call {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         let mut results = vec![];
 
         results.push(self.callee.as_ast());

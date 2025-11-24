@@ -1,4 +1,4 @@
-use crate::script::vm::{gc::ObjectId, object::{ Obj, ObjType}, value::Value};
+use crate::script::vm::{object::{ Obj, ObjType}, value::Value};
 
 
 #[derive(Debug, Clone)]

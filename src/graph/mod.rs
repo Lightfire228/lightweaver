@@ -97,11 +97,11 @@ impl<T> GraphTree<T> {
         IntoIter(Child::SubTree(self))
     }
 
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, T> {
         Iter { next: Some(&self) }
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         IterMut { next: Some(self) }
     }
 }

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, Field, Ident, Member};
+use syn::{Data};
 
 #[proc_macro_derive(AstTryFrom)]
 pub fn ast_try_from(input: TokenStream) -> TokenStream {

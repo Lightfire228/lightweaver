@@ -45,7 +45,7 @@ impl AstNode for Logical {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![
             self.left .as_ast(),
             self.right.as_ast(),

@@ -35,7 +35,7 @@ impl AstNode for Set {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![
             self.target.as_ast(),
             self.value .as_ast(),

@@ -28,7 +28,7 @@ impl AstNode for Block {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         self.stmts.iter().map(Stmt::as_ast).collect()
     }
 }

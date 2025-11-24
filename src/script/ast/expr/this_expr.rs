@@ -30,7 +30,7 @@ impl AstNode for This {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![]
     }
 }

@@ -56,7 +56,7 @@ impl AstNode for FunctionStmt {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         self.body.iter().map(Stmt::as_ast).collect()
     }
 }

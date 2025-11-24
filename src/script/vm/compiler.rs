@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::*, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex, UpvalueIndex}, gc::{Context, ObjectId}, object::{ObjClosure, ObjFunction}}};
+use crate::script::{ast::*, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::{ObjFunction}}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 

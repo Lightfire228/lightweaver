@@ -1,4 +1,3 @@
-use std::{fmt::Display};
 
 use crate::script::vm::gc::{Context, ObjectId};
 
