@@ -5,6 +5,13 @@ var b = "";
 fun fun_1() {
     var c = "";
     var d = "";
+
+    fun fun_2() {
+        var e = "";
+
+        print d;
+        print e;
+    }
 }
 
 print fun_1;

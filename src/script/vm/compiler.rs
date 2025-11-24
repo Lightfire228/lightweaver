@@ -178,7 +178,6 @@ impl<'a> Compiler<'a> {
 
         if is_global.is_some() {
             self.define_global(name_idx);
-            self.write_op(OpCode::GetGlobal { name_idx });
         }
 
         self.write_op(Op::Pop);
@@ -206,7 +205,6 @@ impl<'a> Compiler<'a> {
 
         if let Some(name_idx) = global_idx {
             self.define_global(name_idx);
-            self.write_op(OpCode::GetGlobal { name_idx });
         }
 
 
@@ -310,10 +308,7 @@ impl<'a> Compiler<'a> {
         }
 
         match global {
-            Some(index) => {
-                self.define_global(index);
-                self.write_op(OpCode::GetGlobal { name_idx: index });
-            },
+            Some(index) => self.define_global(index),
             None        => self.mark_initialized(),
         }
 

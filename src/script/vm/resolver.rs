@@ -20,17 +20,16 @@ pub fn resolve(ast: &mut Ast, ctx: &mut Context) {
 
 
 struct Resolver<'a> {
-    func_depth:  usize,
     ctx:         &'a mut Context,
     upvalues:    Vec<Vec<Upvalue>>,
-    locals:      Vec<Local>,
-
     var_types:   Vec<&'a mut VarType>,
+    scopes:      Vec<Scope>,
 }
 
+#[derive(Debug)]
 struct Local {
-    pub func_depth: usize,
-    pub name:       String,
+    pub scope_depth: usize,
+    pub name:        String,
 }
 
 
@@ -39,14 +38,18 @@ struct Upvalue {
     index: UpvalueIndex,
 }
 
+struct Scope {
+    pub depth:     usize,
+    pub locals:    Vec<Local>,
+}
+
 
 impl<'a> Resolver<'a> {
 
     fn new(ctx: &'a mut Context) -> Self {
         Self {
-            func_depth: 0,
             ctx,
-            locals:    vec![],
+            scopes:    vec![],
             upvalues:  vec![vec![]],
             var_types: vec![],
         }
@@ -85,7 +88,11 @@ impl<'a> Resolver<'a> {
 
         self.end_scope();
 
-        self.push_local(class.name.lexeme.to_owned(), &mut class.var_type);
+        if !self.is_global_scope() {
+            class.var_type = VarType::Local(StackIndex(0));
+            self.push_local(class.name.lexeme.to_owned(), &mut class.var_type);
+        }
+
     }
 
     fn resolve_expr_stmt(&mut self, expr_stmt: &'a mut ExpressionStmt) {
@@ -94,11 +101,12 @@ impl<'a> Resolver<'a> {
 
     fn resolve_func_decl(&mut self, func: &'a mut FunctionStmt) {
 
-        if self.func_depth > 0 {
+        if !self.is_global_scope() {
             func.var_type = VarType::Local(StackIndex(0));
+            self.push_local(func.name.lexeme.to_string(), &mut func.var_type);
         }
 
-        self.push_local(func.name.lexeme.to_string(), &mut func.var_type);
+        self.upvalues.push(vec![]);
         self.begin_scope();
 
         for arg in func.params.iter_mut() {
@@ -110,6 +118,7 @@ impl<'a> Resolver<'a> {
         }
 
         self.end_scope();
+        self.upvalues.pop();
 
     }
 
@@ -136,11 +145,11 @@ impl<'a> Resolver<'a> {
 
     fn resolve_var_decl(&mut self, stmt: &'a mut VarStmt) {
 
-        if self.func_depth > 0 {
-            stmt.var_type = VarType::Local(StackIndex(0))
-        }
+        if !self.is_global_scope() {
+            stmt.var_type = VarType::Local(StackIndex(0));
 
-        self.push_local(stmt.name.lexeme.to_owned(), &mut stmt.var_type);
+            self.push_local(stmt.name.lexeme.to_owned(), &mut stmt.var_type);
+        }
 
         if let Some(val) = &mut stmt.initializer {
             self.resolve_expr(val);
@@ -204,38 +213,41 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_var_expr(&mut self, var: &'a mut Variable) {
-        println!("############################################\n");
 
-        for (i, local) in self.locals.iter().rev().enumerate() {
-            println!(">> {} {}", i, local.name)
+        if self.is_global_scope() {
+            return;
         }
 
+        let current_scope_depth = self.scopes.len() -1;
 
-        for (i, local) in self.locals.iter().rev().enumerate() {
+        println!(" ##################### ");
+        for scope in self.scopes.iter_mut().rev() {
 
-            if local.name != var.name.lexeme {
-                continue;
+            for (local_idx, local) in scope.locals.iter().rev().enumerate() {
+
+                dbg!("local: {}", &local.name);
+
+                if local.name != var.name.lexeme {
+                    continue;
+                }
+
+                let type_ = if local.scope_depth == current_scope_depth {
+                    VarType::Local(StackIndex(local_idx))
+                }
+                else {
+                    let func  = self.upvalues.last_mut().unwrap();
+                    let index = UpvalueIndex(func.len());
+                    func.push(Upvalue { index });
+
+                    println!(">>> type upvalue {}", local.name);
+                    VarType::Upvalue(index)
+                };
+
+                *self.var_types[local_idx] = type_;
+                var.var_type                = type_;
+                return;
             }
-
-            let type_ = if local.func_depth == self.func_depth {
-            // +1 to account for the bottom stack slot taken up by the script local object
-                println!(">>> type local {}", local.name);
-                VarType::Local(StackIndex(i +1))
-            }
-            else {
-                let func  = self.upvalues.last_mut().unwrap();
-                let index = UpvalueIndex(func.len());
-                func.push(Upvalue { index });
-
-                println!(">>> type upvalue {}", local.name);
-                VarType::Upvalue(index)
-            };
-
-            let index = self.var_types.len() - i -1;
-            *self.var_types[index] = type_;
-            var.var_type           = type_;
-        };
-
+        }
     }
 
     fn resolve_set_expr(&mut self, set: &'a mut Set) {
@@ -251,8 +263,12 @@ impl<'a> Resolver<'a> {
     }
 
     fn push_local(&mut self, name: String, var_type: &'a mut VarType) {
-        self.locals.push(Local {
-            func_depth: self.func_depth,
+
+        let last        = self.scopes.last_mut().expect("cannot push local in global scope");
+        let scope_depth = last.depth;
+
+        last.locals.push(Local {
+            scope_depth,
             name,
         });
 
@@ -260,24 +276,20 @@ impl<'a> Resolver<'a> {
     }
 
     fn begin_scope(&mut self) {
-        self.func_depth += 1;
+        let depth = self.scopes.len();
+        self.scopes.push(Scope {
+            depth,
+            locals: vec![],
+
+        });
     }
 
     fn end_scope(&mut self) {
-        self.func_depth -= 1;
+        self.scopes.pop();
+    }
 
-        loop {
-            let Some(last) = self.locals.last() else {
-                break;
-            };
-
-            if self.func_depth > last.func_depth {
-                break;
-            }
-
-            self.locals   .pop();
-            self.var_types.pop();
-        }
+    fn is_global_scope(&self) -> bool {
+        self.scopes.is_empty()
     }
 
 }
@@ -312,20 +324,45 @@ mod tests {
         let var_decl_a:    &VarStmt      = (&ast.stmts[0]).try_into().unwrap();
         let var_decl_b:    &VarStmt      = (&ast.stmts[1]).try_into().unwrap();
         let var_decl_fn_1: &FunctionStmt = (&ast.stmts[2]).try_into().unwrap();
-        // let print:         &PrintStmt    = (&ast.stmts[3]).try_into().unwrap();
 
         let var_decl_c:    &VarStmt      = (&var_decl_fn_1.body[0]).try_into().unwrap();
         let var_decl_d:    &VarStmt      = (&var_decl_fn_1.body[1]).try_into().unwrap();
 
+        let var_decl_fn_2: &FunctionStmt = (&var_decl_fn_1.body[2]).try_into().unwrap();
+        let var_decl_e:    &VarStmt      = (&var_decl_fn_2.body[0]).try_into().unwrap();
 
-        assert_eq!(var_decl_a.var_type, VarType::Global);
-        assert_eq!(var_decl_b.var_type, VarType::Global);
+        dbg!("{}", var_decl_a   .var_type);
+        dbg!("{}", var_decl_b   .var_type);
+        dbg!("{}", var_decl_fn_1.var_type);
+        dbg!("{}", var_decl_c   .var_type);
+        dbg!("{}", var_decl_d   .var_type);
+        dbg!("{}", var_decl_fn_2.var_type);
+        dbg!("{}", var_decl_e   .var_type);
 
-        assert!(matches!(var_decl_c.var_type, VarType::Local(_)));
-        assert!(matches!(var_decl_d.var_type, VarType::Local(_)));
+
+        assert_eq!(var_decl_a         .var_type, VarType::Global);
+        assert_eq!(var_decl_b         .var_type, VarType::Global);
+        assert_eq!(var_decl_fn_1      .var_type, VarType::Global);
+
+        assert!(matches!(var_decl_c   .var_type, VarType::Local  (_)));
+        assert!(matches!(var_decl_d   .var_type, VarType::Upvalue(_)));
+
+        assert!(matches!(var_decl_fn_2.var_type, VarType::Local(_)));
+        assert!(matches!(var_decl_e   .var_type, VarType::Local(_)));
 
 
+        let print:        &PrintStmt = (&ast.stmts[3]).try_into().unwrap();
+        let print_target: &Variable  = (&print.expr)  .try_into().unwrap();
+        assert_eq!(print_target.var_type, VarType::Global);
 
+        let print:        &PrintStmt = (&var_decl_fn_2.body[1]).try_into().unwrap();
+        let print_target: &Variable  = (&print.expr)           .try_into().unwrap();
+        assert!(matches!(print_target.var_type, VarType::Upvalue(UpvalueIndex(0))));
+
+        let print:        &PrintStmt = (&var_decl_fn_2.body[2]).try_into().unwrap();
+        let print_target: &Variable  = (&print.expr)           .try_into().unwrap();
+        dbg!("{}", print_target.var_type);
+        assert!(matches!(print_target.var_type, VarType::Local(StackIndex(0))));
     }
 
 }
