@@ -6,6 +6,7 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
+use crate::script::vm::chunk::UpvalueIndex;
 use crate::script::vm::debug::DisassembleData;
 use crate::script::vm::object::{NativeFn, ObjClass, ObjClosure, ObjInstance, ObjNative, ObjValue};
 use crate::script::vm::{
@@ -30,6 +31,7 @@ pub mod resolver;
 
 
 static DEBUG_TRACE_EXECUTION: bool = true;
+// static DEBUG_TRACE_EXECUTION: bool = false;
 
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
@@ -46,6 +48,7 @@ pub struct Vm {
     stack:      Vec<Value>,
     call_stack: Vec<CallFrame>,
     constants:  Vec<Value>,
+    upvalues:   Vec<ObjectId>,
     globals:    HashMap<String, Value>,
     ctx:        Context,
 }
@@ -80,10 +83,14 @@ enum JumpType {
 
 impl Vm {
     pub fn new(mut ctx: Context, script_func: ObjectId, constants: Vec<Value>) -> Self {
+
+        let closure = ObjClosure::new(script_func, 0, vec![]);
+        let closure = ctx.new_obj(closure.into());
+
         let call_frame = CallFrame {
            stack_offset: StackIndex   (0),
            ip:           BytecodeIndex(0),
-           closure:      script_func,
+           closure,
            arity:        0,
         };
 
@@ -98,6 +105,7 @@ impl Vm {
             ctx,
 
             constants,
+            upvalues: vec![],
 
             stack,
 
@@ -111,6 +119,7 @@ impl Vm {
 
         println!(">>>>>>>>>>>>>>>>>>>>> ");
 
+        let mut i = 0;
         loop {
 
             if DEBUG_TRACE_EXECUTION {
@@ -127,52 +136,59 @@ impl Vm {
                 println!();
             }
 
+            // if i > 100 {
+            //     panic!();
+            // }
+            // i += 1;
+
             type O = OpCode;
             match *self.get_instruction() {
-                O::GetConstant { index }        => self.op_constant  (index),
+                O::GetConstant { index }            => self.op_constant    (index),
 
-                O::DefGlobal   { name_idx }     => self.op_def_global(name_idx),
-                O::GetGlobal   { name_idx }     => self.op_get_global(name_idx)?,
-                O::SetGlobal   { name_idx }     => self.op_set_global(name_idx)?,
+                O::DefGlobal   { name_idx }         => self.op_def_global  (name_idx),
+                O::GetGlobal   { name_idx }         => self.op_get_global  (name_idx)?,
+                O::SetGlobal   { name_idx }         => self.op_set_global  (name_idx)?,
 
-                O::GetProperty { name_idx }     => self.op_get_property(name_idx)?,
-                O::SetProperty { name_idx }     => self.op_set_property(name_idx),
+                O::GetProperty { name_idx }         => self.op_get_property(name_idx)?,
+                O::SetProperty { name_idx }         => self.op_set_property(name_idx),
 
-                O::GetLocal    { index }        => self.op_get_local (index),
-                O::SetLocal    { index }        => self.op_set_local (index),
+                O::GetLocal    { index }            => self.op_get_local   (index),
+                O::SetLocal    { index }            => self.op_set_local   (index),
 
-                O::JumpIfFalse { offset }       => self.op_jump_if(JumpType::IfFalsey, offset),
-                O::JumpIfTrue  { offset }       => self.op_jump_if(JumpType::IfTruthy, offset),
-                O::Jump        { offset }       => self.op_jump   (offset),
+                O::GetUpvalue  { index }            => self.op_get_upvalue (index),
+                O::SetUpvalue  { index }            => self.op_set_upvalue (index),
+                O::PushUpvalue { index }            => self.op_push_upvalue(index),
 
-                O::Loop        { offset }       => self.op_loop   (offset),
+                O::JumpIfFalse { offset }           => self.op_jump_if     (JumpType::IfFalsey, offset),
+                O::JumpIfTrue  { offset }           => self.op_jump_if     (JumpType::IfTruthy, offset),
+                O::Jump        { offset }           => self.op_jump        (offset),
 
-                O::Call        { arg_count }    => self.op_call   (arg_count)?,
-                O::Class       { name_idx }     => self.op_class  (name_idx),
-                O::Closure     { func_idx }     => self.op_closure(func_idx),
+                O::Loop        { offset }           => self.op_loop        (offset),
 
-                O::CloseVar    { index }        => self.op_close_var(index),
+                O::Call        { arg_count }        => self.op_call        (arg_count)?,
+                O::Class       { name_idx }         => self.op_class       (name_idx),
+                O::Closure     { func_idx }         => self.op_closure     (func_idx),
 
-                O::Nil                          => self.push_stack(Value::Nil),
-                O::True                         => self.push_stack(Value::Bool(true)),
-                O::False                        => self.push_stack(Value::Bool(false)),
+                O::Nil                              => self.push_stack     (Value::Nil),
+                O::True                             => self.push_stack     (Value::Bool(true)),
+                O::False                            => self.push_stack     (Value::Bool(false)),
 
-                O::Pop                          => self.op_pop(),
+                O::Pop                              => self.op_pop         (),
 
-                O::Equal                        => self.op_equal(),
-                O::Greater                      => self.op_binary(BinaryOp::Greater)?,
-                O::Less                         => self.op_binary(BinaryOp::Less)?,
+                O::Equal                            => self.op_equal       (),
+                O::Greater                          => self.op_binary      (BinaryOp::Greater)?,
+                O::Less                             => self.op_binary      (BinaryOp::Less)?,
 
-                O::Add                          => self.op_add()?,
-                O::Subtract                     => self.op_binary(BinaryOp::Sub)?,
-                O::Multiply                     => self.op_binary(BinaryOp::Mul)?,
-                O::Divide                       => self.op_binary(BinaryOp::Div)?,
+                O::Add                              => self.op_add         ()?,
+                O::Subtract                         => self.op_binary      (BinaryOp::Sub)?,
+                O::Multiply                         => self.op_binary      (BinaryOp::Mul)?,
+                O::Divide                           => self.op_binary      (BinaryOp::Div)?,
 
-                O::Not                          => self.op_not    (),
+                O::Not                              => self.op_not         (),
 
-                O::Print                        => self.op_print(),
-                O::Negate                       => self.op_negate ()?,
-                O::Return                       => {
+                O::Print                            => self.op_print       (),
+                O::Negate                           => self.op_negate      ()?,
+                O::Return                           => {
                     let result = self.pop_stack();
                     let frame  = self.pop_call_stack();
 
@@ -328,6 +344,29 @@ impl Vm {
         self.stack[*index] = value;
     }
 
+    fn op_get_upvalue(&mut self, index: UpvalueIndex) {
+        let upvalue = self.upvalues[*index];
+        self.push_stack(Value::Obj(upvalue));
+    }
+
+    fn op_set_upvalue(&mut self, index: UpvalueIndex) {
+        let value = self.peek_stack(0);
+        let obj   = self.upvalues[*index];
+
+        let obj: &mut ObjValue = self.ctx.get_mut(obj).into();
+
+        obj.value = value;
+    }
+
+    fn op_push_upvalue(&mut self, index: StackIndex) {
+        let val = self.stack_swap(index, Value::Nil);
+
+        let obj = self.ctx.new_obj(ObjValue::new(val).into());
+        self.upvalues.push(obj);
+
+        self.stack_swap(index, Value::Obj(obj));
+    }
+
     fn op_jump_if(&mut self, jump_type: JumpType, offset: Offset) {
         let is_falsey = self.peek_stack(0).is_falsey();
 
@@ -363,6 +402,8 @@ impl Vm {
     }
 
     fn op_closure(&mut self, func_idx: ConstIndex) {
+
+        self.pop_stack();
 
         let func_val           = self.get_constant(func_idx);
         let obj                = func_val.as_obj(&self.ctx).unwrap();
@@ -503,7 +544,9 @@ impl Vm {
         let obj = self.call_frame();
 
         let obj = self.ctx.get(obj.closure);
+        let obj: &ObjClosure  = obj.into();
 
+        let obj = self.ctx.get(obj.function);
         let obj: &ObjFunction = obj.into();
 
         &obj.chunk
@@ -544,7 +587,7 @@ impl Vm {
         let obj = self.ctx.get(obj);
         match &obj.type_ {
 
-            ObjType::Function(func)    => self.call       (obj.id, func.arity, arg_count)?,
+            // ObjType::Function(func)    => self.call       (obj.id, func.arity, arg_count)?,
             ObjType::NativeFn(func)    => self.call_native(arg_count, func.func),
             ObjType::Class   (_)       => self.call_class (obj.id, arg_count)?,
             ObjType::Closure (_)       => self.call       (obj.id, arg_count, arg_count)?,

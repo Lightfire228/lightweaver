@@ -35,7 +35,7 @@ impl AstNode for WhileStmt {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![
             self.condition.as_ast(),
             self.body     .as_ast(),

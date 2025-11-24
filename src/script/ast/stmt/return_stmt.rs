@@ -32,7 +32,7 @@ impl AstNode for ReturnStmt {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         match &self.value {
             Some(value) => vec![value.as_ast()],
             None        => vec![],

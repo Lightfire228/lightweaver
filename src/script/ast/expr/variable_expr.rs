@@ -1,11 +1,10 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token, vm::chunk::StackIndex};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarType, WalkArgs}, tokens::Token, vm::chunk::StackIndex};
 use super::Expr;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Variable {
-    pub name:   Token,
-    pub closed: bool,
-    pub decl:   StackIndex,
+    pub name:     Token,
+    pub var_type: VarType,
 }
 
 
@@ -13,8 +12,7 @@ impl Variable {
     pub fn new(name: Token) -> Variable {
         Self {
             name,
-            closed: false,
-            decl:   StackIndex(0),
+            var_type: VarType::Global,
         }
     }
 
@@ -25,7 +23,8 @@ impl Variable {
 
 impl AstNode for Variable {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
-        let msg = format!("Variable ({})", self.name.lexeme);
+
+        let msg = format!("Variable ({}, type: {}{})", self.name.lexeme, self.var_type, get(&self.var_type));
 
         AstDisplay {
             depth:   args.depth,
@@ -40,5 +39,13 @@ impl AstNode for Variable {
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList {
         vec![]
+    }
+}
+
+fn get(var_type: &VarType) -> String {
+    match var_type {
+        VarType::Global         => format!(""),
+        VarType::Upvalue(index) => format!(", index: {}", **index),
+        VarType::Local  (index) => format!(", index: {}", **index),
     }
 }

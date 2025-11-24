@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::*, vm::{chunk::StackIndex, gc::Context}};
+use crate::script::{ast::*, tokens::Token, vm::{chunk::{StackIndex, UpvalueIndex}, gc::Context}};
 
 use super::{chunk::{OpCode}};
 
@@ -20,26 +20,35 @@ pub fn resolve(ast: &mut Ast, ctx: &mut Context) {
 
 
 struct Resolver<'a> {
-    scope_depth: usize,
+    func_depth:  usize,
     ctx:         &'a mut Context,
+    upvalues:    Vec<Vec<Upvalue>>,
     locals:      Vec<Local>,
 
-    bools:       Vec<&'a mut bool>
+    var_types:   Vec<&'a mut VarType>,
 }
 
 struct Local {
-    pub scope_depth: usize,
-    pub name:        String,
+    pub func_depth: usize,
+    pub name:       String,
 }
+
+
+#[derive(Debug)]
+struct Upvalue {
+    index: UpvalueIndex,
+}
+
 
 impl<'a> Resolver<'a> {
 
     fn new(ctx: &'a mut Context) -> Self {
         Self {
-            scope_depth: 0,
+            func_depth: 0,
             ctx,
-            locals: Vec::new(),
-            bools:  Vec::new(),
+            locals:    vec![],
+            upvalues:  vec![vec![]],
+            var_types: vec![],
         }
     }
 
@@ -69,24 +78,31 @@ impl<'a> Resolver<'a> {
         self.end_scope();
     }
 
-    fn resolve_class_decl(&mut self, _class: &mut Class) {
+    fn resolve_class_decl(&mut self, class: &'a mut Class) {
         self.begin_scope();
 
         // TODO:
 
         self.end_scope();
+
+        self.push_local(class.name.lexeme.to_owned(), &mut class.var_type);
     }
 
-    fn resolve_expr_stmt(&mut self, expr_stmt: &mut ExpressionStmt) {
+    fn resolve_expr_stmt(&mut self, expr_stmt: &'a mut ExpressionStmt) {
         self.resolve_expr(&mut expr_stmt.expr);
     }
 
     fn resolve_func_decl(&mut self, func: &'a mut FunctionStmt) {
+
+        if self.func_depth > 0 {
+            func.var_type = VarType::Local(StackIndex(0));
+        }
+
+        self.push_local(func.name.lexeme.to_string(), &mut func.var_type);
         self.begin_scope();
 
         for arg in func.params.iter_mut() {
-            self.push_local(arg.name.lexeme.to_owned());
-            self.bools.push(&mut arg.closed);
+            self.push_local(arg.name.lexeme.to_owned(), &mut arg.var_type);
         }
 
         for stmt in func.body.iter_mut() {
@@ -108,19 +124,23 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_print_stmt(&mut self, expr: &mut Expr) {
+    fn resolve_print_stmt(&mut self, expr: &'a mut Expr) {
         self.resolve_expr(expr);
     }
 
-    fn resolve_return_stmt(&mut self, return_: &mut ReturnStmt) {
+    fn resolve_return_stmt(&mut self, return_: &'a mut ReturnStmt) {
         if let Some(val) = &mut return_.value {
             self.resolve_expr(val);
         }
     }
 
     fn resolve_var_decl(&mut self, stmt: &'a mut VarStmt) {
-        self.push_local(stmt.name.lexeme.to_owned());
-        self.bools.push(&mut stmt.is_closed);
+
+        if self.func_depth > 0 {
+            stmt.var_type = VarType::Local(StackIndex(0))
+        }
+
+        self.push_local(stmt.name.lexeme.to_owned(), &mut stmt.var_type);
 
         if let Some(val) = &mut stmt.initializer {
             self.resolve_expr(val);
@@ -136,7 +156,7 @@ impl<'a> Resolver<'a> {
 
     // Expressions
 
-    fn resolve_expr(&mut self, expr: &mut Expr) {
+    fn resolve_expr(&mut self, expr: &'a mut Expr) {
         match expr {
             Expr::Assign   (expr) => self.resolve_assign_expr (expr),
             Expr::Binary   (expr) => self.resolve_binary_expr (expr),
@@ -153,25 +173,25 @@ impl<'a> Resolver<'a> {
         };
     }
 
-    fn resolve_logical_expr(&mut self, logical: &mut Logical) {
+    fn resolve_logical_expr(&mut self, logical: &'a mut Logical) {
         self.resolve_expr(&mut logical.left);
     }
 
-    fn resolve_logical_jump(&mut self, right: &mut Expr) {
+    fn resolve_logical_jump(&mut self, right: &'a mut Expr) {
         self.resolve_expr(right);
     }
 
-    fn resolve_assign_expr(&mut self, assign: &mut Assign) {
+    fn resolve_assign_expr(&mut self, assign: &'a mut Assign) {
         self.resolve_expr(&mut assign.value);
     }
 
 
-    fn resolve_binary_expr(&mut self, binary: &mut BinaryOperator) {
+    fn resolve_binary_expr(&mut self, binary: &'a mut BinaryOperator) {
         self.resolve_expr(&mut binary.left);
         self.resolve_expr(&mut binary.right);
     }
 
-    fn resolve_call_expr(&mut self, call: &mut Call) {
+    fn resolve_call_expr(&mut self, call: &'a mut Call) {
         self.resolve_expr(&mut call.callee);
 
         for arg in call.args.iter_mut() {
@@ -179,26 +199,46 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_unary_expr(&mut self, unary: &mut UnaryOperator) {
+    fn resolve_unary_expr(&mut self, unary: &'a mut UnaryOperator) {
         self.resolve_expr(&mut unary.right);
     }
 
-    fn resolve_var_expr(&mut self, var: &mut Variable) {
+    fn resolve_var_expr(&mut self, var: &'a mut Variable) {
+        println!("############################################\n");
 
-        let stack_len = self.locals.len();
+        for (i, local) in self.locals.iter().rev().enumerate() {
+            println!(">> {} {}", i, local.name)
+        }
 
-        for (i, local) in self.locals.iter().enumerate().rev() {
 
-            if local.name == var.name.lexeme {
-                *self.bools[i] = local.scope_depth != self.scope_depth;
-                var.decl       = StackIndex(stack_len - i);
-                break;
+        for (i, local) in self.locals.iter().rev().enumerate() {
+
+            if local.name != var.name.lexeme {
+                continue;
             }
+
+            let type_ = if local.func_depth == self.func_depth {
+            // +1 to account for the bottom stack slot taken up by the script local object
+                println!(">>> type local {}", local.name);
+                VarType::Local(StackIndex(i +1))
+            }
+            else {
+                let func  = self.upvalues.last_mut().unwrap();
+                let index = UpvalueIndex(func.len());
+                func.push(Upvalue { index });
+
+                println!(">>> type upvalue {}", local.name);
+                VarType::Upvalue(index)
+            };
+
+            let index = self.var_types.len() - i -1;
+            *self.var_types[index] = type_;
+            var.var_type           = type_;
         };
 
     }
 
-    fn resolve_set_expr(&mut self, set: &mut Set) {
+    fn resolve_set_expr(&mut self, set: &'a mut Set) {
         self.resolve_expr(&mut set.value);
     }
 
@@ -210,32 +250,82 @@ impl<'a> Resolver<'a> {
         todo!()
     }
 
-    fn push_local(&mut self, name: String) {
+    fn push_local(&mut self, name: String, var_type: &'a mut VarType) {
         self.locals.push(Local {
-            scope_depth: self.scope_depth,
+            func_depth: self.func_depth,
             name,
         });
+
+        self.var_types.push(var_type);
     }
 
     fn begin_scope(&mut self) {
-        self.scope_depth += 1;
+        self.func_depth += 1;
     }
 
     fn end_scope(&mut self) {
-        self.scope_depth -= 1;
+        self.func_depth -= 1;
 
         loop {
             let Some(last) = self.locals.last() else {
                 break;
             };
 
-            if last.scope_depth <= self.scope_depth {
+            if self.func_depth > last.func_depth {
                 break;
             }
 
-            self.locals.pop();
-            self.bools .pop();
+            self.locals   .pop();
+            self.var_types.pop();
         }
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{script::{parser, scanner}};
+    use std::fs;
+
+    use super::*;
+
+    fn get_ast(file: &str) -> Ast {
+
+        let path = format!("./test_scripts/unit_tests/resolver/{file}");
+        let text = fs::read_to_string(&path).unwrap();
+
+        let tokens = scanner::scan_tokens(&text).unwrap();
+        let ast    = parser::parse_ast(tokens).unwrap();
+
+        ast
+
+    }
+
+    #[test]
+    fn base() {
+
+        let mut ast = get_ast("base_01.lox");
+        let mut ctx = Context::new();
+
+        resolve(&mut ast, &mut ctx);
+
+        let var_decl_a:    &VarStmt      = (&ast.stmts[0]).try_into().unwrap();
+        let var_decl_b:    &VarStmt      = (&ast.stmts[1]).try_into().unwrap();
+        let var_decl_fn_1: &FunctionStmt = (&ast.stmts[2]).try_into().unwrap();
+        // let print:         &PrintStmt    = (&ast.stmts[3]).try_into().unwrap();
+
+        let var_decl_c:    &VarStmt      = (&var_decl_fn_1.body[0]).try_into().unwrap();
+        let var_decl_d:    &VarStmt      = (&var_decl_fn_1.body[1]).try_into().unwrap();
+
+
+        assert_eq!(var_decl_a.var_type, VarType::Global);
+        assert_eq!(var_decl_b.var_type, VarType::Global);
+
+        assert!(matches!(var_decl_c.var_type, VarType::Local(_)));
+        assert!(matches!(var_decl_d.var_type, VarType::Local(_)));
+
+
+
     }
 
 }

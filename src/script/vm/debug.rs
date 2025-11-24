@@ -45,6 +45,10 @@ impl OpCode {
             O::GetLocal     { index }     => byte_instruction    ("OP_GET_LOCAL",     **index),
             O::SetLocal     { index }     => byte_instruction    ("OP_SET_LOCAL",     **index),
 
+            O::GetUpvalue   { index }     => byte_instruction    ("OP_GET_UPVALUE",   **index),
+            O::SetUpvalue   { index }     => byte_instruction    ("OP_SET_UPVALUE",   **index),
+            O::PushUpvalue  { index }     => byte_instruction    ("OP_SET_UPVALUE",   **index),
+
             O::JumpIfFalse  { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, offset,  1),
             O::JumpIfTrue   { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, offset,  1),
             O::Jump         { offset }    => jump_instruction    ("OP_JUMP",          ip, offset,  1),
@@ -53,8 +57,6 @@ impl OpCode {
             O::Call         { arg_count } => byte_instruction    ("OP_CALL",          *arg_count),
             O::Class        { name_idx }  => constant_instruction("OP_CLASS",         data, name_idx),
             O::Closure      { func_idx }  => closure_instruction ("OP_CLOSURE",       data, func_idx),
-
-            O::CloseVar     { index }     => byte_instruction    ("OP_CLOSE_VAR",     **index),
 
             O::Nil                        => simple_instruction  ("OP_NIL"),
             O::True                       => simple_instruction  ("OP_TRUE"),

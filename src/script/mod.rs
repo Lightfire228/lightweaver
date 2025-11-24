@@ -37,19 +37,19 @@ pub fn run_file(path: &Path) -> &str {
 
         let mut ctx = Context::new();
 
-        let source = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
+        let source  = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
 
-        let tokens = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
+        let tokens  = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
 
-        let mut ast    = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
+        let mut ast = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
         resolve(&mut ast, &mut ctx);
-        
         display_ast(&ast);
 
 
         let out = compile(ast, &mut ctx).unwrap();
         dbg_funcs(&out, &ctx);
 
+        dbg!(">>>>>>>>> {}", &out.function_ids);
 
         let func = out.function_ids.first().expect("Function stack cannot be empty");
         vm::interpret(ctx, *func, out.constants).map_err(|err| Re::RuntimeError(err))?;

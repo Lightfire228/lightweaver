@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 png = "0.17.16"
+
+ast_macro = { path = "./ast_macro" }

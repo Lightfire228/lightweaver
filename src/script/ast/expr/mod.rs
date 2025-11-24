@@ -1,4 +1,5 @@
 use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
+use ast_macro::AstTryFrom;
 
 mod assign_expr;
 mod binary_expr;
@@ -29,7 +30,7 @@ pub use variable_expr ::*;
 use super::AstDisplay;
 
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, AstTryFrom)]
 pub enum Expr {
     Assign   (Assign),
     Binary   (BinaryOperator),

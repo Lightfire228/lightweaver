@@ -1,12 +1,45 @@
-var x = "global";
-fun outer() {
-  var x = "outer";
-  var y = "test";
+// var x = "global";
+// fun outer() {
+//   var x = "outer";
+//   var y = "test";
 
-  y = y;
-  fun inner() {
-    print x;
-  }
-  inner();
+//   y = y;
+//   fun inner() {
+//     print x;
+//   }
+//   inner();
+// }
+// outer();
+
+// fun outer() {
+
+//   var x = "value";
+
+//   fun middle() {
+
+//     fun inner() {
+//       print x;
+//     }
+
+//     print "create inner closure";
+//     return inner;
+//   }
+
+//   print "return from outer";
+//   return middle;
+// }
+
+// var mid = outer();
+// var in = mid();
+// in();
+
+
+var a = "";
+var b = "";
+
+fun fun_1() {
+    var c = "";
+    var d = "";
 }
-outer();
+
+print fun_1;

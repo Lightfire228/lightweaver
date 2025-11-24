@@ -11,6 +11,7 @@ mod return_stmt;
 mod var_stmt;
 mod while_stmt;
 
+use ast_macro::AstTryFrom;
 pub use expr_stmt     ::*;
 pub use function_stmt ::*;
 pub use block_stmt    ::*;
@@ -23,7 +24,7 @@ pub use while_stmt    ::*;
 
 
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, AstTryFrom)]
 pub enum Stmt {
     Block     (Block),
     Class     (Class),
@@ -45,7 +46,7 @@ impl AstNode for Stmt {
         self.as_ast().compile(args)
     }
 
-    fn walk   (&self, args: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, args: WalkArgs)    -> AstNodeList<'_> {
         self.as_ast().walk(args)
     }
 }

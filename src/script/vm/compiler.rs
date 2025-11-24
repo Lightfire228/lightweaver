@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::*, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::ObjFunction}};
+use crate::script::{ast::*, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex, UpvalueIndex}, gc::{Context, ObjectId}, object::{ObjClosure, ObjFunction}}};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
@@ -21,8 +21,10 @@ pub fn compile(ast: Ast, ctx: &mut Context) ->
 
     compiler.write_op(Op::Return);
 
+    dbg!(compiler.all_functions.len());
+
     Ok(CompilerOut {
-        function_ids: compiler.fns,
+        function_ids: compiler.all_functions,
         constants:    compiler.constants,
     })
 
@@ -31,14 +33,16 @@ pub fn compile(ast: Ast, ctx: &mut Context) ->
 
 
 struct Compiler<'a> {
-    line:        usize,
-    scope_depth: usize,
-    functions:   Vec<Func>,
-    fns:         Vec<ObjectId>,
+    line:           usize,
+    scope_depth:    usize,
+    function_stack: Vec<Func>,
+    all_functions:  Vec<ObjectId>,
 
-    constants:   Vec<Value>,
+    upvalues:       Vec<Vec<ObjectId>>,
 
-    ctx:         &'a mut Context
+    constants:      Vec<Value>,
+
+    ctx:            &'a mut Context
 }
 
 pub struct CompilerOut {
@@ -51,6 +55,12 @@ struct Local {
     name:        Token,
     depth:       usize,
     initialized: bool,
+}
+
+#[derive(Debug)]
+struct Upvalue {
+    index:       StackIndex,
+    is_local:    bool,
 }
 
 enum VariableType {
@@ -66,8 +76,10 @@ enum FuncType {
 struct Func {
     pub type_:    FuncType,
     pub locals:   Vec<Local>,
+    pub upvalues: Vec<Upvalue>,
     pub func_obj: ObjectId,
 }
+
 
 
 #[derive(Debug)]
@@ -89,7 +101,8 @@ impl Func {
         Self {
             type_,
             func_obj,
-            locals: vec![first_slot],
+            locals:   vec![first_slot],
+            upvalues: Vec::new(),
         }
     }
 }
@@ -99,8 +112,8 @@ impl<'a> Compiler<'a> {
     fn new(ctx: &'a mut Context) -> Self {
         let name = "script";
 
-        let func  = ObjFunction::new(name.to_owned(), 0);
-        let id    = ctx.new_obj(func.into());
+        let func    = ObjFunction::new(name.to_owned(), 0);
+        let id      = ctx.new_obj(func.into());
 
         let script_local = Local {
             name:        Token::new(TokenType::Identifier, "", 0, 0),
@@ -111,12 +124,13 @@ impl<'a> Compiler<'a> {
         let func = Func::new(FuncType::Script, id, script_local);
 
         Self {
-            line:        0,
-            scope_depth: 0,
-            functions:   vec![func],
-            fns:         vec![id],
+            line:           0,
+            scope_depth:    0,
+            function_stack: vec![func],
+            all_functions:  vec![id],
 
-            constants:   Vec::new(),
+            constants:      vec![],
+            upvalues:       vec![vec![]],
 
             ctx,
         }
@@ -153,17 +167,18 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn compile_class_decl(&mut self, _class: Class) {
+    fn compile_class_decl(&mut self, class: Class) {
 
-        let is_global = self.declare_variable(&_class.name);
+        let is_global = self.declare_variable(&class.name, class.var_type);
 
         // declare variable doesn't create a name constant, if the variable is a local
-        let name_idx  = is_global.unwrap_or_else(|| self.make_identifier_constant(_class.name));
+        let name_idx  = is_global.unwrap_or_else(|| self.make_identifier_constant(class.name));
 
         self.write_op(Op::Class { name_idx });
 
         if is_global.is_some() {
             self.define_global(name_idx);
+            self.write_op(OpCode::GetGlobal { name_idx });
         }
 
         self.write_op(Op::Pop);
@@ -177,21 +192,23 @@ impl<'a> Compiler<'a> {
 
     fn compile_func_decl(&mut self, func: FunctionStmt) -> CompilerResult<()> {
 
-        let global_idx = self.declare_variable(&func.name);
+        let global_idx = self.declare_variable(&func.name, func.var_type);
         self.mark_initialized();
 
         self.begin_scope();
 
         let func_id = self.make_function(func.name, func.params, *func.body, FuncType::Function)?;
-        self.fns.push(func_id);
-
-        if let Some(index) = global_idx {
-            self.define_global(index);
-        }
 
         self.end_scope();
         let func_idx = self.add_constant(Value::Obj(func_id));
+
         self.write_op(Op::Closure { func_idx });
+
+        if let Some(name_idx) = global_idx {
+            self.define_global(name_idx);
+            self.write_op(OpCode::GetGlobal { name_idx });
+        }
+
 
         Ok(())
     }
@@ -212,16 +229,13 @@ impl<'a> Compiler<'a> {
             depth:       self.scope_depth +1,
             initialized: true,
         });
-        self.functions.push(func);
+        self.function_stack.push(func);
+        self.all_functions .push(obj_id);
 
         self.begin_scope();
         for arg in arguments.iter() {
             self.add_local(arg.name.clone());
             self.mark_initialized();
-        }
-
-        for (i, _) in arguments.iter().rev().enumerate().filter(|p| p.1.closed) {
-            self.write_op(Op::CloseVar { index: StackIndex(i) });
         }
 
         for stmt in body.into_iter() {
@@ -288,7 +302,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_var_decl(&mut self, stmt: VarStmt) -> CompilerResult<()> {
-        let global = self.declare_variable(&stmt.name);
+        let global = self.declare_variable(&stmt.name, stmt.var_type);
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr),
@@ -296,30 +310,24 @@ impl<'a> Compiler<'a> {
         }
 
         match global {
-            Some(index) => self.define_global(index),
+            Some(index) => {
+                self.define_global(index);
+                self.write_op(OpCode::GetGlobal { name_idx: index });
+            },
             None        => self.mark_initialized(),
-        }
-
-        if stmt.is_closed {
-            self.write_op(Op::CloseVar { index: StackIndex(0) });
         }
 
         Ok(())
     }
 
-    fn declare_variable(&mut self, name: &Token) -> Option<ConstIndex> {
+    fn declare_variable(&mut self, name: &Token, var_type: VarType) -> Option<ConstIndex> {
         self.line = name.line;
 
-        let local = self.scope_depth > 0;
-
-        if local {
-            self.declare_local(&name);
-            None
+        match var_type {
+            VarType::Local  (_) => { self.add_local(name.clone()); None },
+            VarType::Upvalue(_) => { self.add_local(name.clone()); None },
+            VarType::Global     => Some(self.make_identifier_constant(name.clone())),
         }
-        else {
-            Some(self.make_identifier_constant(name.clone()))
-        }
-
 
     }
 
@@ -402,11 +410,12 @@ impl<'a> Compiler<'a> {
 
         self.compile_expr(*assign.value);
 
-        let set_op = match self.resolve_local(&assign.target.name) {
-            Some(index) => Op::SetLocal { index },
-            None        => {
+        let set_op = match assign.target.var_type {
+            VarType::Local  (index) => Op::SetLocal   { index },
+            VarType::Upvalue(index) => Op::SetUpvalue { index },
+            VarType::Global         => {
                 let name_idx = self.make_identifier_constant(assign.target.name);
-                Op::SetGlobal { name_idx, }
+                Op::SetGlobal { name_idx }
             }
         };
 
@@ -464,15 +473,16 @@ impl<'a> Compiler<'a> {
     fn compile_var_expr(&mut self, var: Variable) {
         self.line = var.name.line;
 
-        let local = self.resolve_local(&var.name);
-
-        match local {
-            Some(index) => self.write_op(Op::GetLocal { index, }),
-            None        => {
+        let get_op = match var.var_type {
+            VarType::Local  (index) => Op::GetLocal   { index },
+            VarType::Upvalue(index) => Op::GetUpvalue { index },
+            VarType::Global         => {
                 let name_idx = self.make_identifier_constant(var.name);
-                self.write_op(Op::GetGlobal { name_idx })
+                Op::GetGlobal  { name_idx }
             }
         };
+
+        self.write_op(get_op);
 
     }
 
@@ -574,9 +584,8 @@ impl<'a> Compiler<'a> {
     }
 
     fn define_global(&mut self, name_idx: ConstIndex) {
-        self.write_ops(
+        self.write_op(
             Op::DefGlobal { name_idx, },
-            Op::GetGlobal { name_idx, },
         );
     }
 
@@ -590,17 +599,12 @@ impl<'a> Compiler<'a> {
         });
     }
 
-    fn resolve_local(&self, name: &Token) -> Option<StackIndex> {
-        for (i, local) in self.current_func().locals.iter().enumerate().rev() {
-
-            if local.name.lexeme == name.lexeme {
-                assert!(local.initialized, "Can't read local variable in its own initializer");
-
-                return Some(StackIndex(i));
-            }
-        }
-
-        None
+    fn add_upvalue(&mut self, index: StackIndex, is_local: bool) {
+        let func = self.function_stack.last_mut().unwrap();
+        func.upvalues.push(Upvalue {
+            index,
+            is_local
+        });
     }
 
     fn mark_initialized(&mut self) {
@@ -645,11 +649,11 @@ impl<'a> Compiler<'a> {
     }
 
     fn current_func(&self) -> &Func {
-        self.functions.last().expect("Function stack must not be empty")
+        self.function_stack.last().expect("Function stack must not be empty")
     }
 
     fn current_func_mut(&mut self) -> &mut Func {
-        self.functions.last_mut().expect("Function stack must not be empty")
+        self.function_stack.last_mut().expect("Function stack must not be empty")
     }
 
     fn current_bytecode_index(&self) -> BytecodeIndex {
@@ -657,7 +661,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn pop_func(&mut self) -> Func {
-        self.functions.pop().expect("Function stack must not be empty")
+        self.function_stack.pop().expect("Function stack must not be empty")
     }
 
     fn write_op(&mut self, op: OpCode) -> BytecodeIndex {

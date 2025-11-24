@@ -3,6 +3,7 @@ use std::{fmt::Display, ops::{Deref, DerefMut}};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct GlobalIndex  (pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct ConstIndex   (pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct StackIndex   (pub usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct UpvalueIndex (pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct Offset       (pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct BytecodeIndex(pub usize);
 
@@ -20,7 +21,9 @@ pub enum OpCode {
     GetLocal    { index:     StackIndex },
     SetLocal    { index:     StackIndex },
 
-    CloseVar    { index:     StackIndex },
+    GetUpvalue  { index:     UpvalueIndex },
+    SetUpvalue  { index:     UpvalueIndex },
+    PushUpvalue { index:     StackIndex },
 
     JumpIfFalse { offset:    Offset },
     JumpIfTrue  { offset:    Offset },
@@ -90,6 +93,9 @@ impl Display for OpCode {
             OpCode::SetProperty { name_idx }                   => format!("SetProperty {}",   **name_idx),
             OpCode::GetLocal    { index }                      => format!("GetLocal {}",      **index   ),
             OpCode::SetLocal    { index }                      => format!("SetLocal {}",      **index   ),
+            OpCode::GetUpvalue  { index }                      => format!("GetUpvalue {}",    **index   ),
+            OpCode::SetUpvalue  { index }                      => format!("SetUpvalue {}",    **index   ),
+            OpCode::PushUpvalue { index }                      => format!("PushUpvalue {}",   **index),
             OpCode::JumpIfFalse { offset }                     => format!("JumpIfFalse {}",   **offset  ),
             OpCode::JumpIfTrue  { offset }                     => format!("JumpIfTrue {}",    **offset  ),
             OpCode::Jump        { offset }                     => format!("Jump {}",          **offset  ),
@@ -97,7 +103,6 @@ impl Display for OpCode {
             OpCode::Call        { arg_count }                  => format!("Call (args: {})",  arg_count ),
             OpCode::Class       { name_idx }                   => format!("Class {}",         **name_idx),
             OpCode::Closure     { func_idx }                   => format!("Closure {}",       **func_idx),
-            OpCode::CloseVar    { index }                      => format!("CloseVar {}",      **index),
             OpCode::Nil                                        => format!("Nil"),
             OpCode::True                                       => format!("True"),
             OpCode::False                                      => format!("False"),
@@ -147,6 +152,20 @@ impl Deref for StackIndex {
 }
 
 impl DerefMut for StackIndex {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Deref for UpvalueIndex {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for UpvalueIndex {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

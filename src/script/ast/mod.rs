@@ -2,10 +2,12 @@
 
 mod expr;
 mod stmt;
+mod var_type;
 
 
-pub use expr::*;
-pub use stmt::*;
+pub use expr    ::*;
+pub use stmt    ::*;
+pub use var_type::*;
 
 use super::parser::{ParseResult, Parser};
 
@@ -40,7 +42,7 @@ pub trait AstNode {
 
     fn compile(&self, args: CompileArgs) -> ByteCode;
 
-    fn walk   (&self, args: WalkArgs)    -> AstNodeList;
+    fn walk   (&self, args: WalkArgs)    -> AstNodeList<'_>;
 
     fn display_spaces(&self, msg: &str, args: DisplayArgs) {
         println!("{}{}", " ".repeat(args.depth * 4), msg)
@@ -61,7 +63,7 @@ impl AstNode for Ast {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         self.stmts.iter().map(Stmt::as_ast).collect()
     }
 }

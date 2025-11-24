@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs, var_type::VarType}, tokens::Token};
 use crate::script::{ast::Expr};
 
 use super::Stmt;
@@ -6,23 +6,24 @@ use super::Stmt;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarStmt {
     pub name:        Token,
-    pub is_closed:   bool,
     pub initializer: Option<Expr>,
+    pub var_type:    VarType,
 }
+
 
 impl VarStmt {
     pub fn new(name: Token, initializer: Option<Expr>) -> Stmt {
         Stmt::Var(VarStmt {
             name,
-            is_closed: false,
             initializer,
+            var_type: VarType::Global,
         })
     }
 }
 
 impl AstNode for VarStmt {
     fn display(&self, args: DisplayArgs) -> AstDisplay {
-        let msg = format!("Variable ({}, is closed: {})", self.name.lexeme, self.is_closed);
+        let msg = format!("Variable ({}, type: {})", self.name.lexeme, self.var_type);
 
         AstDisplay {
             depth:   args.depth,
@@ -35,10 +36,16 @@ impl AstNode for VarStmt {
         todo!()
     }
 
-    fn walk   (&self, _: WalkArgs)    -> AstNodeList {
+    fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         match &self.initializer {
             Some(init) => vec![init.as_ast()],
             None       => vec![],
         }
+    }
+}
+
+impl From<VarStmt> for Stmt {
+    fn from(value: VarStmt) -> Self {
+        Stmt::Var(value)
     }
 }

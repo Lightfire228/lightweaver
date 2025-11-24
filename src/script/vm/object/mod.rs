@@ -51,7 +51,7 @@ impl Obj {
             ObjType::NativeFn(func)  => format!("<native fn {}>", func .name),
             ObjType::Class   (class) => format!("<class {}>",     class.name),
             ObjType::Instance(inst)  => format!("<{} instance>",  inst.as_str(ctx)),
-            ObjType::Closure (func)  => format!("<fn {}>",        func.as_str(ctx)),
+            ObjType::Closure (func)  => format!("<closure {}>",   func.as_str(ctx)),
             ObjType::Value   (val)   => format!("{}",             val.value.display(ctx)),
         }
     }
