@@ -219,32 +219,35 @@ impl<'a> Resolver<'a> {
         }
 
         let current_scope_depth = self.scopes.len() -1;
+        let locals              = self.var_types.len();
 
-        println!(" ##################### ");
+        let mut count = 0;
         for scope in self.scopes.iter_mut().rev() {
 
             for (local_idx, local) in scope.locals.iter().rev().enumerate() {
 
-                dbg!("local: {}", &local.name);
-
+                dbg!("{} {}", &var.name.lexeme, &local.name);
                 if local.name != var.name.lexeme {
+                    count += 1;
                     continue;
                 }
 
                 let type_ = if local.scope_depth == current_scope_depth {
+                    println!("match local");
                     VarType::Local(StackIndex(local_idx))
                 }
                 else {
                     let func  = self.upvalues.last_mut().unwrap();
                     let index = UpvalueIndex(func.len());
                     func.push(Upvalue { index });
+                    println!("match upvalue");
 
-                    println!(">>> type upvalue {}", local.name);
                     VarType::Upvalue(index)
                 };
 
-                *self.var_types[local_idx] = type_;
-                var.var_type                = type_;
+                let idx = locals - count -1;
+                *self.var_types[idx] = type_;
+                var.var_type         = type_;
                 return;
             }
         }
@@ -282,10 +285,15 @@ impl<'a> Resolver<'a> {
             locals: vec![],
 
         });
+
     }
 
     fn end_scope(&mut self) {
-        self.scopes.pop();
+        let scope = self.scopes.pop().expect("Cannot pop global scope");
+
+        for _ in scope.locals {
+            self.var_types.pop();
+        }
     }
 
     fn is_global_scope(&self) -> bool {
@@ -321,48 +329,95 @@ mod tests {
 
         resolve(&mut ast, &mut ctx);
 
-        let var_decl_a:    &VarStmt      = (&ast.stmts[0]).try_into().unwrap();
-        let var_decl_b:    &VarStmt      = (&ast.stmts[1]).try_into().unwrap();
-        let var_decl_fn_1: &FunctionStmt = (&ast.stmts[2]).try_into().unwrap();
+        let var_decl_a: &VarStmt      = (&ast.stmts[0]).try_into().unwrap();
+        let var_decl_b: &VarStmt      = (&ast.stmts[1]).try_into().unwrap();
+        let fn_decl_1:  &FunctionStmt = (&ast.stmts[2]).try_into().unwrap();
 
-        let var_decl_c:    &VarStmt      = (&var_decl_fn_1.body[0]).try_into().unwrap();
-        let var_decl_d:    &VarStmt      = (&var_decl_fn_1.body[1]).try_into().unwrap();
+        let var_decl_c: &VarStmt      = (&fn_decl_1.body[0]).try_into().unwrap();
+        let var_decl_d: &VarStmt      = (&fn_decl_1.body[1]).try_into().unwrap();
 
-        let var_decl_fn_2: &FunctionStmt = (&var_decl_fn_1.body[2]).try_into().unwrap();
-        let var_decl_e:    &VarStmt      = (&var_decl_fn_2.body[0]).try_into().unwrap();
+        let fn_decl_2:  &FunctionStmt = (&fn_decl_1.body[2]).try_into().unwrap();
+        let var_decl_e: &VarStmt      = (&fn_decl_2.body[0]).try_into().unwrap();
 
-        dbg!("{}", var_decl_a   .var_type);
-        dbg!("{}", var_decl_b   .var_type);
-        dbg!("{}", var_decl_fn_1.var_type);
-        dbg!("{}", var_decl_c   .var_type);
-        dbg!("{}", var_decl_d   .var_type);
-        dbg!("{}", var_decl_fn_2.var_type);
-        dbg!("{}", var_decl_e   .var_type);
+        dbg!("{}", var_decl_a.var_type);
+        dbg!("{}", var_decl_b.var_type);
+        dbg!("{}", fn_decl_1 .var_type);
+        dbg!("{}", var_decl_c.var_type);
+        dbg!("{}", var_decl_d.var_type);
+        dbg!("{}", fn_decl_2 .var_type);
+        dbg!("{}", var_decl_e.var_type);
 
 
-        assert_eq!(var_decl_a         .var_type, VarType::Global);
-        assert_eq!(var_decl_b         .var_type, VarType::Global);
-        assert_eq!(var_decl_fn_1      .var_type, VarType::Global);
+        assert_eq!(var_decl_a.var_type, VarType::Global);
+        assert_eq!(var_decl_b.var_type, VarType::Global);
+        assert_eq!(fn_decl_1 .var_type, VarType::Global);
 
-        assert!(matches!(var_decl_c   .var_type, VarType::Local  (_)));
-        assert!(matches!(var_decl_d   .var_type, VarType::Upvalue(_)));
+        // Variable declarations don't have a defined index
+        assert!(matches!(var_decl_c.var_type, VarType::Local  (_)));
+        assert!(matches!(var_decl_d.var_type, VarType::Upvalue(_)));
 
-        assert!(matches!(var_decl_fn_2.var_type, VarType::Local(_)));
-        assert!(matches!(var_decl_e   .var_type, VarType::Local(_)));
+        assert!(matches!(fn_decl_2 .var_type, VarType::Local(_)));
+        assert!(matches!(var_decl_e.var_type, VarType::Local(_)));
 
 
         let print:        &PrintStmt = (&ast.stmts[3]).try_into().unwrap();
         let print_target: &Variable  = (&print.expr)  .try_into().unwrap();
         assert_eq!(print_target.var_type, VarType::Global);
 
-        let print:        &PrintStmt = (&var_decl_fn_2.body[1]).try_into().unwrap();
+        let print:        &PrintStmt = (&fn_decl_2.body[1]).try_into().unwrap();
         let print_target: &Variable  = (&print.expr)           .try_into().unwrap();
         assert!(matches!(print_target.var_type, VarType::Upvalue(UpvalueIndex(0))));
 
-        let print:        &PrintStmt = (&var_decl_fn_2.body[2]).try_into().unwrap();
+        let print:        &PrintStmt = (&fn_decl_2.body[2]).try_into().unwrap();
         let print_target: &Variable  = (&print.expr)           .try_into().unwrap();
-        dbg!("{}", print_target.var_type);
         assert!(matches!(print_target.var_type, VarType::Local(StackIndex(0))));
     }
+
+    #[test]
+    fn base_01() {
+
+        let mut ast = get_ast("base_02.lox");
+        let mut ctx = Context::new();
+
+        resolve(&mut ast, &mut ctx);
+
+        let fn_decl_outer:      &FunctionStmt = (&ast           .stmts[0]).try_into().unwrap();
+        let var_decl_mid:       &VarStmt      = (&ast           .stmts[1]).try_into().unwrap();
+        let var_decl_in:        &VarStmt      = (&ast           .stmts[2]).try_into().unwrap();
+
+        let var_decl_x:         &VarStmt      = (&fn_decl_outer .body[0]) .try_into().unwrap();
+        let fn_decl_middle:     &FunctionStmt = (&fn_decl_outer .body[1]) .try_into().unwrap();
+        let return_outer:       &ReturnStmt   = (&fn_decl_outer .body[3]) .try_into().unwrap();
+
+        let fn_decl_inner:      &FunctionStmt = (&fn_decl_middle.body[0]) .try_into().unwrap();
+        let return_middle:      &ReturnStmt   = (&fn_decl_middle.body[2]) .try_into().unwrap();
+        let print_inner:        &PrintStmt    = (&fn_decl_inner .body[0]) .try_into().unwrap();
+        let print_inner_target: &Variable     = (&print_inner.expr)       .try_into().unwrap();
+
+        let ret_outer_target:   &Variable     = return_outer .value.as_ref().unwrap().try_into().unwrap();
+        let ret_middle_target:  &Variable     = return_middle.value.as_ref().unwrap().try_into().unwrap();
+
+
+        // Global
+        assert_eq!(fn_decl_outer.var_type, VarType::Global);
+        assert_eq!(var_decl_mid .var_type, VarType::Global);
+        assert_eq!(var_decl_in  .var_type, VarType::Global);
+
+        // Outer
+        dbg!("----- {}", var_decl_x);
+        assert!(matches!(var_decl_x       .var_type, VarType::Upvalue(_)));
+        assert!(matches!(fn_decl_middle   .var_type, VarType::Local  (_)));
+
+        // Middle
+        assert!(matches!(fn_decl_inner    .var_type, VarType::Local  (_)));
+
+        // Return target expr
+        assert_eq!(ret_outer_target .var_type,  VarType::Local  (StackIndex  (0)));
+        assert_eq!(ret_middle_target.var_type,  VarType::Local  (StackIndex  (0)));
+
+        // Print target expr
+        assert_eq!(print_inner_target.var_type, VarType::Upvalue(UpvalueIndex(0)));
+    }
+
 
 }

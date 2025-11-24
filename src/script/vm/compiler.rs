@@ -236,6 +236,10 @@ impl<'a> Compiler<'a> {
             self.mark_initialized();
         }
 
+        for (i, _) in arguments.iter().enumerate().filter(|a| matches!(a.1.var_type, VarType::Upvalue(_))) {
+            self.write_op(Op::PushUpvalue { index: StackIndex(i) });
+        }
+
         for stmt in body.into_iter() {
             self.compile_stmt(stmt)?;
         }
@@ -310,6 +314,10 @@ impl<'a> Compiler<'a> {
         match global {
             Some(index) => self.define_global(index),
             None        => self.mark_initialized(),
+        }
+
+        if matches!(stmt.var_type, VarType::Upvalue(_)) {
+            self.write_op(OpCode::PushUpvalue { index: StackIndex(0) });
         }
 
         Ok(())

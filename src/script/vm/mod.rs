@@ -119,7 +119,6 @@ impl Vm {
 
         println!(">>>>>>>>>>>>>>>>>>>>> ");
 
-        let mut i = 0;
         loop {
 
             if DEBUG_TRACE_EXECUTION {
@@ -135,11 +134,6 @@ impl Vm {
                 print_stack(&data);
                 println!();
             }
-
-            // if i > 100 {
-            //     panic!();
-            // }
-            // i += 1;
 
             type O = OpCode;
             match *self.get_instruction() {
@@ -568,10 +562,12 @@ impl Vm {
         self.call_stack.last_mut().expect("Call stack must not be empty")
     }
 
-    fn get_local(&self, index: StackIndex) -> Value {
-        let frame = self.call_frame();
+    fn stack_index(&self, index: StackIndex) -> usize {
+        self.stack.len() -1 -*index
+    }
 
-        self.stack[*frame.stack_offset + *index]
+    fn get_local(&self, index: StackIndex) -> Value {
+        self.stack[self.stack_index(index)]
     }
 
     fn call_value(&mut self, value: Value, arg_count: usize) -> RuntimeResult<()> {
