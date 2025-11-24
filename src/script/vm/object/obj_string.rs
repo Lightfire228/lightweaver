@@ -15,12 +15,6 @@ impl ObjString {
     }
 }
 
-impl From<ObjString> for ObjType {
-    fn from(value: ObjString) -> Self {
-        ObjType::String(value)
-    }
-}
-
 impl From<String> for ObjType {
     fn from(value: String) -> Self {
         ObjType::String(ObjString::new(value))

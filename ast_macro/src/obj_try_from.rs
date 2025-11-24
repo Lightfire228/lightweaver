@@ -1,0 +1,100 @@
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{Data};
+
+pub fn impl_obj_try_from(ast: &syn::DeriveInput) -> TokenStream {
+    let enum_name = &ast.ident;
+
+    let Data::Enum(data) = &ast.data else {
+        panic!("Not an enum");
+    };
+
+
+    let variants: Vec<_> = data.variants.iter()
+        .filter(|v| v.fields.iter().next().is_some())
+        .map(|v| (
+            &v.ident,
+            v.fields
+                .iter()
+                .map(|f| &f.ty)
+                .next()
+                .unwrap()
+        ))
+        .collect()
+    ;
+
+
+    let generated = variants.iter().map(|v| {
+        let member_name = v.0;
+        let member_type = v.1;
+
+        quote! {
+
+            impl TryFrom<#enum_name> for #member_type {
+                type Error = ();
+
+                fn try_from(value: #enum_name) -> Result<Self, Self::Error> {
+                    match value {
+                        #enum_name::#member_name(value) => Ok(value),
+                        _                               => Err(()),
+                    }
+                }
+            }
+
+            impl TryFrom<Obj> for #member_type {
+                type Error = ();
+
+                fn try_from(value: Obj) -> Result<Self, Self::Error> {
+                    value.type_.try_into()
+                }
+            }
+
+            impl<'a> TryFrom<&'a #enum_name> for &'a #member_type {
+                type Error = ();
+
+                fn try_from(value: &'a #enum_name) -> Result<Self, Self::Error> {
+                    match value {
+                        #enum_name::#member_name(value) => Ok(value),
+                        _                               => Err(()),
+                    }
+                }
+            }
+
+            impl<'a> TryFrom<&'a Obj> for &'a #member_type {
+                type Error = ();
+
+                fn try_from(value: &'a Obj) -> Result<Self, Self::Error> {
+                    (&value.type_).try_into()
+                }
+            }
+
+            impl<'a> TryFrom<&'a mut #enum_name> for &'a mut #member_type {
+                type Error = ();
+
+                fn try_from(value: &'a mut #enum_name) -> Result<Self, Self::Error> {
+                    match value {
+                        #enum_name::#member_name(value) => Ok(value),
+                        _                               => Err(()),
+                    }
+                }
+            }
+
+            impl<'a> TryFrom<&'a mut Obj> for &'a mut #member_type {
+                type Error = ();
+
+                fn try_from(value: &'a mut Obj) -> Result<Self, Self::Error> {
+                    (&mut value.type_).try_into()
+                }
+            }
+
+            impl From<#member_type> for #enum_name {
+                fn from(value: #member_type) -> Self {
+                    #enum_name::#member_name(value)
+                }
+            }
+        }
+    });
+
+    generated.flat_map(|g| TokenStream::from(g)).collect()
+
+}

@@ -636,7 +636,7 @@ impl<'a> Compiler<'a> {
 
         let func = self.ctx.get(func_id);
 
-        let func: &ObjFunction = func.into();
+        let func: &ObjFunction = func.try_into().unwrap();
 
         &func.chunk
     }
@@ -646,7 +646,7 @@ impl<'a> Compiler<'a> {
 
         let func = self.ctx.get_mut(func_id);
 
-        let func: &mut ObjFunction = func.into();
+        let func: &mut ObjFunction = func.try_into().unwrap();
 
         &mut func.chunk
     }

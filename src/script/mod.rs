@@ -66,7 +66,7 @@ fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
     for f_id in &out.function_ids {
         let obj = ctx.get(*f_id);
 
-        let func: &ObjFunction = obj.into();
+        let func: &ObjFunction = obj.try_into().unwrap();
 
         func.chunk.disassemble(&DisassembleData {
             ctx:       &ctx,

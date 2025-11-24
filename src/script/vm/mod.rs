@@ -347,7 +347,7 @@ impl Vm {
         let value = self.peek_stack(0);
         let obj   = self.upvalues[*index];
 
-        let obj: &mut ObjValue = self.ctx.get_mut(obj).into();
+        let obj: &mut ObjValue = self.ctx.get_mut(obj).try_into().unwrap();
 
         obj.value = value;
     }
@@ -401,7 +401,7 @@ impl Vm {
 
         let func_val           = self.get_constant(func_idx);
         let obj                = func_val.as_obj(&self.ctx).unwrap();
-        let func: &ObjFunction = obj.into();
+        let func: &ObjFunction = obj.try_into().unwrap();
 
         let closed_objs = self.stack.iter()
             .filter_map(|v| match v {
@@ -538,10 +538,10 @@ impl Vm {
         let obj = self.call_frame();
 
         let obj = self.ctx.get(obj.closure);
-        let obj: &ObjClosure  = obj.into();
+        let obj: &ObjClosure  = obj.try_into().unwrap();
 
         let obj = self.ctx.get(obj.function);
-        let obj: &ObjFunction = obj.into();
+        let obj: &ObjFunction = obj.try_into().unwrap();
 
         &obj.chunk
     }
@@ -649,8 +649,8 @@ impl Vm {
 
         for frame in self.call_stack.iter().rev() {
 
-            let closure: &ObjClosure  = self.ctx.get(frame  .closure) .into();
-            let func:    &ObjFunction = self.ctx.get(closure.function).into();
+            let closure: &ObjClosure  = self.ctx.get(frame  .closure) .try_into().unwrap();
+            let func:    &ObjFunction = self.ctx.get(closure.function).try_into().unwrap();
 
             let line = func.chunk.lines[*frame.ip -1];
 

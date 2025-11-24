@@ -1,5 +1,5 @@
 
-use crate::script::vm::{object::ObjType, value::Value};
+use crate::script::vm::{value::Value};
 
 pub type NativeFn = fn(&[Value]) -> Value;
 
@@ -16,12 +16,6 @@ impl ObjNative {
             func,
             name,
         }
-    }
-}
-
-impl From<ObjNative> for ObjType {
-    fn from(value: ObjNative) -> Self {
-        ObjType::NativeFn(value)
     }
 }
 

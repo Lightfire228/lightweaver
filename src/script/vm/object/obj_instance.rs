@@ -19,12 +19,6 @@ impl ObjInstance {
     }
 }
 
-impl From<ObjInstance> for ObjType {
-    fn from(value: ObjInstance) -> Self {
-        Self::Instance(value)
-    }
-}
-
 
 impl Obj {
     pub fn to_instance(&self) -> Option<&'_ ObjInstance> {

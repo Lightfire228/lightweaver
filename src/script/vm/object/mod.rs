@@ -1,3 +1,4 @@
+use ast_macro::{ObjTryFrom};
 
 use crate::script::vm::gc::{Context, ObjectId};
 
@@ -23,7 +24,7 @@ pub struct Obj {
     pub type_: ObjType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ObjTryFrom)]
 pub enum ObjType {
     String  (ObjString),
     Function(ObjFunction),
