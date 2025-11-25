@@ -10,12 +10,13 @@ pub mod scanner;
 pub mod ast;
 pub mod parser;
 pub mod vm;
+pub mod resolver;
 
 mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
-use crate::script::{parser::AssignmentTarget, vm::{compiler::CompilerOut, debug::DisassembleData, gc::Context, object::ObjFunction, resolver::resolve}};
+use crate::script::{parser::AssignmentTarget, resolver::resolve, vm::{compiler::CompilerOut, debug::DisassembleData, gc::Context, object::ObjFunction}};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;

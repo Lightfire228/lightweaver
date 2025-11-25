@@ -27,7 +27,6 @@ pub mod value;
 pub mod compiler;
 pub mod object;
 pub mod gc;
-pub mod resolver;
 
 
 static DEBUG_TRACE_EXECUTION: bool = true;

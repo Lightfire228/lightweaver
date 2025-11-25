@@ -1,9 +1,8 @@
 
 use std::usize;
 
-use crate::script::{ast::*, vm::{chunk::{StackIndex, UpvalueIndex}, gc::Context}};
+use crate::script::{ast::*, vm::{chunk::{OpCode, StackIndex, UpvalueIndex}, gc::Context}};
 
-use super::{chunk::{OpCode}};
 
 type Op = OpCode;
 
