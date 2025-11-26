@@ -8,9 +8,11 @@ fun fun_1() {
 
     fun fun_2() {
         var e = "";
+        var f = "";
 
         print d;
         print e;
+        print f;
     }
 }
 

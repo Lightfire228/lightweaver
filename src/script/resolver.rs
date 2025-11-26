@@ -225,21 +225,18 @@ impl<'a> Resolver<'a> {
 
             for (local_idx, local) in scope.locals.iter().rev().enumerate() {
 
-                dbg!("{} {}", &var.name.lexeme, &local.name);
                 if local.name != var.name.lexeme {
                     count += 1;
                     continue;
                 }
 
                 let type_ = if local.scope_depth == current_scope_depth {
-                    println!("match local");
                     VarType::Local(StackIndex(local_idx))
                 }
                 else {
                     let func  = self.upvalues.last_mut().unwrap();
                     let index = UpvalueIndex(func.len());
                     func.push(Upvalue { index });
-                    println!("match upvalue");
 
                     VarType::Upvalue(index)
                 };
@@ -308,111 +305,116 @@ mod tests {
 
     use super::*;
 
+    macro_rules! get {
+        ($arg: expr) => {
+            $arg.try_into().unwrap()
+        };
+    }
+
+    macro_rules! assert_ty {
+        ($arg1: expr, $arg2: pat) => {
+            assert!(matches!($arg1, $arg2))
+        };
+    }
+
     fn get_ast(file: &str) -> Ast {
 
         let path = format!("./test_scripts/unit_tests/resolver/{file}");
         let text = fs::read_to_string(&path).unwrap();
 
-        let tokens = scanner::scan_tokens(&text).unwrap();
-        let ast    = parser::parse_ast(tokens).unwrap();
+        let tokens = scanner::scan_tokens(&text) .unwrap();
+        let ast    = parser ::parse_ast  (tokens).unwrap();
 
         ast
 
     }
 
     #[test]
-    fn base() {
-
-        let mut ast = get_ast("base_01.lox");
+    fn test_variable_resolution_1() {
+        let mut ast = get_ast("test_variable_resolution_1.lox");
         let mut ctx = Context::new();
 
         resolve(&mut ast, &mut ctx);
 
-        let var_decl_a: &VarStmt      = (&ast.stmts[0]).try_into().unwrap();
-        let var_decl_b: &VarStmt      = (&ast.stmts[1]).try_into().unwrap();
-        let fn_decl_1:  &FunctionStmt = (&ast.stmts[2]).try_into().unwrap();
+        let var_decl_a:        &VarStmt      = get!(&ast       .stmts[0]);
+        let var_decl_b:        &VarStmt      = get!(&ast       .stmts[1]);
+        let fn_decl_1:         &FunctionStmt = get!(&ast       .stmts[2]);
+        let print_fn_1:        &PrintStmt    = get!(&ast       .stmts[3]);
 
-        let var_decl_c: &VarStmt      = (&fn_decl_1.body[0]).try_into().unwrap();
-        let var_decl_d: &VarStmt      = (&fn_decl_1.body[1]).try_into().unwrap();
+        let var_decl_c:        &VarStmt      = get!(&fn_decl_1 .body [0]);
+        let var_decl_d:        &VarStmt      = get!(&fn_decl_1 .body [1]);
+        let fn_decl_2:         &FunctionStmt = get!(&fn_decl_1 .body [2]);
 
-        let fn_decl_2:  &FunctionStmt = (&fn_decl_1.body[2]).try_into().unwrap();
-        let var_decl_e: &VarStmt      = (&fn_decl_2.body[0]).try_into().unwrap();
+        let var_decl_e:        &VarStmt      = get!(&fn_decl_2 .body [0]);
+        let var_decl_f:        &VarStmt      = get!(&fn_decl_2 .body [1]);
+        let print_d:           &PrintStmt    = get!(&fn_decl_2 .body [2]);
+        let print_e:           &PrintStmt    = get!(&fn_decl_2 .body [3]);
+        let print_f:           &PrintStmt    = get!(&fn_decl_2 .body [4]);
 
-        dbg!("{}", var_decl_a.var_type);
-        dbg!("{}", var_decl_b.var_type);
-        dbg!("{}", fn_decl_1 .var_type);
-        dbg!("{}", var_decl_c.var_type);
-        dbg!("{}", var_decl_d.var_type);
-        dbg!("{}", fn_decl_2 .var_type);
-        dbg!("{}", var_decl_e.var_type);
+        let print_fn_1_target: &Variable     = get!(&print_fn_1.expr);
+        let print_d_target:    &Variable     = get!(&print_d   .expr);
+        let print_e_target:    &Variable     = get!(&print_e   .expr);
+        let print_f_target:    &Variable     = get!(&print_f   .expr);
 
 
-        assert_eq!(var_decl_a.var_type, VarType::Global);
-        assert_eq!(var_decl_b.var_type, VarType::Global);
-        assert_eq!(fn_decl_1 .var_type, VarType::Global);
+        assert_eq!(var_decl_a       .var_type, VarType::Global);
+        assert_eq!(var_decl_b       .var_type, VarType::Global);
+        assert_eq!(fn_decl_1        .var_type, VarType::Global);
 
         // Variable declarations don't have a defined index
-        assert!(matches!(var_decl_c.var_type, VarType::Local  (_)));
-        assert!(matches!(var_decl_d.var_type, VarType::Upvalue(_)));
+        assert_ty!(var_decl_c       .var_type, VarType::Local  (_));
+        assert_ty!(var_decl_d       .var_type, VarType::Upvalue(_));
 
-        assert!(matches!(fn_decl_2 .var_type, VarType::Local(_)));
-        assert!(matches!(var_decl_e.var_type, VarType::Local(_)));
+        assert_ty!(fn_decl_2        .var_type, VarType::Local  (_));
+        assert_ty!(var_decl_e       .var_type, VarType::Local  (_));
+        assert_ty!(var_decl_f       .var_type, VarType::Local  (_));
 
-
-        let print:        &PrintStmt = (&ast.stmts[3]).try_into().unwrap();
-        let print_target: &Variable  = (&print.expr)  .try_into().unwrap();
-        assert_eq!(print_target.var_type, VarType::Global);
-
-        let print:        &PrintStmt = (&fn_decl_2.body[1]).try_into().unwrap();
-        let print_target: &Variable  = (&print.expr)           .try_into().unwrap();
-        assert!(matches!(print_target.var_type, VarType::Upvalue(UpvalueIndex(0))));
-
-        let print:        &PrintStmt = (&fn_decl_2.body[2]).try_into().unwrap();
-        let print_target: &Variable  = (&print.expr)           .try_into().unwrap();
-        assert!(matches!(print_target.var_type, VarType::Local(StackIndex(0))));
+        assert_eq!(print_fn_1_target.var_type, VarType::Global);
+        assert_eq!(print_d_target   .var_type, VarType::Upvalue(UpvalueIndex(0)));
+        assert_eq!(print_e_target   .var_type, VarType::Local  (StackIndex  (1)));
+        assert_eq!(print_f_target   .var_type, VarType::Local  (StackIndex  (0)));
     }
 
     #[test]
-    fn base_01() {
+    fn test_variable_resolution_2() {
 
-        let mut ast = get_ast("base_02.lox");
+        let mut ast = get_ast("test_variable_resolution_2.lox");
         let mut ctx = Context::new();
 
         resolve(&mut ast, &mut ctx);
 
-        let fn_decl_outer:      &FunctionStmt = (&ast           .stmts[0]).try_into().unwrap();
-        let var_decl_mid:       &VarStmt      = (&ast           .stmts[1]).try_into().unwrap();
-        let var_decl_in:        &VarStmt      = (&ast           .stmts[2]).try_into().unwrap();
+        let fn_decl_outer:      &FunctionStmt = get!(&ast           .stmts[0]);
+        let var_decl_mid:       &VarStmt      = get!(&ast           .stmts[1]);
+        let var_decl_in:        &VarStmt      = get!(&ast           .stmts[2]);
 
-        let var_decl_x:         &VarStmt      = (&fn_decl_outer .body[0]) .try_into().unwrap();
-        let fn_decl_middle:     &FunctionStmt = (&fn_decl_outer .body[1]) .try_into().unwrap();
-        let return_outer:       &ReturnStmt   = (&fn_decl_outer .body[3]) .try_into().unwrap();
+        let var_decl_x:         &VarStmt      = get!(&fn_decl_outer .body [0]);
+        let fn_decl_middle:     &FunctionStmt = get!(&fn_decl_outer .body [1]);
+        let return_outer:       &ReturnStmt   = get!(&fn_decl_outer .body [3]);
 
-        let fn_decl_inner:      &FunctionStmt = (&fn_decl_middle.body[0]) .try_into().unwrap();
-        let return_middle:      &ReturnStmt   = (&fn_decl_middle.body[2]) .try_into().unwrap();
-        let print_inner:        &PrintStmt    = (&fn_decl_inner .body[0]) .try_into().unwrap();
-        let print_inner_target: &Variable     = (&print_inner.expr)       .try_into().unwrap();
+        let fn_decl_inner:      &FunctionStmt = get!(&fn_decl_middle.body [0]);
+        let return_middle:      &ReturnStmt   = get!(&fn_decl_middle.body [2]);
+        let print_inner:        &PrintStmt    = get!(&fn_decl_inner .body [0]);
+        let print_inner_target: &Variable     = get!(&print_inner   .expr);
 
-        let ret_outer_target:   &Variable     = return_outer .value.as_ref().unwrap().try_into().unwrap();
-        let ret_middle_target:  &Variable     = return_middle.value.as_ref().unwrap().try_into().unwrap();
+        let ret_outer_target:   &Variable     = get!(return_outer .value.as_ref().unwrap());
+        let ret_middle_target:  &Variable     = get!(return_middle.value.as_ref().unwrap());
 
 
         // Global
-        assert_eq!(fn_decl_outer.var_type, VarType::Global);
-        assert_eq!(var_decl_mid .var_type, VarType::Global);
-        assert_eq!(var_decl_in  .var_type, VarType::Global);
+        assert_eq!(fn_decl_outer     .var_type, VarType::Global);
+        assert_eq!(var_decl_mid      .var_type, VarType::Global);
+        assert_eq!(var_decl_in       .var_type, VarType::Global);
 
         // Outer
-        dbg!("----- {}", var_decl_x);
-        assert!(matches!(var_decl_x       .var_type, VarType::Upvalue(_)));
-        assert!(matches!(fn_decl_middle   .var_type, VarType::Local  (_)));
+        assert_ty!(var_decl_x        .var_type, VarType::Upvalue(_));
+        assert_ty!(fn_decl_middle    .var_type, VarType::Local  (_));
 
         // Middle
-        assert!(matches!(fn_decl_inner    .var_type, VarType::Local  (_)));
+        assert_ty!(fn_decl_inner     .var_type, VarType::Local  (_));
 
         // Return target expr
-        assert_eq!(ret_outer_target .var_type,  VarType::Local  (StackIndex  (0)));
-        assert_eq!(ret_middle_target.var_type,  VarType::Local  (StackIndex  (0)));
+        assert_eq!(ret_outer_target  .var_type, VarType::Local  (StackIndex  (0)));
+        assert_eq!(ret_middle_target .var_type, VarType::Local  (StackIndex  (0)));
 
         // Print target expr
         assert_eq!(print_inner_target.var_type, VarType::Upvalue(UpvalueIndex(0)));
