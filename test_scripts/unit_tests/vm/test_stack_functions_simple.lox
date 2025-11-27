@@ -1,0 +1,16 @@
+// global script object: 0
+
+fun fn_1(b, c) {
+    // call: 1
+    // b: 2
+    // c: 3
+
+    return b + c;
+}
+
+// fun fn_2(d, e) {
+// }
+
+print fn_1(1, 2);
+
+// print fn_2("", 5);

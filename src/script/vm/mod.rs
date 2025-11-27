@@ -53,12 +53,13 @@ pub struct Vm {
 }
 
 struct CallFrame {
-    pub stack_offset: StackIndex,
+    pub stack_len:    StackIndex,
     pub ip:           BytecodeIndex,
     pub closure:      ObjectId,
     pub arity:        usize,
 }
 
+#[derive(Debug)]
 pub struct RuntimeError {
     pub stack_trace: String,
     pub msg:         String,
@@ -87,7 +88,7 @@ impl Vm {
         let closure = ctx.new_obj(closure.into());
 
         let call_frame = CallFrame {
-           stack_offset: StackIndex   (0),
+           stack_len:    StackIndex   (0),
            ip:           BytecodeIndex(0),
            closure,
            arity:        0,
@@ -189,8 +190,12 @@ impl Vm {
                         return Ok(())
                     }
 
-                    for _ in 0..frame.arity +1 {
-                        self.pop_stack();
+                    println!("stack len:   {}", self.stack.len());
+                    println!("frame stack: {}", *frame.stack_len);
+                    let diff = self.stack.len() - *frame.stack_len;
+
+                    for _ in 0..diff {
+                        self.stack.pop();
                     }
 
                     self.push_stack(result);
@@ -232,18 +237,22 @@ impl Vm {
     }
 
     fn peek_stack(&self, index: usize) -> Value {
-        let index = self.stack.len() - index -1;
+        let index = self.from_stack_top(index);
         self.stack[index]
     }
 
     fn stack_swap(&mut self, index: StackIndex, value: Value) -> Value {
         let top   = self.stack.len();
-        let index = self.stack.len() - *index -1;
+        let index = self.from_stack_top(*index);
 
         self.stack.push(value);
         self.stack.swap(top, index);
 
         self.pop_stack()
+    }
+
+    fn from_stack_top(&self, index: usize) -> usize {
+        self.stack.len() - index -1
     }
 
     // op codes
@@ -351,7 +360,10 @@ impl Vm {
         obj.value = value;
     }
 
-    fn op_push_upvalue(&mut self, index: StackIndex) {
+    fn op_push_upvalue(&mut self, index: Offset) {
+
+        let index = StackIndex(self.from_stack_top(*index));
+
         let val = self.stack_swap(index, Value::Nil);
 
         let obj = self.ctx.new_obj(ObjValue::new(val).into());
@@ -561,12 +573,13 @@ impl Vm {
         self.call_stack.last_mut().expect("Call stack must not be empty")
     }
 
-    fn stack_index(&self, index: StackIndex) -> usize {
-        self.stack.len() -1 -*index
-    }
+    // fn stack_index(&self, index: StackIndex) -> usize {
+
+    //     self.stack.len() -1 -*index
+    // }
 
     fn get_local(&self, index: StackIndex) -> Value {
-        self.stack[self.stack_index(index)]
+        self.stack[*index]
     }
 
     fn call_value(&mut self, value: Value, arg_count: usize) -> RuntimeResult<()> {
@@ -605,10 +618,8 @@ impl Vm {
             Err(self.runtime_error("Stack overflow".to_owned()))?
         }
 
-        let offset = self.stack.len() - (arg_count + 1);
-
         self.call_stack.push(CallFrame {
-            stack_offset: StackIndex   (offset),
+            stack_len:    StackIndex   (self.stack.len() - func_arity -1),
             ip:           BytecodeIndex(0),
             closure,
             arity:        func_arity,
@@ -689,4 +700,81 @@ fn clock_native(_: &[Value]) -> Value {
     let time_since = start.duration_since(UNIX_EPOCH).unwrap();
 
     Value::Number(time_since.as_millis() as f64 / 1000.0)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use crate::script::{parser, resolver::resolve, scanner, vm::compiler::{CompilerOut, compile}};
+
+    use super::*;
+
+    fn source(file: &str) -> String {
+        let path = format!("./test_scripts/unit_tests/vm/{file}");
+        fs::read_to_string(&path).unwrap()
+    }
+
+    fn init(source: String) -> Vm {
+
+        let mut ctx    = Context::new();
+        let     tokens = scanner::scan_tokens(&source).unwrap();
+        let mut ast    = parser ::parse_ast  (tokens) .unwrap();
+        resolve(&mut ast, &mut ctx);
+
+        let out = compile(ast, &mut ctx).unwrap();
+
+        let func = out.function_ids.first().unwrap();
+
+        dbg_funcs(&out, &ctx);
+
+        Vm::new(ctx, *func, out.constants)
+
+    }
+
+    fn assert_stack_empty(code: String) {
+        let mut vm = init(code);
+
+        vm.run().unwrap();
+
+        assert!(vm.stack.is_empty());
+
+    }
+
+    fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
+        for f_id in &out.function_ids {
+            let obj = ctx.get(*f_id);
+
+            let func: &ObjFunction = obj.try_into().unwrap();
+
+            func.chunk.disassemble(&DisassembleData {
+                ctx:       &ctx,
+                lines:     &func.chunk.lines,
+                stack:     &[],
+                constants: &out.constants,
+            });
+        }
+    }
+
+    #[test]
+    fn test_stack_empty_base_syntax() {
+        assert_stack_empty(source("test_stack_base_syntax.lox"));
+    }
+
+    #[test]
+    fn test_stack_empty_functions_simple() {
+        assert_stack_empty(source("test_stack_functions_simple.lox"));
+    }
+
+    #[test]
+    fn test_stack_empty_functions_nested_1() {
+        assert_stack_empty(source("test_stack_functions_nested_1.lox"));
+    }
+
+    #[test]
+    fn test_stack_empty_functions_nested_2() {
+        assert_stack_empty(source("test_stack_functions_nested_2.lox"));
+    }
+
 }

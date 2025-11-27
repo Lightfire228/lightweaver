@@ -75,7 +75,6 @@ enum FuncType {
 
 struct Func {
     pub type_:    FuncType,
-    pub locals:   Vec<Local>,
     pub upvalues: Vec<Upvalue>,
     pub func_obj: ObjectId,
 }
@@ -97,11 +96,10 @@ enum JumpType {
 }
 
 impl Func {
-    pub fn new(type_: FuncType, func_obj: ObjectId, first_slot: Local) -> Self {
+    pub fn new(type_: FuncType, func_obj: ObjectId) -> Self {
         Self {
             type_,
             func_obj,
-            locals:   vec![first_slot],
             upvalues: Vec::new(),
         }
     }
@@ -115,13 +113,7 @@ impl<'a> Compiler<'a> {
         let func    = ObjFunction::new(name.to_owned(), 0);
         let id      = ctx.new_obj(func.into());
 
-        let script_local = Local {
-            name:        Token::new(TokenType::Identifier, "", 0, 0),
-            depth:       0,
-            initialized: true,
-        };
-
-        let func = Func::new(FuncType::Script, id, script_local);
+        let func = Func::new(FuncType::Script, id);
 
         Self {
             line:           0,
@@ -163,7 +155,7 @@ impl<'a> Compiler<'a> {
             self.compile_stmt(stmt)?;
         }
 
-        self.end_scope();
+        self.end_scope(block.locals);
         Ok(())
     }
 
@@ -192,14 +184,9 @@ impl<'a> Compiler<'a> {
     fn compile_func_decl(&mut self, func: FunctionStmt) -> CompilerResult<()> {
 
         let global_idx = self.declare_variable(&func.name, func.var_type);
-        self.mark_initialized();
 
-        self.begin_scope();
-
-        let func_id = self.make_function(func.name, func.params, *func.body, FuncType::Function)?;
-
-        self.end_scope();
-        let func_idx = self.add_constant(Value::Obj(func_id));
+        let func_id    = self.make_function(func, FuncType::Function)?;
+        let func_idx   = self.add_constant(Value::Obj(func_id));
 
         self.write_op(Op::Closure { func_idx });
 
@@ -212,35 +199,25 @@ impl<'a> Compiler<'a> {
     }
 
     fn make_function(&mut self,
-        name:      Token,
-        arguments: Vec<FunctionParam>,
-        body:      Vec<Stmt>,
+        stmt:      FunctionStmt,
         func_type: FuncType,
     )
         -> CompilerResult<ObjectId>
     {
-        let obj    = ObjFunction::new(name.lexeme.clone(), arguments.len());
+        let obj    = ObjFunction::new(stmt.name.lexeme, stmt.params.len());
         let obj_id = self.ctx.new_obj(obj.into());
 
-        let func = Func::new(func_type, obj_id, Local {
-            name,
-            depth:       self.scope_depth +1,
-            initialized: true,
-        });
+        let func = Func::new(func_type, obj_id);
         self.function_stack.push(func);
         self.all_functions .push(obj_id);
 
         self.begin_scope();
-        for arg in arguments.iter() {
-            self.add_local(arg.name.clone());
-            self.mark_initialized();
+
+        for (i, _) in stmt.params.iter().enumerate().filter(|a| matches!(a.1.var_type, VarType::Upvalue(_))) {
+            self.write_op(Op::PushUpvalue { index: Offset(i) });
         }
 
-        for (i, _) in arguments.iter().enumerate().filter(|a| matches!(a.1.var_type, VarType::Upvalue(_))) {
-            self.write_op(Op::PushUpvalue { index: StackIndex(i) });
-        }
-
-        for stmt in body.into_iter() {
+        for stmt in stmt.body.into_iter() {
             self.compile_stmt(stmt)?;
         }
 
@@ -252,7 +229,7 @@ impl<'a> Compiler<'a> {
         self.compile_stmt(implicit_return)?;
 
         let func = self.pop_func();
-        self.end_scope();
+        self.end_scope(0);           // return is responsible for popping func locals off the stack
 
         self.emit_constant(Value::Obj(func.func_obj));
 
@@ -311,13 +288,12 @@ impl<'a> Compiler<'a> {
             None       => { self.write_op(Op::Nil); }
         }
 
-        match global {
-            Some(index) => self.define_global(index),
-            None        => self.mark_initialized(),
+        if let Some(index) = global{
+            self.define_global(index);
         }
 
         if matches!(stmt.var_type, VarType::Upvalue(_)) {
-            self.write_op(OpCode::PushUpvalue { index: StackIndex(0) });
+            self.write_op(OpCode::PushUpvalue { index: Offset(0) });
         }
 
         Ok(())
@@ -327,9 +303,8 @@ impl<'a> Compiler<'a> {
         self.line = name.line;
 
         match var_type {
-            VarType::Local  (_) => { self.add_local(name.clone()); None },
-            VarType::Upvalue(_) => { self.add_local(name.clone()); None },
             VarType::Global     => Some(self.make_identifier_constant(name.clone())),
+            _                   => None,
         }
 
     }
@@ -572,34 +547,10 @@ impl<'a> Compiler<'a> {
         index
     }
 
-    fn declare_local(&mut self, name: &Token) {
-        // TODO: allow locals to shadow each other?
-        for local in self.current_func().locals.iter().rev() {
-
-            if local.initialized && local.depth < self.scope_depth {
-                break;
-            }
-
-            assert_ne!(local.name.lexeme, name.lexeme, "todo, make this a compiler error");
-        }
-
-        self.add_local(name.clone());
-    }
-
     fn define_global(&mut self, name_idx: ConstIndex) {
         self.write_op(
             Op::DefGlobal { name_idx, },
         );
-    }
-
-    fn add_local(&mut self, name: Token) {
-        let depth = self.scope_depth;
-
-        self.current_func_mut().locals.push(Local {
-            name,
-            depth,
-            initialized: false,
-        });
     }
 
     fn add_upvalue(&mut self, index: StackIndex, is_local: bool) {
@@ -608,16 +559,6 @@ impl<'a> Compiler<'a> {
             index,
             is_local
         });
-    }
-
-    fn mark_initialized(&mut self) {
-        if self.scope_depth == 0 {
-            return;
-        }
-
-        let local = self.current_func_mut().locals.last_mut().expect("No Local to mark initialized");
-
-        local.initialized = true;
     }
 
 
@@ -679,6 +620,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn write_pop(&mut self) -> BytecodeIndex {
+
         self.write_op(Op::Pop)
     }
 
@@ -686,17 +628,8 @@ impl<'a> Compiler<'a> {
         self.scope_depth += 1;
     }
 
-    fn end_scope(&mut self) {
+    fn end_scope(&mut self, pop_count: usize) {
         self.scope_depth -= 1;
-
-        let depth  = self.scope_depth;
-        let locals = &mut self.current_func_mut().locals;
-
-        let pop_count = locals.iter().filter(|l| l.depth > depth).count();
-
-        for _ in 0..pop_count {
-            locals.pop();
-        }
 
         for _ in 0..pop_count {
             self.write_pop();

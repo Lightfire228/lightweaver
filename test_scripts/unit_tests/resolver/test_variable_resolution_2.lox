@@ -1,19 +1,29 @@
+// global script object: 0
+
+
 fun outer() {
+    // outer call: 1
 
-  var x = "value";
+    // 2
+    var x = "value"; // Upvalue: 0
 
-  fun middle() {
+    // decl: 3
+    fun middle() {
+        // call: 4
 
-    fun inner() {
-      print x;
+        // decl 5
+        fun inner() {
+            // call: 6
+
+            print x;
+        }
+
+        print "create inner closure";
+        return inner;
     }
 
-    print "create inner closure";
-    return inner;
-  }
-
-  print "return from outer";
-  return middle;
+    print "return from outer";
+    return middle;
 }
 
 var mid = outer();

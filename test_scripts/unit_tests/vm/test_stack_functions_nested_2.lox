@@ -1,0 +1,10 @@
+fun fn_1() {
+    fn_2();
+}
+
+fun fn_2() {
+    return 5;
+}
+
+
+print fn_1();

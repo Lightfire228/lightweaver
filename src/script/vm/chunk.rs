@@ -1,11 +1,6 @@
 use std::{fmt::Display, ops::{Deref, DerefMut}};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct GlobalIndex  (pub usize);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct ConstIndex   (pub usize);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct StackIndex   (pub usize);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct UpvalueIndex (pub usize);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct Offset       (pub usize);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub struct BytecodeIndex(pub usize);
+use ast_macro::derive_all;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpCode {
@@ -23,7 +18,7 @@ pub enum OpCode {
 
     GetUpvalue  { index:     UpvalueIndex },
     SetUpvalue  { index:     UpvalueIndex },
-    PushUpvalue { index:     StackIndex },
+    PushUpvalue { index:     Offset },
 
     JumpIfFalse { offset:    Offset },
     JumpIfTrue  { offset:    Offset },
@@ -121,6 +116,26 @@ impl Display for OpCode {
         })
     }
 }
+
+#[derive_all]
+pub struct GlobalIndex  (pub usize);
+
+#[derive_all]
+pub struct ConstIndex   (pub usize);
+
+#[derive_all]
+pub struct StackIndex   (pub usize);
+
+#[derive_all]
+pub struct UpvalueIndex (pub usize);
+
+#[derive_all]
+pub struct Offset       (pub usize);
+
+#[derive_all]
+pub struct BytecodeIndex(pub usize);
+
+
 
 impl Deref for BytecodeIndex {
     type Target = usize;

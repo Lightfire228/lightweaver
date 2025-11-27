@@ -7,6 +7,7 @@ use super::Stmt;
 pub struct FunctionStmt {
     pub name:      Token,
     pub params:    Vec<FunctionParam>,
+    pub locals:    usize,
     pub body:      Box<Vec<Stmt>>,
     pub var_type:  VarType,
 }
@@ -28,6 +29,7 @@ impl FunctionStmt {
             params:   params.into_iter().map(|p| FunctionParam::new(p)).collect(),
             body:     Box::new(body),
             var_type: VarType::Global,
+            locals:   0,
         }
     }
 }

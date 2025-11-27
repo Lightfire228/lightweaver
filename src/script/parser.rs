@@ -6,7 +6,7 @@ use super::tokens::{Token, TokenType};
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-static DEBUG_LOG: bool = true;
+static DEBUG_LOG: bool = false;
 
 pub fn parse_ast(tokens: Vec<Token>) -> Result<Ast, Vec<ParseError>> {
     let mut parser = Parser::new(tokens);
@@ -17,8 +17,9 @@ pub fn parse_ast(tokens: Vec<Token>) -> Result<Ast, Vec<ParseError>> {
 
     while !parser.is_eof() {
         match parser.parse_declaration(&logger) {
-            Ok (stmt) => statements.push(stmt),
-            Err(err)  => errors    .push(err),
+            Ok(Some(stmt)) => statements.push(stmt),
+            Ok(None)       => {},
+            Err(err)       => errors    .push(err),
         }
     }
 
@@ -226,26 +227,29 @@ impl Parser {
     //#region declarations
 
 
-    fn parse_declaration(&mut self, logger: &Logger) -> ParseResult<Stmt> {
+    fn parse_declaration(&mut self, logger: &Logger) -> ParseResult<Option<Stmt>> {
         logger.log("parse_declaration", self.peek().clone(), || {
 
-            let result: ParseResult<Stmt> = match self.advance().type_ {
+            let result: Option<ParseResult<Stmt>> = match self.advance().type_ {
 
-                Tt::Class => self.parse_class_decl(logger),
-                Tt::Fun   => self.parse_function_decl(FunctionType::Function, logger).map(|f| Stmt::Function(f)),
-                Tt::Var   => self.parse_var_decl  (logger),
+                Tt::Class     => Some(self.parse_class_decl(logger)),
+                Tt::Fun       => Some(self.parse_function_decl(FunctionType::Function, logger).map(|f| Stmt::Function(f))),
+                Tt::Var       => Some(self.parse_var_decl  (logger)),
+                Tt::Semicolon => None,
 
                 _ => {
                     self.roll_back();
-                    self.parse_statement(logger)
+                    Some(self.parse_statement(logger))
                 }
             };
+
+            let Some(result) = result else { return Ok(None) };
 
             if result.is_err() {
                 self.synchronize();
             }
 
-            result
+            result.map(|r| Some (r))
 
         })
 
@@ -351,12 +355,12 @@ impl Parser {
             let mut statements = vec![];
 
             while !self.check(Tt::RightBrace) && !self.is_eof() {
-                statements.push(self.parse_declaration(logger)?);
+                self.parse_declaration(logger)?.map(|stmt| statements.push(stmt));
             }
 
             self.consume(Tt::RightBrace, Pe::MissingBlockCloseBrace)?;
 
-            Ok(Block { stmts: Box::new(statements), })
+            Ok(Block { stmts: Box::new(statements), locals: 0})
         })
     }
 
@@ -471,7 +475,7 @@ impl Parser {
     }
 
     fn parse_expression_statement(&mut self, logger: &Logger) -> ParseResult<Stmt> {
-        logger.log("parse_expression_statecment", self.peek().clone(), || {
+        logger.log("parse_expression_statement", self.peek().clone(), || {
 
             let expr = self.parse_expression(None, logger)?;
             self.consume(Tt::Semicolon, Pe::MissingExpressionStmtSemicolon)?;
@@ -816,6 +820,13 @@ impl Logger {
         }
     }
 
+    // TODO: rewrite this using a macro
+    // log!("func_name", {
+    //  ...
+    // })
+    //
+    // which gets compiled to a match || {} try_catch thingy
+    //
     fn log<Func, OkVal>(&self, name: &str, token: Token, mut f: Func) -> ParseResult<OkVal>
         where Func: FnMut() -> ParseResult<OkVal>
     {

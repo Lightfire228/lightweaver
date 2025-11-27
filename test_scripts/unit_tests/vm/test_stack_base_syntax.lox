@@ -1,0 +1,58 @@
+// literals
+1;
+"a";
+true;
+false;
+nil;
+;
+
+// math operators
+-1;
+1 + 2;
+1 - 2;
+1 * 2;
+1 / 2;
+1 * (2 - 3);
+"a" + "a";
+
+// logic operators
+true or  false;
+true and false;
+!true;
+1 <  2;
+1 <= 2;
+1 >  2;
+1 >= 2;
+1 == 2;
+1 != 2;
+
+// Var decls
+var a;
+a = 2;
+
+var b = 5;
+
+{
+    var d = 6;
+}
+
+
+fun fn_1() {
+    var c = 2;
+}
+
+fn_1();
+
+// {
+//     var d = 2;
+//     fun fn_2() {}
+//     fn_2();
+// }
+
+// print "foo";
+// print 1;
+// print true;
+// print nil;
+
+// fun fn_3() {}
+// print fn_3;
