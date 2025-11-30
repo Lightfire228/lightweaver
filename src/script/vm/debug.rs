@@ -47,7 +47,7 @@ impl OpCode {
 
             O::GetUpvalue   { index }     => byte_instruction    ("OP_GET_UPVALUE",   **index),
             O::SetUpvalue   { index }     => byte_instruction    ("OP_SET_UPVALUE",   **index),
-            O::PushUpvalue  { index }     => byte_instruction    ("OP_SET_UPVALUE",   **index),
+            O::PushUpvalue  { index }     => byte_instruction    ("OP_PUSH_UPVALUE",  **index),
 
             O::JumpIfFalse  { offset }    => jump_instruction    ("OP_JUMP_IF_FALSE", ip, offset,  1),
             O::JumpIfTrue   { offset }    => jump_instruction    ("OP_JUMP_IF_TRUE",  ip, offset,  1),

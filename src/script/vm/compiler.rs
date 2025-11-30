@@ -1,7 +1,15 @@
 
 use std::usize;
 
-use crate::script::{ast::*, tokens::{Token, TokenType}, vm::{chunk::{BytecodeIndex, ConstIndex, Offset, StackIndex}, gc::{Context, ObjectId}, object::{ObjFunction}}};
+use crate::script::{
+    ast::*,
+    tokens::{Token, TokenType},
+    vm::{
+        chunk::*,
+        gc::{Context, ObjectId},
+        object::ObjFunction
+    }
+};
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
@@ -214,7 +222,7 @@ impl<'a> Compiler<'a> {
         self.begin_scope();
 
         for (i, _) in stmt.params.iter().enumerate().filter(|a| a.1.var_type == VarDeclType::Upvalue) {
-            self.write_op(Op::PushUpvalue { index: Offset(i) });
+            self.write_op(Op::PushUpvalue { index: StackOffset(i) });
         }
 
         for stmt in stmt.body.into_iter() {
@@ -293,7 +301,7 @@ impl<'a> Compiler<'a> {
         }
 
         if stmt.var_type == VarDeclType::Upvalue {
-            self.write_op(OpCode::PushUpvalue { index: Offset(0) });
+            self.write_op(OpCode::PushUpvalue { index: StackOffset(0) });
         }
 
         Ok(())
@@ -550,14 +558,6 @@ impl<'a> Compiler<'a> {
         self.write_op(
             Op::DefGlobal { name_idx, },
         );
-    }
-
-    fn add_upvalue(&mut self, index: StackIndex, is_local: bool) {
-        let func = self.function_stack.last_mut().unwrap();
-        func.upvalues.push(Upvalue {
-            index,
-            is_local
-        });
     }
 
 

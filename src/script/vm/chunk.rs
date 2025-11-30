@@ -18,7 +18,7 @@ pub enum OpCode {
 
     GetUpvalue  { index:     UpvalueIndex },
     SetUpvalue  { index:     UpvalueIndex },
-    PushUpvalue { index:     Offset },
+    PushUpvalue { index:     StackOffset },
 
     JumpIfFalse { offset:    Offset },
     JumpIfTrue  { offset:    Offset },

@@ -8,7 +8,7 @@ use gc::Context;
 
 use crate::script::vm::chunk::{StackOffset, UpvalueIndex};
 use crate::script::vm::debug::DisassembleData;
-use crate::script::vm::object::{NativeFn, ObjClass, ObjClosure, ObjInstance, ObjNative, ObjValue};
+use crate::script::vm::object::*;
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -29,8 +29,8 @@ pub mod object;
 pub mod gc;
 
 
-// static DEBUG_TRACE_EXECUTION: bool = true;
-static DEBUG_TRACE_EXECUTION: bool = false;
+static DEBUG_TRACE_EXECUTION: bool = true;
+// static DEBUG_TRACE_EXECUTION: bool = false;
 
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
@@ -241,10 +241,9 @@ impl Vm {
 
     fn stack_swap(&mut self, index: StackIndex, value: Value) -> Value {
         let top   = self.stack.len();
-        let index = self.from_stack_top(*index);
 
         self.stack.push(value);
-        self.stack.swap(top, index);
+        self.stack.swap(top, *index);
 
         self.pop_stack()
     }
@@ -363,8 +362,7 @@ impl Vm {
         obj.value = value;
     }
 
-    fn op_push_upvalue(&mut self, index: Offset) {
-
+    fn op_push_upvalue(&mut self, index: StackOffset) {
         let index = StackIndex(self.from_stack_top(*index));
 
         let val = self.stack_swap(index, Value::Nil);
