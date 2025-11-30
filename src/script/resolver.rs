@@ -147,8 +147,9 @@ impl<'a> Resolver<'a> {
 
     fn resolve_if_stmt(&mut self, if_stmt: &'a mut IfStmt) {
 
+        let temps = self.temporaries;
         self.resolve_expr(&mut if_stmt.condition);
-        self.temporaries = 0;
+        self.temporaries = temps;
 
         self.resolve_stmt(&mut if_stmt.then_branch);
 
@@ -191,6 +192,7 @@ impl<'a> Resolver<'a> {
     // Expressions
 
     fn resolve_expr(&mut self, expr: &'a mut Expr) {
+
         match expr {
             Expr::Assign   (expr) => self.resolve_assign_expr (expr),
             Expr::Binary   (expr) => self.resolve_binary_expr (expr),
@@ -205,40 +207,57 @@ impl<'a> Resolver<'a> {
             Expr::Unary    (expr) => self.resolve_unary_expr  (expr),
             Expr::Variable (expr) => self.resolve_var_expr    (expr),
         };
-        self.temporaries += 1;
     }
 
     fn resolve_logical_expr(&mut self, logical: &'a mut Logical) {
+        let temps = self.temporaries;
+
         self.resolve_expr(&mut logical.left);
+        self.temporaries = temps +1;
+
+        self.resolve_expr(&mut logical.right);
+        self.temporaries = temps +2;
     }
 
-    fn resolve_logical_jump(&mut self, right: &'a mut Expr) {
-        self.resolve_expr(right);
-    }
 
     fn resolve_assign_expr(&mut self, assign: &'a mut Assign) {
+        let temps = self.temporaries;
+
         self.resolve_expr(&mut assign.value);
+        self.temporaries = temps +1;
     }
 
-
     fn resolve_binary_expr(&mut self, binary: &'a mut BinaryOperator) {
+        let temps = self.temporaries;
+
         self.resolve_expr(&mut binary.left);
+        self.temporaries = temps +1;
+
         self.resolve_expr(&mut binary.right);
+        self.temporaries = temps +2;
     }
 
     fn resolve_call_expr(&mut self, call: &'a mut Call) {
-        self.resolve_expr(&mut call.callee);
+        let temps = self.temporaries;
 
-        for arg in call.args.iter_mut() {
+        self.resolve_expr(&mut call.callee);
+        self.temporaries = temps +1;
+
+        for (i, arg) in call.args.iter_mut().enumerate() {
             self.resolve_expr(arg);
+            self.temporaries = temps + i;
         }
     }
 
     fn resolve_unary_expr(&mut self, unary: &'a mut UnaryOperator) {
+        let temps = self.temporaries;
+
         self.resolve_expr(&mut unary.right);
+        self.temporaries = temps +1;
     }
 
     fn resolve_var_expr(&mut self, var: &'a mut Variable) {
+        self.temporaries += 1;
 
         if self.is_global_scope() {
             return;
@@ -268,7 +287,7 @@ impl<'a> Resolver<'a> {
         let func = self.funcs.last();
 
         if func.is_none_or(|func| local.function_depth.unwrap() == func.depth) {
-            var.var_type = VarType::Local(StackOffset(i + self.temporaries));
+            var.var_type = VarType::Local(StackOffset(i + self.temporaries -1));
             return;
         }
 
@@ -287,7 +306,10 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_set_expr(&mut self, set: &'a mut Set) {
+        let temps = self.temporaries;
+
         self.resolve_expr(&mut set.value);
+        self.temporaries = temps +1;
     }
 
     fn resolve_super_expr(&mut self, _super: &mut Super) {
@@ -524,6 +546,35 @@ mod tests {
         assert_eq!(print_n  .var_type, VarType::Local(StackOffset(1)));
         assert_eq!(ret_n    .var_type, VarType::Local(StackOffset(1)));
         assert_eq!(ret_rec_n.var_type, VarType::Local(StackOffset(3)));
+    }
+
+    #[test]
+    fn test_recursive_fib() {
+
+        let mut ast = get_ast("recursive_fib.lox");
+        let mut ctx = Context::new();
+
+        resolve(&mut ast, &mut ctx);
+
+        let fib_decl:    &FunctionStmt   = get!(& ast        .stmts [0]);
+
+        let decl_n:      &FunctionParam  = get!(& fib_decl   .params[0]);
+        let return_stmt: &ReturnStmt     = get!(& fib_decl   .body  [1]);
+
+        let ret_expr:    &BinaryOperator = get!(  return_stmt.value.as_ref().unwrap());
+        let ret_fib_1:   &Call           = get!(&*ret_expr   .left);
+        let ret_fib_2:   &Call           = get!(&*ret_expr   .right);
+
+        let ret_fib_1_n: &BinaryOperator = get!(& ret_fib_1  .args  [0]);
+        let ret_fib_2_n: &BinaryOperator = get!(& ret_fib_2  .args  [0]);
+        let ret_fib_1_n: &Variable       = get!(&*ret_fib_1_n.left);
+        let ret_fib_2_n: &Variable       = get!(&*ret_fib_2_n.left);
+
+        assert_eq!(decl_n   .var_type, VarDeclType::Local);
+
+
+        assert_eq!(ret_fib_1_n.var_type, VarType::Local(StackOffset(1)));
+        assert_eq!(ret_fib_2_n.var_type, VarType::Local(StackOffset(2)));
 
 
     }

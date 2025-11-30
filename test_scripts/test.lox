@@ -1,18 +1,51 @@
-// 0: Global stack slot
+// // var x = "global";
+// // fun outer() {
+// //   var x = "outer";
+// //   var y = "test";
 
-fun fib(n) {
-    // stack 0: Call
-    // stack 1: n
+// //   y = y;
+// //   fun inner() {
+// //     print x;
+// //   }
+// //   inner();
+// // }
+// // outer();
 
-    if (n <= 2) {
-        return n;
+// ----------------
+fun outer() {
+
+  var x = "value";
+
+  fun middle() {
+
+    fun inner() {
+      print x;
     }
 
-    return fib(n -1) + fib(n -2);
+    print "create inner closure";
+    return inner;
+  }
+
+  print "return from outer";
+  return middle;
 }
 
-print fib(1);
-print fib(2);
-print fib(3);
-print fib(4);
-print fib(5);
+var mid = outer();
+var in = mid();
+in();
+
+
+// fun fib(n) {
+
+//     if (n <= 2) {
+//         return n;
+//     }
+
+//     return fib(n -1) + fib(n - 2);
+// }
+
+// print fib(1);
+// print fib(2);
+// print fib(3);
+// print fib(4);
+// print fib(5);

@@ -8,6 +8,8 @@ fun fib(n) {
         return n;
     }
 
+    //     _   1
+    //     _           _   2
     return fib(n -1) + fib(n -2);
 }
 
