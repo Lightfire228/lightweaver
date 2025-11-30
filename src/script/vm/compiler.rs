@@ -29,8 +29,6 @@ pub fn compile(ast: Ast, ctx: &mut Context) ->
 
     compiler.write_op(Op::Return);
 
-    dbg!(compiler.all_functions.len());
-
     Ok(CompilerOut {
         function_ids: compiler.all_functions,
         constants:    compiler.constants,

@@ -29,8 +29,8 @@ pub mod object;
 pub mod gc;
 
 
-static DEBUG_TRACE_EXECUTION: bool = true;
-// static DEBUG_TRACE_EXECUTION: bool = false;
+// static DEBUG_TRACE_EXECUTION: bool = true;
+static DEBUG_TRACE_EXECUTION: bool = false;
 
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯

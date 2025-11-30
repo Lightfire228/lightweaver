@@ -2,18 +2,18 @@
 
 
 fun outer() {
-    // outer call: 1
+    // outer call: 0
 
-    // 2
+    // 1
     var x = "value"; // Upvalue: 0
 
-    // decl: 3
+    // decl: 2
     fun middle() {
-        // call: 4
+        // call: 0
 
-        // decl 5
+        // decl 1
         fun inner() {
-            // call: 6
+            // call: 0
 
             print x;
         }

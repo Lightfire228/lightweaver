@@ -50,8 +50,6 @@ pub fn run_file(path: &Path) -> &str {
         let out = compile(ast, &mut ctx).unwrap();
         dbg_funcs(&out, &ctx);
 
-        dbg!(">>>>>>>>> {}", &out.function_ids);
-
         let func = out.function_ids.first().expect("Function stack cannot be empty");
         vm::interpret(ctx, *func, out.constants).map_err(|err| Re::RuntimeError(err))?;
 

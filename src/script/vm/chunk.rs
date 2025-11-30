@@ -139,7 +139,7 @@ pub struct Offset       (pub usize);
 pub struct BytecodeIndex(pub usize);
 
 
-
+// TODO: macro this
 impl Deref for BytecodeIndex {
     type Target = usize;
 

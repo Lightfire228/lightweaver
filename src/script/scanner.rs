@@ -377,8 +377,6 @@ mod tests {
         assert!(tokens.is_ok());
         let tokens = tokens.unwrap();
 
-        dbg!(&tokens);
-
         assert_eq!(tokens, example.tokens);
     }
 

@@ -575,8 +575,36 @@ mod tests {
 
         assert_eq!(ret_fib_1_n.var_type, VarType::Local(StackOffset(1)));
         assert_eq!(ret_fib_2_n.var_type, VarType::Local(StackOffset(2)));
+    }
 
+    #[test]
+    fn test_upvalue_in_func_args() {
 
+        let mut ast = get_ast("upvalue_in_func_args.lox");
+        let mut ctx = Context::new();
+
+        resolve(&mut ast, &mut ctx);
+
+        let decl_fn_1:   &FunctionStmt   = get!(& ast        .stmts [0]);
+        let decl_a:      &FunctionParam  = get!(& decl_fn_1  .params[0]);
+        let decl_b:      &FunctionParam  = get!(& decl_fn_1  .params[1]);
+
+        let decl_d:      &VarStmt        = get!(& decl_fn_1  .body  [0]);
+        let decl_x:      &VarStmt        = get!(& decl_fn_1  .body  [1]);
+        let decl_fn_2:   &FunctionStmt   = get!(& decl_fn_1  .body  [2]);
+
+        let print_a:     &PrintStmt      = get!(& decl_fn_2  .body  [0]);
+        let print_a:     &Variable       = get!(& print_a    .expr);
+        let print_d:     &PrintStmt      = get!(& decl_fn_2  .body  [1]);
+        let print_d:     &Variable       = get!(& print_d    .expr);
+
+        assert_eq!(decl_a .var_type, VarDeclType::Upvalue);
+        assert_eq!(decl_b .var_type, VarDeclType::Local);
+        assert_eq!(decl_d .var_type, VarDeclType::Upvalue);
+        assert_eq!(decl_x .var_type, VarDeclType::Local);
+
+        assert_eq!(print_a.var_type, VarType::Upvalue(UpvalueIndex(0)));
+        assert_eq!(print_d.var_type, VarType::Upvalue(UpvalueIndex(1)));
     }
 
 

@@ -1,0 +1,21 @@
+// global script object: 0
+
+fun fun_1(a, b) {
+    // call: 0
+    // a:    1, Upvalue: 0
+    // b:    2
+
+    // d: 3, Upvalue: 1
+    var d = "";
+
+    // x: 4
+    var x = 0;
+
+    // fun_2: 5
+    fun fun_2() {
+
+
+        print a; // Upvalue: 0
+        print d; // Upvalue: 1
+    }
+}

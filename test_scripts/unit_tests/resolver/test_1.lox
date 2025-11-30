@@ -4,20 +4,20 @@ var a = "";
 var b = "";
 
 fun fun_1() {
-    // call: 1
+    // call: 0
 
-    // 2
+    // 1
     var c = "";
-    // 3
+    // 2
     var d = ""; // Upvalue: 0
 
-    // decl: 4
+    // decl: 3
     fun fun_2() {
-        // call: 5
+        // call: 0
 
-        // 6
+        // 1
         var e = "";
-        // 7
+        // 2
         var f = "";
 
         print d; // Upvalue: 0
