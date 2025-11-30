@@ -6,7 +6,7 @@ use chunk::{Chunk, OpCode};
 use value::Value;
 use gc::Context;
 
-use crate::script::vm::chunk::UpvalueIndex;
+use crate::script::vm::chunk::{StackOffset, UpvalueIndex};
 use crate::script::vm::debug::DisassembleData;
 use crate::script::vm::object::{NativeFn, ObjClass, ObjClosure, ObjInstance, ObjNative, ObjValue};
 use crate::script::vm::{
@@ -29,8 +29,8 @@ pub mod object;
 pub mod gc;
 
 
-static DEBUG_TRACE_EXECUTION: bool = true;
-// static DEBUG_TRACE_EXECUTION: bool = false;
+// static DEBUG_TRACE_EXECUTION: bool = true;
+static DEBUG_TRACE_EXECUTION: bool = false;
 
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
@@ -146,8 +146,8 @@ impl Vm {
                 O::GetProperty { name_idx }         => self.op_get_property(name_idx)?,
                 O::SetProperty { name_idx }         => self.op_set_property(name_idx),
 
-                O::GetLocal    { index }            => self.op_get_local   (index),
-                O::SetLocal    { index }            => self.op_set_local   (index),
+                O::GetLocal    { offset }           => self.op_get_local   (offset),
+                O::SetLocal    { offset }           => self.op_set_local   (offset),
 
                 O::GetUpvalue  { index }            => self.op_get_upvalue (index),
                 O::SetUpvalue  { index }            => self.op_set_upvalue (index),
@@ -190,8 +190,6 @@ impl Vm {
                         return Ok(())
                     }
 
-                    println!("stack len:   {}", self.stack.len());
-                    println!("frame stack: {}", *frame.stack_len);
                     let diff = self.stack.len() - *frame.stack_len;
 
                     for _ in 0..diff {
@@ -337,13 +335,18 @@ impl Vm {
     }
 
 
-    fn op_get_local(&mut self, index: StackIndex) {
-        self.push_stack(self.get_local(index));
+    fn op_get_local(&mut self, index: StackOffset) {
+        let index = self.from_stack_top(*index);
+        let val   = self.get_local(StackIndex(index));
+
+        self.push_stack(val);
     }
 
-    fn op_set_local(&mut self, index: StackIndex) {
+    fn op_set_local(&mut self, index: StackOffset) {
         let value = self.peek_stack(0);
-        self.stack[*index] = value;
+        let index = self.from_stack_top(*index);
+
+        self.stack[index] = value;
     }
 
     fn op_get_upvalue(&mut self, index: UpvalueIndex) {
@@ -768,8 +771,8 @@ mod tests {
     }
 
     #[test]
-    fn test_stack_empty_functions_nested_1() {
-        assert_stack_empty(source("test_stack_functions_nested_1.lox"));
+    fn test_stack_empty_functions_recursion() {
+        assert_stack_empty(source("test_stack_functions_recursion.lox"));
     }
 
     #[test]

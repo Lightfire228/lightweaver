@@ -5,7 +5,8 @@ fun fib(n) {
         return n;
     }
 
+    print n;
     return n + fib(n -1);
 }
 
-print fib();
+print fib(2);

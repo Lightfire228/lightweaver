@@ -1,7 +1,7 @@
 
 use std::usize;
 
-use crate::script::{ast::*, vm::{chunk::{OpCode, StackIndex, UpvalueIndex}, gc::Context}};
+use crate::script::{ast::*, vm::{chunk::{OpCode, StackIndex, StackOffset, UpvalueIndex}, gc::Context}};
 
 
 type Op = OpCode;
@@ -19,22 +19,24 @@ pub fn resolve(ast: &mut Ast, ctx: &mut Context) {
 
 
 struct Resolver<'a> {
-    ctx:         &'a mut Context,
-    upvalues:    Vec<Vec<Upvalue>>,
-    scopes:      Vec<Scope<'a>>,
+    ctx:            &'a mut Context,
+    scopes:         Vec<Scope<'a>>,
+    funcs:          Vec<Func>,
+    temporaries:    usize,
 }
 
 #[derive(Debug)]
 struct Local<'a> {
-    pub scope_depth: usize,
-    pub name:        String,
-    pub type_:       LocalType<'a>,
+    pub scope_depth:    usize,
+    pub function_depth: Option<usize>,
+    pub name:           String,
+    pub type_:          LocalType<'a>,
 }
 
 #[derive(Debug)]
 enum LocalType<'a> {
-    Local(&'a mut VarType),
-    Call (VarType)
+    Local(&'a mut VarDeclType),
+    Call (VarDeclType)
 }
 
 #[derive(Debug)]
@@ -47,14 +49,20 @@ struct Scope<'a> {
     pub locals:    Vec<Local<'a>>,
 }
 
+struct Func {
+    pub depth:    usize,
+    pub upvalues: Vec<Upvalue>,
+}
+
 
 impl<'a> Resolver<'a> {
 
     fn new(ctx: &'a mut Context) -> Self {
         Self {
             ctx,
-            scopes:     vec![],
-            upvalues:   vec![vec![]],
+            scopes:      vec![],
+            funcs:       vec![],
+            temporaries: 0,
         }
     }
 
@@ -72,6 +80,8 @@ impl<'a> Resolver<'a> {
             Stmt::Var        (stmt) => self.resolve_var_decl   (stmt),
             Stmt::While      (stmt) => self.resolve_while_stmt (stmt),
         };
+
+        self.temporaries = 0;
     }
 
     fn resolve_block_stmt(&mut self, block: &'a mut Block) {
@@ -92,8 +102,8 @@ impl<'a> Resolver<'a> {
         self.end_scope();
 
         if !self.is_global_scope() {
-            class.var_type = VarType  ::Local(self.stack_index());
-            let type_      = LocalType::Local(&mut class.var_type);
+            class.var_type = VarDeclType::Local;
+            let type_      = LocalType  ::Local(&mut class.var_type);
 
             self.push_local(class.name.lexeme.to_owned(), type_);
         }
@@ -109,16 +119,16 @@ impl<'a> Resolver<'a> {
         let arity = func.params.len();
 
         if !self.is_global_scope() {
-            func.var_type = VarType  ::Local(self.stack_index());
+            func.var_type = VarDeclType::Local;
             let type_     = LocalType::Local(&mut func.var_type);
 
             self.push_local(func.name.lexeme.to_string(), type_);
         }
 
-        self.upvalues.push(vec![]);
+        self.begin_func();
         self.begin_scope();
 
-        let type_ = LocalType::Call(VarType::Local(self.stack_index()));
+        let type_ = LocalType::Call(VarDeclType::Local);
         self.push_local(func.name.lexeme.clone(), type_);
 
         for arg in func.params.iter_mut() {
@@ -131,13 +141,14 @@ impl<'a> Resolver<'a> {
         }
 
         func.locals = self.end_scope() - arity;
-        self.upvalues.pop();
+        self.funcs.pop();
 
     }
 
     fn resolve_if_stmt(&mut self, if_stmt: &'a mut IfStmt) {
 
         self.resolve_expr(&mut if_stmt.condition);
+        self.temporaries = 0;
 
         self.resolve_stmt(&mut if_stmt.then_branch);
 
@@ -159,8 +170,8 @@ impl<'a> Resolver<'a> {
     fn resolve_var_decl(&mut self, stmt: &'a mut VarStmt) {
 
         if !self.is_global_scope() {
-            stmt.var_type = VarType  ::Local(self.stack_index());
-            let type_     = LocalType::Local(&mut stmt.var_type);
+            stmt.var_type = VarDeclType::Local;
+            let type_     = LocalType  ::Local(&mut stmt.var_type);
 
             self.push_local(stmt.name.lexeme.to_owned(), type_);
         }
@@ -194,6 +205,7 @@ impl<'a> Resolver<'a> {
             Expr::Unary    (expr) => self.resolve_unary_expr  (expr),
             Expr::Variable (expr) => self.resolve_var_expr    (expr),
         };
+        self.temporaries += 1;
     }
 
     fn resolve_logical_expr(&mut self, logical: &'a mut Logical) {
@@ -232,46 +244,45 @@ impl<'a> Resolver<'a> {
             return;
         }
 
-        let current_scope_depth = self.scopes.len() -1;
-
-        let mut locals: Vec<_> = self.scopes.iter_mut()
-            .flat_map(|scope| &mut scope.locals)
-            .collect()
+        let locals = self.scopes.iter_mut()
+            .flat_map(|scope|
+                &mut scope.locals
+            )
+            .rev()
+            .enumerate()
         ;
 
-        let locals = locals.iter_mut().enumerate().rev();
-
-        for (i, local) in locals {
-
-            // +1 for the top script stack object
-            let i = i +1;
-
-            if local.name != var.name.lexeme {
-                continue;
+        let mut found = None;
+        for l in locals {
+            if l.1.name == var.name.lexeme {
+                found = Some(l);
+                break;
             }
+        }
 
-            var.var_type = if local.scope_depth == current_scope_depth {
-                VarType::Local(StackIndex(i))
-            }
-            else {
-                let func  = self.upvalues.last_mut().unwrap();
-                let index = UpvalueIndex(func.len());
-                func.push(Upvalue { index });
+        let Some((i, local)) = found else {
+            return;
+        };
 
 
-                let type_ = VarType::Upvalue(index);
+        let func = self.funcs.last();
 
-                let LocalType::Local(decl_type) = &mut local.type_ else {
-                    panic!("The resolve stack got done borked");
-                };
-
-                **decl_type = type_;
-
-                type_
-            };
-
+        if func.is_none_or(|func| local.function_depth.unwrap() == func.depth) {
+            var.var_type = VarType::Local(StackOffset(i + self.temporaries));
             return;
         }
+
+
+        let func  = self.funcs.last_mut().unwrap();
+        let index = UpvalueIndex(func.upvalues.len());
+        func.upvalues.push(Upvalue { index });
+
+        let LocalType::Local(decl_type) = &mut local.type_ else {
+            panic!("The resolve stack got done borked");
+        };
+
+        **decl_type  = VarDeclType::Upvalue;
+        var.var_type = VarType    ::Upvalue(index);
 
     }
 
@@ -295,7 +306,9 @@ impl<'a> Resolver<'a> {
         last.locals.push(Local {
             scope_depth,
             name,
-            type_: var_type,
+            function_depth: self.funcs.last().map(|f| f.depth),
+            type_:          var_type,
+
         });
     }
 
@@ -312,6 +325,20 @@ impl<'a> Resolver<'a> {
         let scope = self.scopes.pop().expect("Cannot pop global scope");
 
         scope.locals.len()
+    }
+
+    fn begin_func(&mut self) {
+        let depth = self.funcs.len();
+
+        self.funcs.push(Func {
+            depth,
+            upvalues: vec![],
+        });
+
+    }
+
+    fn end_func(&mut self) {
+        self.funcs.pop().expect("Cannot pop global scope");
     }
 
     fn is_global_scope(&self) -> bool {
@@ -331,14 +358,14 @@ impl<'a> Resolver<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::script::{parser, scanner};
+    use crate::script::{parser, scanner, vm::chunk::StackOffset};
     use std::fs;
 
     use super::*;
 
     macro_rules! get {
         ($arg: expr) => {
-            $arg.try_into().unwrap()
+            ($arg).try_into().unwrap()
         };
     }
 
@@ -355,8 +382,8 @@ mod tests {
     }
 
     #[test]
-    fn test_variable_resolution_1() {
-        let mut ast = get_ast("test_variable_resolution_1.lox");
+    fn test_1() {
+        let mut ast = get_ast("test_1.lox");
         let mut ctx = Context::new();
 
         resolve(&mut ast, &mut ctx);
@@ -369,6 +396,7 @@ mod tests {
         let var_decl_c:        &VarStmt      = get!(&fn_decl_1 .body [0]);
         let var_decl_d:        &VarStmt      = get!(&fn_decl_1 .body [1]);
         let fn_decl_2:         &FunctionStmt = get!(&fn_decl_1 .body [2]);
+        let print_c:           &PrintStmt    = get!(&fn_decl_1 .body [3]);
 
         let var_decl_e:        &VarStmt      = get!(&fn_decl_2 .body [0]);
         let var_decl_f:        &VarStmt      = get!(&fn_decl_2 .body [1]);
@@ -380,33 +408,35 @@ mod tests {
         let print_d_target:    &Variable     = get!(&print_d   .expr);
         let print_e_target:    &Variable     = get!(&print_e   .expr);
         let print_f_target:    &Variable     = get!(&print_f   .expr);
+        let print_c_target:    &Variable     = get!(&print_c   .expr);
 
 
-        assert_eq!(var_decl_a       .var_type, VarType::Global);
-        assert_eq!(var_decl_b       .var_type, VarType::Global);
-        assert_eq!(fn_decl_1        .var_type, VarType::Global);
+        assert_eq!(var_decl_a       .var_type, VarDeclType::Global);
+        assert_eq!(var_decl_b       .var_type, VarDeclType::Global);
+        assert_eq!(fn_decl_1        .var_type, VarDeclType::Global);
 
         // The first slot in a function call is reserved
-        assert_eq!(var_decl_c       .var_type, VarType::Local  (StackIndex  (2)));
-        assert_eq!(var_decl_d       .var_type, VarType::Upvalue(UpvalueIndex(0)));
+        assert_eq!(var_decl_c       .var_type, VarDeclType::Local);
+        assert_eq!(var_decl_d       .var_type, VarDeclType::Upvalue);
 
-        assert_eq!(fn_decl_2        .var_type, VarType::Local  (StackIndex(4)));
-        assert_eq!(var_decl_e       .var_type, VarType::Local  (StackIndex(6)));
-        assert_eq!(var_decl_f       .var_type, VarType::Local  (StackIndex(7)));
+        assert_eq!(fn_decl_2        .var_type, VarDeclType::Local);
+        assert_eq!(var_decl_e       .var_type, VarDeclType::Local);
+        assert_eq!(var_decl_f       .var_type, VarDeclType::Local);
         assert_eq!(fn_decl_1        .locals,   4);
 
         assert_eq!(print_fn_1_target.var_type, VarType::Global);
         assert_eq!(print_d_target   .var_type, VarType::Upvalue(UpvalueIndex(0)));
-        assert_eq!(print_e_target   .var_type, VarType::Local  (StackIndex  (6)));
-        assert_eq!(print_f_target   .var_type, VarType::Local  (StackIndex  (7)));
+        assert_eq!(print_e_target   .var_type, VarType::Local  (StackOffset (1)));
+        assert_eq!(print_f_target   .var_type, VarType::Local  (StackOffset (0)));
+        assert_eq!(print_c_target   .var_type, VarType::Local  (StackOffset (2)));
         assert_eq!(fn_decl_2        .locals,   3);
 
     }
 
     #[test]
-    fn test_variable_resolution_2() {
+    fn test_2() {
 
-        let mut ast = get_ast("test_variable_resolution_2.lox");
+        let mut ast = get_ast("test_2.lox");
         let mut ctx = Context::new();
 
         resolve(&mut ast, &mut ctx);
@@ -429,28 +459,73 @@ mod tests {
 
 
         // Global
-        assert_eq!(fn_decl_outer     .var_type, VarType::Global);
-        assert_eq!(var_decl_mid      .var_type, VarType::Global);
-        assert_eq!(var_decl_in       .var_type, VarType::Global);
+        assert_eq!(fn_decl_outer     .var_type, VarDeclType::Global);
+        assert_eq!(var_decl_mid      .var_type, VarDeclType::Global);
+        assert_eq!(var_decl_in       .var_type, VarDeclType::Global);
 
         // Outer
-        assert_eq!(var_decl_x        .var_type, VarType::Upvalue(UpvalueIndex(0)));
-        assert_eq!(fn_decl_middle    .var_type, VarType::Local  (StackIndex  (3)));
+        assert_eq!(var_decl_x        .var_type, VarDeclType::Upvalue);
+        assert_eq!(fn_decl_middle    .var_type, VarDeclType::Local);
         assert_eq!(fn_decl_outer     .locals,   3);
 
         // Middle
-        assert_eq!(fn_decl_inner     .var_type, VarType::Local  (StackIndex(5)));
+        assert_eq!(fn_decl_inner     .var_type, VarDeclType::Local);
         assert_eq!(fn_decl_middle    .locals,   2);
 
         // Inner
         assert_eq!(fn_decl_inner     .locals,   1);
 
         // Return target expr
-        assert_eq!(ret_outer_target  .var_type, VarType::Local  (StackIndex  (3)));
-        assert_eq!(ret_middle_target .var_type, VarType::Local  (StackIndex  (5)));
+        assert_eq!(ret_outer_target  .var_type, VarType::Local  (StackOffset (0)));
+        assert_eq!(ret_middle_target .var_type, VarType::Local  (StackOffset (0)));
 
         // Print target expr
         assert_eq!(print_inner_target.var_type, VarType::Upvalue(UpvalueIndex(0)));
+    }
+
+    #[test]
+    fn test_recursion() {
+
+        let mut ast = get_ast("recursion.lox");
+        let mut ctx = Context::new();
+
+        resolve(&mut ast, &mut ctx);
+
+        let rec_decl:    &FunctionStmt   = get!(& ast        .stmts [0]);
+
+        let decl_n:      &FunctionParam  = get!(& rec_decl   .params[0]);
+        let if_stmt:     &IfStmt         = get!(& rec_decl   .body  [0]);
+        let print:       &PrintStmt      = get!(& rec_decl   .body  [2]);
+        let return_stmt: &ReturnStmt     = get!(& rec_decl   .body  [3]);
+
+        let print_n:     &Variable       = get!(& print      .expr);
+        let ret_expr:    &BinaryOperator = get!(  return_stmt.value.as_ref().unwrap());
+        let ret_n:       &Variable       = get!(&*ret_expr   .left);
+        let ret_rec:     &Call           = get!(&*ret_expr   .right);
+
+        let ret_rec_n:   &BinaryOperator = get!(& ret_rec    .args  [0]);
+        let ret_rec_n:   &Variable       = get!(&*ret_rec_n  .left);
+
+        let if_cond:     &BinaryOperator = get!(& if_stmt    .condition);
+        let if_n:        &Variable       = get!(&*if_cond    .left);
+        let if_ret:      &Block          = get!(&*if_stmt    .then_branch);
+        let if_ret:      &ReturnStmt     = get!(& if_ret     .stmts [0]);
+        let if_ret_n:    &Variable       = get!(  if_ret     .value.as_ref().unwrap());
+
+
+        assert_eq!(decl_n   .var_type, VarDeclType::Local);
+
+
+        assert_eq!(if_n     .var_type, VarType::Local(StackOffset(0)));
+        assert_eq!(if_ret_n .var_type, VarType::Local(StackOffset(0)));
+
+        // stack +1
+
+        assert_eq!(print_n  .var_type, VarType::Local(StackOffset(1)));
+        assert_eq!(ret_n    .var_type, VarType::Local(StackOffset(1)));
+        assert_eq!(ret_rec_n.var_type, VarType::Local(StackOffset(3)));
+
+
     }
 
 

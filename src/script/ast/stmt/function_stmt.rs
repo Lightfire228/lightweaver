@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs, var_type::VarType}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarDeclType, WalkArgs}, tokens::Token};
 
 use super::Stmt;
 
@@ -9,13 +9,13 @@ pub struct FunctionStmt {
     pub params:    Vec<FunctionParam>,
     pub locals:    usize,
     pub body:      Box<Vec<Stmt>>,
-    pub var_type:  VarType,
+    pub var_type:  VarDeclType,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FunctionParam {
     pub name:     Token,
-    pub var_type: VarType,
+    pub var_type: VarDeclType,
 }
 
 impl FunctionStmt {
@@ -28,7 +28,7 @@ impl FunctionStmt {
             name,
             params:   params.into_iter().map(|p| FunctionParam::new(p)).collect(),
             body:     Box::new(body),
-            var_type: VarType::Global,
+            var_type: VarDeclType::Global,
             locals:   0,
         }
     }
@@ -38,7 +38,7 @@ impl FunctionParam {
     fn new(name: Token) -> Self {
         Self {
             name,
-            var_type: VarType::Global,
+            var_type: VarDeclType::Local,
         }
     }
 }

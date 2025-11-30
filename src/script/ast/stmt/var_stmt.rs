@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs, var_type::VarType}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarDeclType, WalkArgs}, tokens::Token};
 use crate::script::{ast::Expr};
 
 use super::Stmt;
@@ -7,7 +7,7 @@ use super::Stmt;
 pub struct VarStmt {
     pub name:        Token,
     pub initializer: Option<Expr>,
-    pub var_type:    VarType,
+    pub var_type:    VarDeclType,
 }
 
 
@@ -16,7 +16,7 @@ impl VarStmt {
         Stmt::Var(VarStmt {
             name,
             initializer,
-            var_type: VarType::Global,
+            var_type: VarDeclType::Global,
         })
     }
 }

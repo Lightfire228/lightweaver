@@ -1,4 +1,4 @@
-use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarType, WalkArgs}, tokens::Token};
+use crate::script::{ast::{AstDisplay, AstNode, AstNodeList, CompileArgs, DisplayArgs, VarDeclType, WalkArgs}, tokens::Token};
 use crate::script::{ast::Variable};
 
 use super::{FunctionStmt, Stmt};
@@ -8,7 +8,7 @@ pub struct Class {
     pub name:       Token,
     pub superclass: Option<Variable>,
     pub methods:    Box<Vec<FunctionStmt>>,
-    pub var_type:   VarType,
+    pub var_type:   VarDeclType,
 }
 
 impl Class {
@@ -20,8 +20,8 @@ impl Class {
         Stmt::Class(Self {
             name,
             superclass,
-            methods: Box::new(methods),
-            var_type: VarType::Global,
+            methods:  Box::new(methods),
+            var_type: VarDeclType::Global,
         })
     }
 }

@@ -161,7 +161,7 @@ impl<'a> Compiler<'a> {
 
     fn compile_class_decl(&mut self, class: Class) {
 
-        let is_global = self.declare_variable(&class.name, class.var_type);
+        let is_global = self.declare_variable(&class.name);
 
         // declare variable doesn't create a name constant, if the variable is a local
         let name_idx  = is_global.unwrap_or_else(|| self.make_identifier_constant(class.name));
@@ -183,7 +183,7 @@ impl<'a> Compiler<'a> {
 
     fn compile_func_decl(&mut self, func: FunctionStmt) -> CompilerResult<()> {
 
-        let global_idx = self.declare_variable(&func.name, func.var_type);
+        let global_idx = self.declare_variable(&func.name);
 
         let func_id    = self.make_function(func, FuncType::Function)?;
         let func_idx   = self.add_constant(Value::Obj(func_id));
@@ -213,7 +213,7 @@ impl<'a> Compiler<'a> {
 
         self.begin_scope();
 
-        for (i, _) in stmt.params.iter().enumerate().filter(|a| matches!(a.1.var_type, VarType::Upvalue(_))) {
+        for (i, _) in stmt.params.iter().enumerate().filter(|a| a.1.var_type == VarDeclType::Upvalue) {
             self.write_op(Op::PushUpvalue { index: Offset(i) });
         }
 
@@ -281,7 +281,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_var_decl(&mut self, stmt: VarStmt) -> CompilerResult<()> {
-        let global = self.declare_variable(&stmt.name, stmt.var_type);
+        let global = self.declare_variable(&stmt.name);
 
         match stmt.initializer {
             Some(expr) =>   self.compile_expr(expr),
@@ -292,20 +292,19 @@ impl<'a> Compiler<'a> {
             self.define_global(index);
         }
 
-        if matches!(stmt.var_type, VarType::Upvalue(_)) {
+        if stmt.var_type == VarDeclType::Upvalue {
             self.write_op(OpCode::PushUpvalue { index: Offset(0) });
         }
 
         Ok(())
     }
 
-    fn declare_variable(&mut self, name: &Token, var_type: VarType) -> Option<ConstIndex> {
+    fn declare_variable(&mut self, name: &Token) -> Option<ConstIndex> {
         self.line = name.line;
 
-        match var_type {
-            VarType::Global     => Some(self.make_identifier_constant(name.clone())),
-            _                   => None,
-        }
+        (self.scope_depth == 0).then(||
+            self.make_identifier_constant(name.clone())
+        )
 
     }
 
@@ -389,8 +388,8 @@ impl<'a> Compiler<'a> {
         self.compile_expr(*assign.value);
 
         let set_op = match assign.target.var_type {
-            VarType::Local  (index) => Op::SetLocal   { index },
-            VarType::Upvalue(index) => Op::SetUpvalue { index },
+            VarType::Local  (offset) => Op::SetLocal   { offset },
+            VarType::Upvalue(index)  => Op::SetUpvalue { index },
             VarType::Global         => {
                 let name_idx = self.make_identifier_constant(assign.target.name);
                 Op::SetGlobal { name_idx }
@@ -452,8 +451,8 @@ impl<'a> Compiler<'a> {
         self.line = var.name.line;
 
         let get_op = match var.var_type {
-            VarType::Local  (index) => Op::GetLocal   { index },
-            VarType::Upvalue(index) => Op::GetUpvalue { index },
+            VarType::Local  (offset) => Op::GetLocal   { offset },
+            VarType::Upvalue(index)  => Op::GetUpvalue { index },
             VarType::Global         => {
                 let name_idx = self.make_identifier_constant(var.name);
                 Op::GetGlobal  { name_idx }

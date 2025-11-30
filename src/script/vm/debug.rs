@@ -42,8 +42,8 @@ impl OpCode {
             O::GetProperty  { name_idx }  => constant_instruction("OP_GET_PROPERTY",  data, name_idx),
             O::SetProperty  { name_idx }  => constant_instruction("OP_SET_PROPERTY",  data, name_idx),
 
-            O::GetLocal     { index }     => byte_instruction    ("OP_GET_LOCAL",     **index),
-            O::SetLocal     { index }     => byte_instruction    ("OP_SET_LOCAL",     **index),
+            O::GetLocal     { offset }    => byte_instruction    ("OP_GET_LOCAL",     **offset),
+            O::SetLocal     { offset }    => byte_instruction    ("OP_SET_LOCAL",     **offset),
 
             O::GetUpvalue   { index }     => byte_instruction    ("OP_GET_UPVALUE",   **index),
             O::SetUpvalue   { index }     => byte_instruction    ("OP_SET_UPVALUE",   **index),

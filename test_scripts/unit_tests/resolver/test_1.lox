@@ -9,7 +9,7 @@ fun fun_1() {
     // 2
     var c = "";
     // 3
-    var d = ""; // Upvalu: 0
+    var d = ""; // Upvalue: 0
 
     // decl: 4
     fun fun_2() {
@@ -20,10 +20,12 @@ fun fun_1() {
         // 7
         var f = "";
 
-        print d;
-        print e;
-        print f;
+        print d; // Upvalue: 0
+        print e; // 2
+        print f; // 1
     }
+
+    print c;
 }
 
 print fun_1;

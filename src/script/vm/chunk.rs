@@ -13,8 +13,8 @@ pub enum OpCode {
     GetProperty { name_idx:  ConstIndex },
     SetProperty { name_idx:  ConstIndex },
 
-    GetLocal    { index:     StackIndex },
-    SetLocal    { index:     StackIndex },
+    GetLocal    { offset:    StackOffset },
+    SetLocal    { offset:    StackOffset },
 
     GetUpvalue  { index:     UpvalueIndex },
     SetUpvalue  { index:     UpvalueIndex },
@@ -86,8 +86,8 @@ impl Display for OpCode {
             OpCode::SetGlobal   { name_idx }                   => format!("SetGlobal {}",     **name_idx),
             OpCode::GetProperty { name_idx }                   => format!("GetProperty {}",   **name_idx),
             OpCode::SetProperty { name_idx }                   => format!("SetProperty {}",   **name_idx),
-            OpCode::GetLocal    { index }                      => format!("GetLocal {}",      **index   ),
-            OpCode::SetLocal    { index }                      => format!("SetLocal {}",      **index   ),
+            OpCode::GetLocal    { offset }                     => format!("GetLocal {}",      **offset),
+            OpCode::SetLocal    { offset }                     => format!("SetLocal {}",      **offset),
             OpCode::GetUpvalue  { index }                      => format!("GetUpvalue {}",    **index   ),
             OpCode::SetUpvalue  { index }                      => format!("SetUpvalue {}",    **index   ),
             OpCode::PushUpvalue { index }                      => format!("PushUpvalue {}",   **index),
@@ -125,6 +125,9 @@ pub struct ConstIndex   (pub usize);
 
 #[derive_all]
 pub struct StackIndex   (pub usize);
+
+#[derive_all]
+pub struct StackOffset  (pub usize);
 
 #[derive_all]
 pub struct UpvalueIndex (pub usize);
@@ -167,6 +170,20 @@ impl Deref for StackIndex {
 }
 
 impl DerefMut for StackIndex {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Deref for StackOffset {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for StackOffset {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

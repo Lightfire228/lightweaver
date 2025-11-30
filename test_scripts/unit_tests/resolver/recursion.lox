@@ -1,0 +1,23 @@
+// 0: Global stack slot
+
+fun rec(n) {
+    // stack 0: Call
+    // stack 1: n
+
+    //  0
+    if (n <= 1) {
+        //     0
+        return n;
+    }
+
+    // stack 2: a
+    var a = 0;
+
+    //    1
+    print n;
+
+    //     1   _   3
+    return n + rec(n -1);
+}
+
+print rec(2);
