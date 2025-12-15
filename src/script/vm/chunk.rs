@@ -1,8 +1,10 @@
-use std::{fmt::Display, ops::{Deref, DerefMut}};
+use std::{fmt::Display, marker::PhantomData, ops::{Deref, DerefMut}};
 
 use ast_macro::derive_all;
+use gc_arena::Collect;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Collect)]
+#[collect(no_drop)]
 pub enum OpCode {
     GetConstant { index:     ConstIndex },
 
@@ -46,22 +48,24 @@ pub enum OpCode {
     Negate,
     Print,
     Return,
-
 }
 
-#[derive(Debug, Clone)]
-pub struct Chunk {
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct Chunk<'gc> {
     pub name:      String,
     pub code:      Vec<OpCode>,
     pub lines:     Vec<usize>,
+    p: PhantomData<&'gc ()>
 }
 
-impl Chunk {
+impl<'gc> Chunk<'gc> {
     pub fn new(name: String) -> Self {
         Self {
             name,
             code:  vec![],
             lines: vec![],
+            p: PhantomData,
         }
     }
 

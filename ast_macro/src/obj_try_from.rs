@@ -30,10 +30,10 @@ pub fn impl_obj_try_from(ast: &syn::DeriveInput) -> TokenStream {
 
         quote! {
 
-            impl TryFrom<#enum_name> for #member_type {
+            impl<'gc> TryFrom<#enum_name<'gc>> for #member_type {
                 type Error = ();
 
-                fn try_from(value: #enum_name) -> Result<Self, Self::Error> {
+                fn try_from(value: #enum_name<'gc>) -> Result<Self, Self::Error> {
                     match value {
                         #enum_name::#member_name(value) => Ok(value),
                         _                               => Err(()),
@@ -41,18 +41,18 @@ pub fn impl_obj_try_from(ast: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            impl TryFrom<Obj> for #member_type {
+            impl<'gc> TryFrom<Obj<'gc>> for #member_type {
                 type Error = ();
 
-                fn try_from(value: Obj) -> Result<Self, Self::Error> {
+                fn try_from(value: Obj<'gc>) -> Result<Self, Self::Error> {
                     value.type_.try_into()
                 }
             }
 
-            impl<'a> TryFrom<&'a #enum_name> for &'a #member_type {
+            impl<'a, 'gc: 'a> TryFrom<&'a #enum_name<'gc>> for &'a #member_type {
                 type Error = ();
 
-                fn try_from(value: &'a #enum_name) -> Result<Self, Self::Error> {
+                fn try_from(value: &'a #enum_name<'gc>) -> Result<Self, Self::Error> {
                     match value {
                         #enum_name::#member_name(value) => Ok(value),
                         _                               => Err(()),
@@ -60,18 +60,18 @@ pub fn impl_obj_try_from(ast: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            impl<'a> TryFrom<&'a Obj> for &'a #member_type {
+            impl<'a, 'gc: 'a> TryFrom<&'a Obj<'gc>> for &'a #member_type {
                 type Error = ();
 
-                fn try_from(value: &'a Obj) -> Result<Self, Self::Error> {
+                fn try_from(value: &'a Obj<'gc>) -> Result<Self, Self::Error> {
                     (&value.type_).try_into()
                 }
             }
 
-            impl<'a> TryFrom<&'a mut #enum_name> for &'a mut #member_type {
+            impl<'a, 'gc: 'a> TryFrom<&'a mut #enum_name<'gc>> for &'a mut #member_type {
                 type Error = ();
 
-                fn try_from(value: &'a mut #enum_name) -> Result<Self, Self::Error> {
+                fn try_from(value: &'a mut #enum_name<'gc>) -> Result<Self, Self::Error> {
                     match value {
                         #enum_name::#member_name(value) => Ok(value),
                         _                               => Err(()),
@@ -79,15 +79,15 @@ pub fn impl_obj_try_from(ast: &syn::DeriveInput) -> TokenStream {
                 }
             }
 
-            impl<'a> TryFrom<&'a mut Obj> for &'a mut #member_type {
+            impl<'a, 'gc: 'a> TryFrom<&'a mut Obj<'gc>> for &'a mut #member_type {
                 type Error = ();
 
-                fn try_from(value: &'a mut Obj) -> Result<Self, Self::Error> {
+                fn try_from(value: &'a mut Obj<'gc>) -> Result<Self, Self::Error> {
                     (&mut value.type_).try_into()
                 }
             }
 
-            impl From<#member_type> for #enum_name {
+            impl<'gc> From<#member_type> for #enum_name<'gc> {
                 fn from(value: #member_type) -> Self {
                     #enum_name::#member_name(value)
                 }

@@ -1,12 +1,11 @@
-use crate::script::vm::{chunk::{ConstIndex, Offset}, gc::Context, value::Value};
+use crate::script::vm::{chunk::{ConstIndex, Offset}, value::Value};
 
 use super::chunk::{Chunk, OpCode};
 
-pub struct DisassembleData<'a> {
-    pub ctx:       &'a Context,
+pub struct DisassembleData<'gc, 'a> {
     pub lines:     &'a [usize],
-    pub stack:     &'a [Value],
-    pub constants: &'a [Value],
+    pub stack:     &'a [Value<'gc>],
+    pub constants: &'a [Value<'gc>],
 }
 
 impl Chunk {
@@ -91,7 +90,7 @@ fn print_line_info(data: &DisassembleData, offset: usize) {
 
 pub fn print_stack(data: &DisassembleData) {
     for x in data.stack {
-        print!("[ {} ]", x.display(data.ctx))
+        print!("[ {} ]", x.display())
     }
 }
 
@@ -103,7 +102,7 @@ fn simple_instruction(name: &str) {
 }
 
 fn constant_instruction(name: &str, data: &DisassembleData, index: &ConstIndex) {
-    let msg = format!("{:16} {:4} {:30} ", name, **index, &data.constants[**index].display(data.ctx));
+    let msg = format!("{:16} {:4} {:30} ", name, **index, &data.constants[**index].display());
     let msg = right_adjust(&msg);
     print!("{msg}");
 }
@@ -124,7 +123,7 @@ fn jump_instruction(name: &str, ip: usize, offset: &Offset, sign: isize) {
 }
 
 fn closure_instruction(name: &str, data: &DisassembleData, index: &ConstIndex) {
-    let msg = format!("{:16} {:4} {:30}", name, **index, &data.constants[**index].display(data.ctx));
+    let msg = format!("{:16} {:4} {:30}", name, **index, &data.constants[**index].display());
     let msg = right_adjust(&msg);
     print!("{msg}");
 }

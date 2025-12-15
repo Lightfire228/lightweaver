@@ -3,8 +3,9 @@ use std::{collections::HashMap};
 use std::fmt::Write;
 
 use chunk::{Chunk, OpCode};
+use gc_arena::lock::RefLock;
+use gc_arena::{Arena, Collect, Gc, Mutation, Rootable};
 use value::Value;
-use gc::Context;
 
 use crate::script::vm::chunk::{StackOffset, UpvalueIndex};
 use crate::script::vm::debug::DisassembleData;
@@ -14,7 +15,6 @@ use crate::script::vm::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
         },
         debug ::print_stack,
-        gc    ::ObjectId,
         object::{
             ObjFunction,
             ObjType,
@@ -26,7 +26,6 @@ pub mod debug;
 pub mod value;
 pub mod compiler;
 pub mod object;
-pub mod gc;
 
 
 // static DEBUG_TRACE_EXECUTION: bool = true;
@@ -35,27 +34,37 @@ static DEBUG_TRACE_EXECUTION: bool = false;
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
 
-pub fn interpret(ctx: Context, script_func: ObjectId, constants: Vec<Value>) -> RuntimeResult<()> {
+pub fn interpret(root: ArenaRoot) -> RuntimeResult<()> {
 
-    let mut vm  = Vm::new(ctx, script_func, constants);
+    let mut vm  = Vm::new(root);
 
     vm.run()
 }
 
 // TODO: String interning
-pub struct Vm {
-    stack:      Vec<Value>,
-    call_stack: Vec<CallFrame>,
-    constants:  Vec<Value>,
-    upvalues:   Vec<ObjectId>,
-    globals:    HashMap<String, Value>,
-    ctx:        Context,
+pub struct Vm<'gc> {
+    root:       ArenaRoot,
 }
 
-struct CallFrame {
+#[derive(Collect)]
+#[collect(no_drop)]
+pub struct Root<'gc> {
+    pub call_stack: Vec<CallFrame  <'gc>>,
+    pub stack:      Vec<Value      <'gc>>,
+    pub constants:  Vec<Value      <'gc>>,
+    pub upvalues:   Vec<Obj        <'gc>>,
+    pub functions:  Vec<ObjFunction<'gc>>,
+    pub globals:    HashMap<String, Value<'gc>>,
+}
+
+pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
+
+#[derive(Collect)]
+#[collect(no_drop)]
+struct CallFrame<'gc> {
     pub stack_len:    StackIndex,
     pub ip:           BytecodeIndex,
-    pub closure:      ObjectId,
+    pub closure:      Gc<'gc, ObjClosure<'gc>>,
     pub arity:        usize,
 }
 
@@ -82,36 +91,29 @@ enum JumpType {
 }
 
 impl Vm {
-    pub fn new(mut ctx: Context, script_func: ObjectId, constants: Vec<Value>) -> Self {
+    pub fn new(mut root: ArenaRoot) -> Self {
 
-        let closure = ObjClosure::new(script_func, 0, vec![]);
-        let closure = ctx.new_obj(closure.into());
+        root.mutate_root(|ctx, root| {
 
-        let call_frame = CallFrame {
-           stack_len:    StackIndex   (0),
-           ip:           BytecodeIndex(0),
-           closure,
-           arity:        0,
-        };
+            let script_func    = root.functions.first().expect("Function list cannot be empty");
+            let script_closure = ObjClosure::new(Gc::new(ctx, *script_func), 0, vec![]);
 
-        let mut globals = HashMap::new();
-        def_natives(&mut globals, &mut ctx);
+            let call_frame = CallFrame {
+                stack_len:    StackIndex   (0),
+                ip:           BytecodeIndex(0),
+                closure:      Gc::new(ctx, script_closure),
+                arity:        0,
+            };
 
-        let mut stack = Vec::with_capacity(INITIAL_STACK_CAPACITY);
-        stack.push(Value::new_obj(script_func));
+            def_natives(&mut root.globals, ctx);
+
+            let mut stack = Vec::with_capacity(INITIAL_STACK_CAPACITY);
+            stack.push(Value::new_obj(*script_closure.into()));
+        });
+
 
         Self {
-            globals,
-            ctx,
-
-            constants,
-            upvalues: vec![],
-
-            stack,
-
-            call_stack: vec![
-                call_frame
-            ],
+            root,
         }
     }
 
@@ -683,19 +685,21 @@ fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
     Value::new_obj(id)
 }
 
-fn def_natives(globals: &mut HashMap<String, Value>, ctx: &mut Context) {
+fn def_natives(globals: &mut HashMap<String, Value>, ctx: &Mutation) {
 
     let mut make_global = |name: &str, func| {
+
         let obj = ObjNative::new(name.to_owned(), func);
-        let obj = ctx.new_obj(obj.into());
+        let obj = Obj::new(ObjType::NativeFn(obj), 0.into());
+        let obj = Gc::new(ctx, RefLock::new(obj));
 
         globals.insert(name.to_owned(), Value::Obj(obj))
     };
 
-    make_global("clock", clock_native);
+    make_global("clock", Gc::new(ctx, clock_native));
 }
 
-fn clock_native(_: &[Value]) -> Value {
+fn clock_native<'gc>(_: &[Value<'gc>]) -> Value<'gc> {
     let start = SystemTime::now();
 
     let time_since = start.duration_since(UNIX_EPOCH).unwrap();

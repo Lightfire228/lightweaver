@@ -1,7 +1,10 @@
+use gc_arena::Collect;
+
 use crate::script::vm::object::ObjType;
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Collect)]
+#[collect(no_drop)]
 pub struct ObjString {
     pub string: String,
 }
@@ -15,7 +18,7 @@ impl ObjString {
     }
 }
 
-impl From<String> for ObjType {
+impl<'gc> From<String> for ObjType<'gc> {
     fn from(value: String) -> Self {
         ObjType::String(ObjString::new(value))
     }

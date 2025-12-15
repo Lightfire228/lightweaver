@@ -1,6 +1,7 @@
-use ast_macro::{ObjTryFrom};
+use std::cell::{Cell, Ref, RefMut};
 
-use crate::script::vm::gc::{Context, ObjectId};
+use ast_macro::{ObjTryFrom};
+use gc_arena::{Collect, Gc, lock::RefLock};
 
 mod obj_native;
 mod obj_string;
@@ -18,46 +19,56 @@ pub use obj_instance::*;
 pub use obj_closure ::*;
 pub use obj_value   ::*;
 
-#[derive(Debug, Clone)]
-pub struct Obj {
-    pub id:    ObjectId,
-    pub type_: ObjType,
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct Obj<'gc> {
+    pub id:    usize,
+    pub type_: ObjType<'gc>,
 }
 
-#[derive(Debug, Clone, ObjTryFrom)]
-pub enum ObjType {
+pub type ObjPtr   <'gc> = Gc    <'gc, RefLock<Obj<'gc>>>;
+pub type ObjRef   <'gc> = Ref   <'gc, Obj<'gc>>;
+pub type ObjRefMut<'gc> = RefMut<'gc, Obj<'gc>>;
+
+#[derive(Debug, Clone, Collect, ObjTryFrom)]
+#[collect(no_drop)]
+pub enum ObjType<'gc> {
     String  (ObjString),
-    Function(ObjFunction),
-    NativeFn(ObjNative),
+    Function(ObjFunction<'gc>),
+    NativeFn(ObjNative  <'gc>),
     Class   (ObjClass),
-    Instance(ObjInstance),
-    Closure (ObjClosure),
-    Value   (ObjValue),
+    Instance(ObjInstance<'gc>),
+    Closure (ObjClosure <'gc>),
+    Value   (ObjValue   <'gc>),
 }
 
+const ID: Cell<usize> = Cell::new(0);
 
-impl Obj {
-    pub fn new(type_: ObjType, id: ObjectId) -> Obj {
+impl<'gc> Obj<'gc> {
+    pub fn new(type_: ObjType<'gc>) -> Obj<'gc> {
+        let id = ID.get();
+        ID.set(id +1);
+
         Self {
             id,
             type_,
         }
     }
 
-    pub fn as_string(&self, ctx: &Context) -> String {
+    pub fn as_string(&self) -> String {
         match &self.type_ {
             ObjType::String  (str)   => str.string.clone(),
             ObjType::Function(func)  => format!("<fn {}>",        func .name),
             ObjType::NativeFn(func)  => format!("<native fn {}>", func .name),
             ObjType::Class   (class) => format!("<class {}>",     class.name),
-            ObjType::Instance(inst)  => format!("<{} instance>",  inst.as_str(ctx)),
-            ObjType::Closure (func)  => format!("<closure {}>",   func.as_str(ctx)),
-            ObjType::Value   (val)   => format!("{}",             val.value.display(ctx)),
+            ObjType::Instance(inst)  => format!("<{} instance>",  inst.as_str()),
+            ObjType::Closure (func)  => format!("<closure {}>",   func.as_str()),
+            ObjType::Value   (val)   => format!("{}",             val.value.display()),
         }
     }
 }
 
-impl PartialEq for Obj {
+impl<'gc> PartialEq for Obj<'gc> {
     fn eq(&self, other: &Self) -> bool {
         match (&self.type_, &other.type_) {
             (ObjType::String  (a), ObjType::String  (b)) => a.string == b.string,
@@ -67,20 +78,16 @@ impl PartialEq for Obj {
     }
 }
 
-impl Eq for Obj {}
+impl<'gc> Eq for Obj<'gc> {}
 
-impl ObjInstance {
-    fn as_str<'a>(&'a self, ctx: &'a Context) -> &'a str {
-        let class: &ObjClass = ctx.get(self.class).try_into().unwrap();
-
-        &class.name
+impl<'gc> ObjInstance<'gc> {
+    fn as_str<'a>(&'a self) -> &'a str {
+        &self.class.name
     }
 }
 
-impl ObjClosure {
-    fn as_str<'a>(&'a self, ctx: &'a Context) -> &'a str {
-        let func: &ObjFunction = ctx.get(self.function).try_into().unwrap();
-
-        &func.name
+impl<'gc> ObjClosure<'gc> {
+    fn as_str<'a>(&'a self) -> &'a str {
+        &self.function.name
     }
 }

@@ -1,15 +1,16 @@
 
 use std::usize;
 
-use crate::script::{ast::*, vm::{chunk::{OpCode, StackIndex, StackOffset, UpvalueIndex}, gc::Context}};
+use crate::script::{ast::*, vm::chunk::{OpCode, StackIndex, StackOffset, UpvalueIndex}};
 
 
 type Op = OpCode;
 
 // type Func = (FuncType, ObjectId);
 
-pub fn resolve(ast: &mut Ast, ctx: &mut Context) {
-    let mut resolver = Resolver::new(ctx);
+pub fn resolve(ast: &mut Ast) {
+
+    let mut resolver = Resolver::new();
 
     for stmt in ast.stmts.iter_mut() {
         resolver.resolve_stmt(stmt);
@@ -17,9 +18,7 @@ pub fn resolve(ast: &mut Ast, ctx: &mut Context) {
 }
 
 
-
 struct Resolver<'a> {
-    ctx:            &'a mut Context,
     scopes:         Vec<Scope<'a>>,
     funcs:          Vec<Func>,
     temporaries:    usize,
@@ -57,9 +56,8 @@ struct Func {
 
 impl<'a> Resolver<'a> {
 
-    fn new(ctx: &'a mut Context) -> Self {
+    fn new() -> Self {
         Self {
-            ctx,
             scopes:      vec![],
             funcs:       vec![],
             temporaries: 0,
@@ -406,9 +404,8 @@ mod tests {
     #[test]
     fn test_1() {
         let mut ast = get_ast("test_1.lox");
-        let mut ctx = Context::new();
 
-        resolve(&mut ast, &mut ctx);
+        resolve(&mut ast);
 
         let var_decl_a:        &VarStmt      = get!(&ast       .stmts[0]);
         let var_decl_b:        &VarStmt      = get!(&ast       .stmts[1]);
@@ -459,9 +456,8 @@ mod tests {
     fn test_2() {
 
         let mut ast = get_ast("test_2.lox");
-        let mut ctx = Context::new();
 
-        resolve(&mut ast, &mut ctx);
+        resolve(&mut ast);
 
         let fn_decl_outer:      &FunctionStmt = get!(&ast           .stmts[0]);
         let var_decl_mid:       &VarStmt      = get!(&ast           .stmts[1]);
@@ -509,9 +505,8 @@ mod tests {
     fn test_recursion() {
 
         let mut ast = get_ast("recursion.lox");
-        let mut ctx = Context::new();
 
-        resolve(&mut ast, &mut ctx);
+        resolve(&mut ast);
 
         let rec_decl:    &FunctionStmt   = get!(& ast        .stmts [0]);
 
@@ -552,9 +547,8 @@ mod tests {
     fn test_recursive_fib() {
 
         let mut ast = get_ast("recursive_fib.lox");
-        let mut ctx = Context::new();
 
-        resolve(&mut ast, &mut ctx);
+        resolve(&mut ast);
 
         let fib_decl:    &FunctionStmt   = get!(& ast        .stmts [0]);
 
@@ -581,9 +575,8 @@ mod tests {
     fn test_upvalue_in_func_args() {
 
         let mut ast = get_ast("upvalue_in_func_args.lox");
-        let mut ctx = Context::new();
 
-        resolve(&mut ast, &mut ctx);
+        resolve(&mut ast);
 
         let decl_fn_1:   &FunctionStmt   = get!(& ast        .stmts [0]);
         let decl_a:      &FunctionParam  = get!(& decl_fn_1  .params[0]);

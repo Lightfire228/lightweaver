@@ -1,17 +1,20 @@
-use crate::script::vm::{gc::ObjectId, value::Value};
+use gc_arena::{Collect, Gc};
+
+use crate::script::vm::{object::ObjFunction, value::Value};
 
 
-#[derive(Debug, Clone)]
-pub struct ObjClosure {
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct ObjClosure<'gc> {
     pub arity:       usize,
-    pub function:    ObjectId,
-    pub closed_vals: Vec<Value>,
+    pub function:    Gc<'gc, ObjFunction<'gc>>,
+    pub closed_vals: Vec<Value<'gc>>,
 }
 
 
 
-impl ObjClosure {
-    pub fn new(function: ObjectId, arity: usize, closed_vals: Vec<Value>) -> Self {
+impl<'gc> ObjClosure<'gc> {
+    pub fn new(function: Gc<'gc, ObjFunction<'gc>>, arity: usize, closed_vals: Vec<Value<'gc>>) -> Self {
         Self {
             arity,
             function,

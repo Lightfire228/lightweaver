@@ -25,7 +25,8 @@ pub fn derive_all(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let input: TokenStream2 = input.into();
 
     quote! {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Collect)]
+        #[collect(no_drop)]
         #input
     }.into()
 }

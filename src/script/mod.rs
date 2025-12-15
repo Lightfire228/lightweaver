@@ -1,6 +1,7 @@
-use std::{fs, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
 use ast::{Ast, AstNode, DisplayArgs, WalkArgs};
+use gc_arena::{Arena, Collect, Gc, Rootable};
 use parser::{parse_ast, ParseErrorType};
 use scanner::{scan_tokens, ScannerErrorType};
 
@@ -16,7 +17,15 @@ mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
-use crate::script::{parser::AssignmentTarget, resolver::resolve, vm::{compiler::CompilerOut, debug::DisassembleData, gc::Context, object::ObjFunction}};
+use crate::script::{
+    parser::AssignmentTarget,
+    resolver::resolve,
+    vm::{
+        ArenaRoot,
+        Root,
+        debug::DisassembleData,
+    }
+};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
@@ -36,22 +45,32 @@ pub fn run_file(path: &Path) -> &str {
 
     match (|| {
 
-        let mut ctx = Context::new();
-
         let source  = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
 
         let tokens  = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
 
         let mut ast = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
-        resolve(&mut ast, &mut ctx);
+        resolve(&mut ast);
         display_ast(&ast);
 
+        let mut root = ArenaRoot::new(|_| {
+            Root {
+                call_stack: vec![],
+                stack:      vec![],
+                constants:  vec![],
+                upvalues:   vec![],
+                functions:  vec![],
+                globals:    HashMap::new(),
+            }
+        });
 
-        let out = compile(ast, &mut ctx).unwrap();
-        dbg_funcs(&out, &ctx);
+        root.mutate_root(|_, root| {
+            compile(ast, root).unwrap();
+            dbg_funcs(root);
+        });
 
-        let func = out.function_ids.first().expect("Function stack cannot be empty");
-        vm::interpret(ctx, *func, out.constants).map_err(|err| Re::RuntimeError(err))?;
+
+        vm::interpret(root).map_err(|err| Re::RuntimeError(err))?;
 
         Ok("test")
     })() {
@@ -61,17 +80,13 @@ pub fn run_file(path: &Path) -> &str {
     }
 }
 
-fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
-    for f_id in &out.function_ids {
-        let obj = ctx.get(*f_id);
+fn dbg_funcs(ctx: &Root) {
 
-        let func: &ObjFunction = obj.try_into().unwrap();
-
+    for func in &ctx.functions {
         func.chunk.disassemble(&DisassembleData {
-            ctx:       &ctx,
             lines:     &func.chunk.lines,
             stack:     &[],
-            constants: &out.constants,
+            constants: &ctx.constants,
         });
     }
 }

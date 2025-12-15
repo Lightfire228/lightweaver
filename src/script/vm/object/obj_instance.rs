@@ -1,28 +1,31 @@
 use std::collections::HashMap;
 
-use crate::script::vm::{gc::ObjectId, object::{Obj, ObjType}, value::Value};
+use gc_arena::{Collect, Gc, Mutation};
 
-pub type Fields = HashMap<String, Value>;
+use crate::script::vm::{object::{Obj, ObjClass, ObjType}, value::Value};
 
-#[derive(Debug, Clone)]
-pub struct ObjInstance {
-    pub class:  ObjectId,
-    pub fields: Fields,
+pub type Fields<'gc> = HashMap<String, Value<'gc>>;
+
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub struct ObjInstance<'gc> {
+    pub class:  Gc<'gc, ObjClass>,
+    pub fields: Gc<'gc, Fields<'gc>>,
 }
 
-impl ObjInstance {
-    pub fn new(class: ObjectId) -> Self {
+impl<'gc> ObjInstance<'gc> {
+    pub fn new(class: Gc<'gc, ObjClass>, ctx: &Mutation<'gc>) -> Self {
         Self {
             class,
-            fields: HashMap::new(),
+            fields: Gc::new(ctx, HashMap::new()),
         }
     }
 }
 
 
-impl Obj {
-    pub fn to_instance(&self) -> Option<&'_ ObjInstance> {
-        type T = ObjType;
+impl<'gc> Obj<'gc> {
+    pub fn to_instance(&self) -> Option<&'gc ObjInstance> {
+        type T<'a> = ObjType<'a>;
 
         match &self.type_ {
             T::Instance(inst) => Some(inst),
@@ -30,8 +33,8 @@ impl Obj {
         }
     }
 
-    pub fn to_instance_mut(&mut self) -> Option<&'_ mut ObjInstance> {
-        type T = ObjType;
+    pub fn to_instance_mut(&mut self) -> Option<&'gc mut ObjInstance> {
+        type T<'a> = ObjType<'a>;
 
         match &mut self.type_ {
             T::Instance(inst) => Some(inst),

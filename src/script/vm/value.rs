@@ -1,21 +1,37 @@
-use crate::script::vm::gc::{Context, ObjectId};
+use std::{cell::{Ref, RefMut}, ops::DerefMut};
+
+use gc_arena::{Collect, Gc, Mutation, lock::RefLock};
+
+use crate::script::vm::{object::{ObjPtr, ObjRef, ObjRefMut}};
 
 use super::object::{Obj, ObjType};
 
 
-#[derive(Debug, Clone, Copy)]
-pub enum Value {
+#[derive(Debug, Clone, Copy, Collect)]
+#[collect(no_drop)]
+pub enum Value<'gc> {
     Number(f64),
     Bool  (bool),
-    Obj   (ObjectId),
-    Closed(ObjectId),
+    Obj   (ValueObj<'gc>),
+    Closed(ObjPtr<'gc>),
     Nil,
 }
 
-impl Value {
+#[derive(Debug, Clone, Copy, Collect)]
+#[collect(no_drop)]
+pub enum ValueObj<'gc> {
+    Obj   (Gc<'gc, Obj<'gc>>),
+    ObjMut(Gc<'gc, RefLock<Obj<'gc>>>),
+}
 
-    pub fn new_obj(obj_id: ObjectId) -> Self {
-        Value::Obj(obj_id)
+impl<'gc> Value<'gc> {
+
+    pub fn new_obj(obj: Gc<'gc, Obj<'gc>>) -> Self {
+        Value::Obj(ValueObj::Obj(obj))
+    }
+
+    pub fn new_obj_mut(obj: Gc<'gc, RefLock<Obj<'gc>>>) -> Self {
+        Value::Obj(ValueObj::ObjMut(obj))
     }
 
     pub fn as_number(&self) -> Option<f64> {
@@ -33,49 +49,46 @@ impl Value {
         }
     }
 
-    pub fn as_obj<'a>(&'a self, ctx: &'a Context) -> Option<&'a Obj> {
+    pub fn as_obj<'a>(&'a self) -> Option<ObjRef<'gc>> {
+
 
         match self {
-            Value::Obj(o) => {
-                Some(ctx.get(*o))
-            },
-            _             => None,
+            Value::Obj(o)    => Some(o.borrow()),
+            Value::Closed(o) => Some(o.borrow()),
+            _                => None,
         }
     }
 
-    pub fn as_obj_mut<'a>(&'a mut self, ctx: &'a mut Context) -> Option<&'a mut Obj> {
+    pub fn as_obj_mut<'a>(&'a mut self, ctx: &Mutation<'gc>) -> Option<ObjRefMut<'gc>> {
 
         match self {
-            Value::Obj(o) => {
-                Some(ctx.get_mut(*o))
-            },
-            _             => None,
+            Value::Obj(o)    => Some(o.borrow_mut(ctx)),
+            Value::Closed(o) => Some(o.borrow_mut(ctx)),
+            _                => None,
         }
     }
 
-    pub fn to_str<'a, 'b: 'a>(&'a self, ctx: &'b Context) -> Option<&'b str> {
+    pub fn to_str<'a, 'b>(&'a self) -> Option<&'a str> {
 
-        match self {
-            Value::Obj(obj_id) => Some({
+        todo!();
+        // match self {
+        //     Value::Obj(obj) => Some({
 
-                let obj = ctx.get(*obj_id);
-
-                match &obj.type_ {
-                    ObjType::String  (obj)   => &obj.string,
-                    _                        => None?
-                }
-            }),
-            _ => None,
-        }
+        //         match &obj.type_ {
+        //             ObjType::String  (s)   =>  s.string.as_str(),
+        //             _                        => None?
+        //         }
+        //     }),
+        //     _ => None,
+        // }
     }
 
-    pub fn is_lw_string(&self, ctx: &Context) -> bool {
+    pub fn is_lw_string(&self) -> bool {
 
         match self {
-            Value::Obj(obj_id) => {
-                let obj = ctx.get(*obj_id);
+            Value::Obj(obj) => {
 
-                match obj.type_ {
+                match obj.borrow().type_ {
                     ObjType::String(_) => true,
                     _                  => false,
                 }
@@ -85,10 +98,10 @@ impl Value {
 
     }
 
-    pub fn display(&self, ctx: &Context) -> String {
+    pub fn display(&self) -> String {
         match self {
-            Value::Obj   (x) => ctx.get(*x).as_string(ctx),
-            Value::Closed(x) => ctx.get(*x).as_string(ctx),
+            Value::Obj   (x) => x.borrow().as_string(),
+            Value::Closed(x) => x.borrow().as_string(),
             Value::Number(x) => x.to_string(),
             Value::Bool  (x) => x.to_string(),
             Value::Nil       => "nil".to_owned(),
@@ -107,7 +120,7 @@ impl Value {
 }
 
 
-impl PartialEq for Value {
+impl<'gc> PartialEq for Value<'gc> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,

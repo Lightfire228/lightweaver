@@ -7,3 +7,4 @@ edition = "2021"
 png = "0.17.16"
 
 ast_macro = { path = "./ast_macro" }
+gc-arena = "0.5.3"

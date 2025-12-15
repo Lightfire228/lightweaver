@@ -1,13 +1,13 @@
 
 use std::usize;
 
+use gc_arena::{Gc, Mutation};
+
 use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        chunk::*,
-        gc::{Context, ObjectId},
-        object::ObjFunction
+        Root, chunk::*, object::{Obj, ObjFunction}
     }
 };
 
@@ -17,11 +17,11 @@ type Op = OpCode;
 
 // type Func = (FuncType, ObjectId);
 
-pub fn compile(ast: Ast, ctx: &mut Context) ->
-    CompilerResult<CompilerOut>
+pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) ->
+    CompilerResult<()>
 {
 
-    let mut compiler = Compiler::new(ctx);
+    let mut compiler = Compiler::new(root, ctx);
 
     for stmt in ast.stmts {
         compiler.compile_stmt(stmt)?;
@@ -29,31 +29,28 @@ pub fn compile(ast: Ast, ctx: &mut Context) ->
 
     compiler.write_op(Op::Return);
 
-    Ok(CompilerOut {
-        function_ids: compiler.all_functions,
-        constants:    compiler.constants,
-    })
+    Ok(())
 
 }
 
 
 
-struct Compiler<'a> {
+struct Compiler<'gc> {
+    root:           &'gc mut Root<'gc>,
+    ctx:            &'gc Mutation<'gc>,
     line:           usize,
     scope_depth:    usize,
-    function_stack: Vec<Func>,
-    all_functions:  Vec<ObjectId>,
+    function_stack: Vec<Func<'gc>>,
+    all_functions:  Vec<Gc<'gc, ObjFunction<'gc>>>,
 
-    upvalues:       Vec<Vec<ObjectId>>,
+    upvalues:       Vec<Vec<Obj<'gc>>>,
 
-    constants:      Vec<Value>,
-
-    ctx:            &'a mut Context
+    constants:      Vec<Value<'gc>>,
 }
 
-pub struct CompilerOut {
-    pub function_ids: Vec<ObjectId>,
-    pub constants:    Vec<Value>,
+pub struct CompilerOut<'gc> {
+    pub functions: Vec<ObjFunction<'gc>>,
+    pub constants: Vec<Value<'gc>>,
 }
 
 #[derive(Debug)]
@@ -79,10 +76,10 @@ enum FuncType {
     Script,
 }
 
-struct Func {
+struct Func<'gc> {
     pub type_:    FuncType,
     pub upvalues: Vec<Upvalue>,
-    pub func_obj: ObjectId,
+    pub func_obj: Gc::<'gc, ObjFunction<'gc>>,
 }
 
 
@@ -101,8 +98,8 @@ enum JumpType {
     Always,
 }
 
-impl Func {
-    pub fn new(type_: FuncType, func_obj: ObjectId) -> Self {
+impl<'gc> Func<'gc> {
+    pub fn new(type_: FuncType, func_obj: Gc<'gc, ObjFunction<'gc>>) -> Self {
         Self {
             type_,
             func_obj,
@@ -111,26 +108,24 @@ impl Func {
     }
 }
 
-impl<'a> Compiler<'a> {
+impl<'gc> Compiler<'gc> {
 
-    fn new(ctx: &'a mut Context) -> Self {
+    fn new(root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
         let name = "script";
 
-        let func    = ObjFunction::new(name.to_owned(), 0);
-        let id      = ctx.new_obj(func.into());
-
-        let func = Func::new(FuncType::Script, id);
+        let func = ObjFunction::new(name.to_owned(), 0, ctx);
 
         Self {
+            root,
+            ctx,
+
             line:           0,
             scope_depth:    0,
-            function_stack: vec![func],
-            all_functions:  vec![id],
+            function_stack: vec![Func::new(FuncType::Script, func)],
+            all_functions:  vec![func],
 
             constants:      vec![],
             upvalues:       vec![vec![]],
-
-            ctx,
         }
     }
 
@@ -208,14 +203,13 @@ impl<'a> Compiler<'a> {
         stmt:      FunctionStmt,
         func_type: FuncType,
     )
-        -> CompilerResult<ObjectId>
+        -> CompilerResult<&ObjFunction>
     {
-        let obj    = ObjFunction::new(stmt.name.lexeme, stmt.params.len());
-        let obj_id = self.ctx.new_obj(obj.into());
+        let obj  = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), self.ctx);
+        let func = Func::new(func_type, obj);
 
-        let func = Func::new(func_type, obj_id);
         self.function_stack.push(func);
-        self.all_functions .push(obj_id);
+        self.all_functions .push(obj);
 
         self.begin_scope();
 
@@ -237,7 +231,8 @@ impl<'a> Compiler<'a> {
         let func = self.pop_func();
         self.end_scope(0);           // return is responsible for popping func locals off the stack
 
-        self.emit_constant(Value::Obj(func.func_obj));
+
+        self.emit_constant(Value::Obj(obj));
 
         Ok(obj_id)
 
@@ -361,7 +356,7 @@ impl<'a> Compiler<'a> {
                 self.emit_constant(value);
             },
             LiteralType::String => {
-                let obj   = self.ctx.add_string(&value.lexeme);
+                let obj   = self.root.add_string(&value.lexeme);
                 let value = Value::new_obj(obj);
 
                 self.emit_constant(value);
@@ -545,7 +540,7 @@ impl<'a> Compiler<'a> {
 
 
     fn make_identifier_constant(&mut self, name: Token) -> ConstIndex {
-        let val = str_to_val(name.lexeme, self.ctx);
+        let val = str_to_val(name.lexeme, self.root);
 
         let index = self.add_constant(val);
 
@@ -572,7 +567,7 @@ impl<'a> Compiler<'a> {
     fn current_chunk(&self) -> &Chunk {
         let func_id = self.current_func().func_obj;
 
-        let func = self.ctx.get(func_id);
+        let func = self.root.get(func_id);
 
         let func: &ObjFunction = func.try_into().unwrap();
 
@@ -582,7 +577,7 @@ impl<'a> Compiler<'a> {
     fn current_chunk_mut(&mut self) -> &mut Chunk {
         let func_id = self.current_func().func_obj;
 
-        let func = self.ctx.get_mut(func_id);
+        let func = self.root.get_mut(func_id);
 
         let func: &mut ObjFunction = func.try_into().unwrap();
 
@@ -632,7 +627,6 @@ impl<'a> Compiler<'a> {
             self.write_pop();
         }
     }
-
 }
 
 

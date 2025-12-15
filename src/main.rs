@@ -119,3 +119,8 @@ fn lox() {
     let path = Path::new("./test_scripts/test.lox");
     script::run_file(path);
 }
+
+
+fn generativity() {
+
+}
