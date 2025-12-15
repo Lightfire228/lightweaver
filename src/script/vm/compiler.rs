@@ -7,13 +7,13 @@ use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        Root, chunk::*, object::{Obj, ObjFunction}
+        Root, chunk::*, object::{Obj, ObjFunction, ObjNative, ObjString, ObjType}, value::ValueObj
     }
 };
 
 use super::{chunk::{Chunk, OpCode}, value::Value};
 
-type Op = OpCode;
+type Op<'gc> = OpCode<'gc>;
 
 // type Func = (FuncType, ObjectId);
 
@@ -41,16 +41,10 @@ struct Compiler<'gc> {
     line:           usize,
     scope_depth:    usize,
     function_stack: Vec<Func<'gc>>,
-    all_functions:  Vec<Gc<'gc, ObjFunction<'gc>>>,
 
     upvalues:       Vec<Vec<Obj<'gc>>>,
 
     constants:      Vec<Value<'gc>>,
-}
-
-pub struct CompilerOut<'gc> {
-    pub functions: Vec<ObjFunction<'gc>>,
-    pub constants: Vec<Value<'gc>>,
 }
 
 #[derive(Debug)]
@@ -79,7 +73,8 @@ enum FuncType {
 struct Func<'gc> {
     pub type_:    FuncType,
     pub upvalues: Vec<Upvalue>,
-    pub func_obj: Gc::<'gc, ObjFunction<'gc>>,
+    pub chunk:    Chunk<'gc>,
+    pub func_obj: ObjFunction<'gc>,
 }
 
 
@@ -99,11 +94,12 @@ enum JumpType {
 }
 
 impl<'gc> Func<'gc> {
-    pub fn new(type_: FuncType, func_obj: Gc<'gc, ObjFunction<'gc>>) -> Self {
+    pub fn new(type_: FuncType, func_obj: ObjFunction<'gc>) -> Self {
         Self {
             type_,
             func_obj,
-            upvalues: Vec::new(),
+            chunk:    Chunk::new(),
+            upvalues: Vec  ::new(),
         }
     }
 }
@@ -111,9 +107,13 @@ impl<'gc> Func<'gc> {
 impl<'gc> Compiler<'gc> {
 
     fn new(root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
-        let name = "script";
 
-        let func = ObjFunction::new(name.to_owned(), 0, ctx);
+        let chunk = Chunk::new();
+        let func  = new_func("script".to_owned(), 0, chunk);
+
+        let ObjType::Function(func) = func.type_ else {
+            unreachable!();
+        };
 
         Self {
             root,
@@ -122,7 +122,6 @@ impl<'gc> Compiler<'gc> {
             line:           0,
             scope_depth:    0,
             function_stack: vec![Func::new(FuncType::Script, func)],
-            all_functions:  vec![func],
 
             constants:      vec![],
             upvalues:       vec![vec![]],
@@ -186,10 +185,11 @@ impl<'gc> Compiler<'gc> {
 
         let global_idx = self.declare_variable(&func.name);
 
-        let func_id    = self.make_function(func, FuncType::Function)?;
-        let func_idx   = self.add_constant(Value::Obj(func_id));
+        let obj = self.make_function(func, FuncType::Function)?;
 
-        self.write_op(Op::Closure { func_idx });
+
+
+        self.write_op(Op::Closure { func: obj });
 
         if let Some(name_idx) = global_idx {
             self.define_global(name_idx);
@@ -203,13 +203,13 @@ impl<'gc> Compiler<'gc> {
         stmt:      FunctionStmt,
         func_type: FuncType,
     )
-        -> CompilerResult<&ObjFunction>
+        -> CompilerResult<Gc<'gc, ObjFunction<'gc>>>
     {
-        let obj  = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), self.ctx);
-        let func = Func::new(func_type, obj);
+
+        let func = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), Chunk::new());
+        let func = Func::new(func_type, func);
 
         self.function_stack.push(func);
-        self.all_functions .push(obj);
 
         self.begin_scope();
 
@@ -231,10 +231,12 @@ impl<'gc> Compiler<'gc> {
         let func = self.pop_func();
         self.end_scope(0);           // return is responsible for popping func locals off the stack
 
+        let (mut func, chunk) = (func.func_obj, func.chunk);
 
-        self.emit_constant(Value::Obj(obj));
+        func.chunk = chunk;
+        let func = Gc::new(self.ctx, func);
 
-        Ok(obj_id)
+        Ok(func)
 
     }
 
@@ -356,9 +358,7 @@ impl<'gc> Compiler<'gc> {
                 self.emit_constant(value);
             },
             LiteralType::String => {
-                let obj   = self.root.add_string(&value.lexeme);
-                let value = Value::new_obj(obj);
-
+                let value = self.new_str_val(value.lexeme.to_owned());
                 self.emit_constant(value);
             },
             LiteralType::True   => { self.write_op(Op::True);  },
@@ -492,7 +492,7 @@ impl<'gc> Compiler<'gc> {
 
     // Variables
 
-    fn emit_constant(&mut self, value: Value) -> BytecodeIndex {
+    fn emit_constant(&mut self, value: Value<'gc>) -> BytecodeIndex {
         let index = self.add_constant(value);
 
         self.write_op(Op::GetConstant { index, } )
@@ -540,8 +540,7 @@ impl<'gc> Compiler<'gc> {
 
 
     fn make_identifier_constant(&mut self, name: Token) -> ConstIndex {
-        let val = str_to_val(name.lexeme, self.root);
-
+        let val   = self.new_str_val(name.lexeme);
         let index = self.add_constant(val);
 
         index
@@ -556,39 +555,29 @@ impl<'gc> Compiler<'gc> {
 
     // utils
 
-    pub fn add_constant(&mut self, value: Value) -> ConstIndex {
+    pub fn add_constant(&mut self, value: Value<'gc>) -> ConstIndex {
         let index = self.constants.len();
 
-        self.constants.push(value);
+        self.root.constants.push(value);
 
         ConstIndex(index)
     }
 
-    fn current_chunk(&self) -> &Chunk {
-        let func_id = self.current_func().func_obj;
+    fn current_chunk(&self) -> &Chunk<'gc> {
+        &self.current_func().chunk
 
-        let func = self.root.get(func_id);
-
-        let func: &ObjFunction = func.try_into().unwrap();
-
-        &func.chunk
     }
 
-    fn current_chunk_mut(&mut self) -> &mut Chunk {
-        let func_id = self.current_func().func_obj;
+    fn current_chunk_mut(&mut self) -> &mut Chunk<'gc> {
+        &mut self.current_func_mut().chunk
 
-        let func = self.root.get_mut(func_id);
-
-        let func: &mut ObjFunction = func.try_into().unwrap();
-
-        &mut func.chunk
     }
 
-    fn current_func(&self) -> &Func {
+    fn current_func(&self) -> &Func<'gc> {
         self.function_stack.last().expect("Function stack must not be empty")
     }
 
-    fn current_func_mut(&mut self) -> &mut Func {
+    fn current_func_mut(&mut self) -> &mut Func<'gc> {
         self.function_stack.last_mut().expect("Function stack must not be empty")
     }
 
@@ -596,15 +585,15 @@ impl<'gc> Compiler<'gc> {
         BytecodeIndex(self.current_chunk().code.len())
     }
 
-    fn pop_func(&mut self) -> Func {
+    fn pop_func(&mut self) -> Func<'gc> {
         self.function_stack.pop().expect("Function stack must not be empty")
     }
 
-    fn write_op(&mut self, op: OpCode) -> BytecodeIndex {
+    fn write_op(&mut self, op: OpCode<'gc>) -> BytecodeIndex {
         let line = self.line;
         self.current_chunk_mut().write_op(op, line)
     }
-    fn write_ops(&mut self, op1: OpCode, op2: OpCode) -> BytecodeIndex {
+    fn write_ops(&mut self, op1: OpCode<'gc>, op2: OpCode<'gc>) -> BytecodeIndex {
         let line = self.line;
         let chunk = self.current_chunk_mut();
         chunk.write_op(op1, line);
@@ -627,6 +616,19 @@ impl<'gc> Compiler<'gc> {
             self.write_pop();
         }
     }
+
+    // TODO: string interning
+    fn new_str_obj(&mut self, s: String) -> Gc<'gc, Obj<'gc>> {
+        let obj   = ObjString::new(s);
+        let obj   = Obj::new(obj.into());
+        Gc::new(self.ctx, obj)
+    }
+
+    // TODO: string interning
+    fn new_str_val(&mut self, s: String) -> Value<'gc> {
+        let obj = self.new_str_obj(s);
+        Value::Obj(ValueObj::Obj(obj))
+    }
 }
 
 
@@ -634,8 +636,8 @@ fn to_number(lexeme: &str) -> f64 {
     lexeme.parse().expect("Unable lexeme to convert to f64")
 }
 
-fn str_to_val(string: String, ctx: &mut Context) -> Value {
-    let obj = ctx.add_string(&string);
+fn new_func<'gc>(name: String, arity: usize, chunk: Chunk<'gc>) -> Obj<'gc> {
+    let func = ObjFunction::new(name.to_owned(), arity, chunk);
 
-    Value::Obj(obj)
+    Obj::new(func.into())
 }

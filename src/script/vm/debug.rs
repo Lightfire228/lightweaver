@@ -1,16 +1,17 @@
-use crate::script::vm::{chunk::{ConstIndex, Offset}, value::Value};
+use crate::script::vm::{chunk::{ConstIndex, Offset}, object::ObjFunction, value::Value};
 
 use super::chunk::{Chunk, OpCode};
 
 pub struct DisassembleData<'gc, 'a> {
+    pub name:      &'a str,
     pub lines:     &'a [usize],
     pub stack:     &'a [Value<'gc>],
     pub constants: &'a [Value<'gc>],
 }
 
-impl Chunk {
+impl<'gc> Chunk<'gc> {
     pub fn disassemble(&self, data: &DisassembleData) {
-        println!("== {} ==", &self.name);
+        println!("== {} ==", data.name);
 
         println!("addr line instruction");
 
@@ -24,13 +25,13 @@ impl Chunk {
 }
 
 
-impl OpCode {
+impl<'gc> OpCode<'gc> {
     pub fn disassemble(&self, data: &DisassembleData, ip: usize) {
         print!("{:04} ", ip);
 
         print_line_info(data, ip);
 
-        type O = OpCode;
+        type O<'gc> = OpCode<'gc>;
         match &self {
             O::GetConstant  { index }     => constant_instruction("OP_CONSTANT",      data, index),
 
@@ -55,7 +56,7 @@ impl OpCode {
 
             O::Call         { arg_count } => byte_instruction    ("OP_CALL",          *arg_count),
             O::Class        { name_idx }  => constant_instruction("OP_CLASS",         data, name_idx),
-            O::Closure      { func_idx }  => closure_instruction ("OP_CLOSURE",       data, func_idx),
+            O::Closure      { func }      => closure_instruction ("OP_CLOSURE",       func),
 
             O::Nil                        => simple_instruction  ("OP_NIL"),
             O::True                       => simple_instruction  ("OP_TRUE"),
@@ -122,8 +123,8 @@ fn jump_instruction(name: &str, ip: usize, offset: &Offset, sign: isize) {
     print!("{msg}");
 }
 
-fn closure_instruction(name: &str, data: &DisassembleData, index: &ConstIndex) {
-    let msg = format!("{:16} {:4} {:30}", name, **index, &data.constants[**index].display());
+fn closure_instruction<'gc>(name: &str, func: &ObjFunction<'gc>) {
+    let msg = format!("{:16} {:4} {:30}", name, "_", func.name);
     let msg = right_adjust(&msg);
     print!("{msg}");
 }

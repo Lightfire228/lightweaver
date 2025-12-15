@@ -1,11 +1,13 @@
 use std::{fmt::Display, marker::PhantomData, ops::{Deref, DerefMut}};
 
 use ast_macro::derive_all;
-use gc_arena::Collect;
+use gc_arena::{Collect, Gc};
+
+use crate::script::vm::object::{Obj, ObjFunction};
 
 #[derive(Debug, Clone, PartialEq, Eq, Collect)]
 #[collect(no_drop)]
-pub enum OpCode {
+pub enum OpCode<'gc> {
     GetConstant { index:     ConstIndex },
 
     DefGlobal   { name_idx:  ConstIndex },
@@ -30,7 +32,7 @@ pub enum OpCode {
 
     Call        { arg_count: usize },
     Class       { name_idx:  ConstIndex },
-    Closure     { func_idx:  ConstIndex },
+    Closure     { func:      Gc<'gc, ObjFunction<'gc>> },
 
 
     Nil,
@@ -53,23 +55,19 @@ pub enum OpCode {
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
 pub struct Chunk<'gc> {
-    pub name:      String,
-    pub code:      Vec<OpCode>,
+    pub code:      Vec<OpCode<'gc>>,
     pub lines:     Vec<usize>,
-    p: PhantomData<&'gc ()>
 }
 
 impl<'gc> Chunk<'gc> {
-    pub fn new(name: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            name,
             code:  vec![],
             lines: vec![],
-            p: PhantomData,
         }
     }
 
-    pub fn write_op(&mut self, op: OpCode, line: usize) -> BytecodeIndex {
+    pub fn write_op(&mut self, op: OpCode<'gc>, line: usize) -> BytecodeIndex {
         let index = self.code.len();
 
         self.code .push(op);
@@ -80,7 +78,7 @@ impl<'gc> Chunk<'gc> {
 
 }
 
-impl Display for OpCode {
+impl<'gc> Display for OpCode<'gc> {
 
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
@@ -101,7 +99,7 @@ impl Display for OpCode {
             OpCode::Loop        { offset }                     => format!("Loop {}",          **offset  ),
             OpCode::Call        { arg_count }                  => format!("Call (args: {})",  arg_count ),
             OpCode::Class       { name_idx }                   => format!("Class {}",         **name_idx),
-            OpCode::Closure     { func_idx }                   => format!("Closure {}",       **func_idx),
+            OpCode::Closure     { func }                       => format!("Closure {}",       func.name),
             OpCode::Nil                                        => format!("Nil"),
             OpCode::True                                       => format!("True"),
             OpCode::False                                      => format!("False"),

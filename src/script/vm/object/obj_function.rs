@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use gc_arena::{Arena, Collect, Gc, Mutation, Rootable};
+use gc_arena::{Arena, Collect, Gc, Mutation, Rootable, lock::RefLock};
 
 use crate::script::vm::{chunk::Chunk};
 
@@ -9,24 +9,24 @@ use crate::script::vm::{chunk::Chunk};
 #[collect(no_drop)]
 pub struct ObjFunction<'gc> {
     pub arity: usize,
-    pub chunk: Gc<'gc, Chunk<'gc>>,
+    pub chunk: Chunk<'gc>,
     pub name:  String,
 }
 
 
 
 impl<'gc> ObjFunction<'gc> {
-    pub fn new(name: String, arity: usize, ctx: &'gc Mutation<'gc>) -> Gc<'gc, Self> {
+    pub fn new(name: String, arity: usize, chunk: Chunk<'gc>) -> Self {
 
-        let chunk = Gc::new(ctx, Chunk::new(name.clone()));
-
-        Gc::new(ctx, Self {
+        Self {
             arity,
             chunk,
             name:  name,
-        })
+        }
     }
 }
+
+
 
 impl<'gc> Eq for ObjFunction<'gc> {}
 
