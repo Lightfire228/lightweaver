@@ -7,7 +7,7 @@ use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        Root, chunk::*, object::{Obj, ObjFunction, ObjNative, ObjString, ObjType}, value::ValueObj
+        Root, chunk::*, object::{Obj, ObjFunction, ObjNative, ObjString, ObjType}
     }
 };
 
@@ -626,8 +626,7 @@ impl<'gc> Compiler<'gc> {
 
     // TODO: string interning
     fn new_str_val(&mut self, s: String) -> Value<'gc> {
-        let obj = self.new_str_obj(s);
-        Value::Obj(ValueObj::Obj(obj))
+        Value::Obj(self.new_str_obj(s))
     }
 }
 

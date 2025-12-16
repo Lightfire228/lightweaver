@@ -64,9 +64,12 @@ pub fn run_file(path: &Path) -> &str {
             }
         });
 
-        root.mutate_root(|_, root| {
-            compile(ast, root).unwrap();
-            dbg_funcs(root);
+        root.mutate_root(|ctx, root| {
+            compile(ast, root, ctx).unwrap();
+        });
+
+        root.mutate(|_ctx, root| {
+            dbg_funcs(&root);
         });
 
 
@@ -80,13 +83,14 @@ pub fn run_file(path: &Path) -> &str {
     }
 }
 
-fn dbg_funcs(ctx: &Root) {
+fn dbg_funcs(root: &Root) {
 
-    for func in &ctx.functions {
+    for func in &root.functions {
         func.chunk.disassemble(&DisassembleData {
+            name:      &func.name,
             lines:     &func.chunk.lines,
             stack:     &[],
-            constants: &ctx.constants,
+            constants: &root.constants,
         });
     }
 }

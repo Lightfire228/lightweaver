@@ -1,12 +1,8 @@
 
 use std::usize;
 
-use crate::script::{ast::*, vm::chunk::{OpCode, StackIndex, StackOffset, UpvalueIndex}};
+use crate::script::{ast::*, vm::chunk::{StackIndex, StackOffset, UpvalueIndex}};
 
-
-type Op = OpCode;
-
-// type Func = (FuncType, ObjectId);
 
 pub fn resolve(ast: &mut Ast) {
 

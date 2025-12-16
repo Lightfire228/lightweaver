@@ -1,8 +1,8 @@
-use std::{cell::{Ref, RefMut}, ops::DerefMut};
+use std::{cell::{Ref, RefMut}, ops::{Deref, DerefMut}};
 
 use gc_arena::{Collect, Gc, Mutation, lock::RefLock};
 
-use crate::script::vm::{object::{ObjPtr, ObjRef, ObjRefMut}};
+use crate::script::vm::object::{ObjPtr, ObjPtrWritable, ObjString};
 
 use super::object::{Obj, ObjType};
 
@@ -12,14 +12,14 @@ use super::object::{Obj, ObjType};
 pub enum Value<'gc> {
     Number(f64),
     Bool  (bool),
-    Obj   (ValueObj<'gc>),
-    Closed(ObjPtr<'gc>),
+    Obj   (Gc<'gc, Obj<'gc>>),
+    ObjMut(Gc<'gc, RefLock<Obj<'gc>>>),
     Nil,
 }
 
 #[derive(Debug, Clone, Copy, Collect)]
 #[collect(no_drop)]
-pub enum ValueObj<'gc> {
+pub enum ObjRef<'gc> {
     Obj   (Gc<'gc, Obj<'gc>>),
     ObjMut(Gc<'gc, RefLock<Obj<'gc>>>),
 }
@@ -27,11 +27,11 @@ pub enum ValueObj<'gc> {
 impl<'gc> Value<'gc> {
 
     pub fn new_obj(obj: Gc<'gc, Obj<'gc>>) -> Self {
-        Value::Obj(ValueObj::Obj(obj))
+        Value::Obj(obj)
     }
 
     pub fn new_obj_mut(obj: Gc<'gc, RefLock<Obj<'gc>>>) -> Self {
-        Value::Obj(ValueObj::ObjMut(obj))
+        Value::ObjMut(obj)
     }
 
     pub fn as_number(&self) -> Option<f64> {
@@ -45,63 +45,45 @@ impl<'gc> Value<'gc> {
         match self {
             Value::Nil       => true,
             Value::Bool  (x) => !(*x),
-            _                => false,
+            Value::Number(_) => false,
+            Value::Obj   (_) => false,
+            Value::ObjMut(_) => false,
         }
     }
 
-    pub fn as_obj<'a>(&'a self) -> Option<ObjRef<'gc>> {
-
-
+    pub fn as_obj(&'gc self) -> Option<&'gc Obj<'gc>> {
         match self {
-            Value::Obj(o)    => Some(o.borrow()),
-            Value::Closed(o) => Some(o.borrow()),
-            _                => None,
+            Value::Obj(obj) => Some(obj),
+            _               => None,
         }
     }
 
-    pub fn as_obj_mut<'a>(&'a mut self, ctx: &Mutation<'gc>) -> Option<ObjRefMut<'gc>> {
-
+    pub fn as_obj_ref(&'gc self) -> Option<Ref<Obj<'gc>>> {
         match self {
-            Value::Obj(o)    => Some(o.borrow_mut(ctx)),
-            Value::Closed(o) => Some(o.borrow_mut(ctx)),
-            _                => None,
+            Value::ObjMut(obj) => Some(obj.borrow()),
+            _                  => None,
         }
     }
 
-    pub fn to_str<'a, 'b>(&'a self) -> Option<&'a str> {
-
-        todo!();
-        // match self {
-        //     Value::Obj(obj) => Some({
-
-        //         match &obj.type_ {
-        //             ObjType::String  (s)   =>  s.string.as_str(),
-        //             _                        => None?
-        //         }
-        //     }),
-        //     _ => None,
-        // }
-    }
-
-    pub fn is_lw_string(&self) -> bool {
-
+    pub fn as_obj_mut<'a>(&'a mut self, ctx: &Mutation<'gc>) -> Option<RefMut<Obj<'gc>>> {
         match self {
-            Value::Obj(obj) => {
-
-                match obj.borrow().type_ {
-                    ObjType::String(_) => true,
-                    _                  => false,
-                }
-            }
-            _                  => false,
+            Value::ObjMut(obj) => Some(obj.borrow_mut(ctx)),
+            _                  => None,
         }
+    }
 
+    pub fn to_lw_str<'a, 'b>(&'a self) -> Option<&'a ObjString> {
+        let Value::Obj(obj) = self else { None? };
+
+        let ObjType::String(obj) = &obj.type_ else { None? };
+
+        Some(&obj)
     }
 
     pub fn display(&self) -> String {
         match self {
-            Value::Obj   (x) => x.borrow().as_string(),
-            Value::Closed(x) => x.borrow().as_string(),
+            Value::Obj   (x) => x.as_string(),
+            Value::ObjMut(x) => x.borrow().as_string(),
             Value::Number(x) => x.to_string(),
             Value::Bool  (x) => x.to_string(),
             Value::Nil       => "nil".to_owned(),
@@ -111,7 +93,7 @@ impl<'gc> Value<'gc> {
     pub fn display_type(&self) -> String {
         match self {
             Value::Obj   (_) => "Object" .to_owned(),
-            Value::Closed(_) => "Closed" .to_owned(),
+            Value::ObjMut(_) => "Object" .to_owned(),
             Value::Number(_) => "Number" .to_owned(),
             Value::Bool  (_) => "Boolean".to_owned(),
             Value::Nil       => "Nil"    .to_owned(),
@@ -126,7 +108,7 @@ impl<'gc> PartialEq for Value<'gc> {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Bool  (a), Value::Bool  (b)) => a == b,
             (Value::Obj   (a), Value::Obj   (b)) => a == b,
-            (Value::Closed(a), Value::Closed(b)) => a == b,
+            (Value::ObjMut(a), Value::ObjMut(b)) => a == b,
             (Value::Nil,       Value::Nil)       => true,
             _                                    => false,
         }

@@ -26,9 +26,8 @@ pub struct Obj<'gc> {
     pub type_: ObjType<'gc>,
 }
 
-pub type ObjPtr   <'gc> = Gc    <'gc, RefLock<Obj<'gc>>>;
-pub type ObjRef   <'gc> = Ref   <'gc, Obj<'gc>>;
-pub type ObjRefMut<'gc> = RefMut<'gc, Obj<'gc>>;
+pub type ObjPtrWritable<'gc> = Gc<'gc, RefLock<Obj<'gc>>>;
+pub type ObjPtr        <'gc> = Gc<'gc, Obj<'gc>>;
 
 #[derive(Debug, Clone, Collect, ObjTryFrom)]
 #[collect(no_drop)]
