@@ -18,7 +18,7 @@ type Op<'gc> = OpCode<'gc>;
 // type Func = (FuncType, ObjectId);
 
 pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) ->
-    CompilerResult<()>
+    CompilerResult<Gc<'gc, ObjFunction<'gc>>>
 {
 
     let mut compiler = Compiler::new(root, ctx);
@@ -29,8 +29,17 @@ pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>)
 
     compiler.write_op(Op::Return);
 
-    Ok(())
+    let script_func = compiler.function_stack
+        .pop()
+        .expect("expect top level script function")
+        .func_obj
+    ;
 
+    let script_func = Gc::new(ctx, script_func);
+
+    compiler.root.functions.push(script_func);
+
+    Ok(script_func)
 }
 
 
@@ -108,7 +117,7 @@ impl<'gc> Compiler<'gc> {
 
     fn new(root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
 
-        let chunk = Chunk::new();
+        let chunk = Gc::new(ctx, Chunk::new());
         let func  = new_func("script".to_owned(), 0, chunk);
 
         let ObjType::Function(func) = func.type_ else {
@@ -206,7 +215,8 @@ impl<'gc> Compiler<'gc> {
         -> CompilerResult<Gc<'gc, ObjFunction<'gc>>>
     {
 
-        let func = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), Chunk::new());
+        let chunk = Gc::new(self.ctx, Chunk::new());
+        let func = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), chunk);
         let func = Func::new(func_type, func);
 
         self.function_stack.push(func);
@@ -233,8 +243,8 @@ impl<'gc> Compiler<'gc> {
 
         let (mut func, chunk) = (func.func_obj, func.chunk);
 
-        func.chunk = chunk;
-        let func = Gc::new(self.ctx, func);
+        func.chunk = Gc::new(self.ctx, chunk);
+        let func   = Gc::new(self.ctx, func);
 
         Ok(func)
 
@@ -635,7 +645,7 @@ fn to_number(lexeme: &str) -> f64 {
     lexeme.parse().expect("Unable lexeme to convert to f64")
 }
 
-fn new_func<'gc>(name: String, arity: usize, chunk: Chunk<'gc>) -> Obj<'gc> {
+fn new_func<'gc>(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Obj<'gc> {
     let func = ObjFunction::new(name.to_owned(), arity, chunk);
 
     Obj::new(func.into())

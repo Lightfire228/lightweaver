@@ -9,14 +9,14 @@ use crate::script::vm::{chunk::Chunk};
 #[collect(no_drop)]
 pub struct ObjFunction<'gc> {
     pub arity: usize,
-    pub chunk: Chunk<'gc>,
+    pub chunk: Gc<'gc, Chunk<'gc>>,
     pub name:  String,
 }
 
 
 
 impl<'gc> ObjFunction<'gc> {
-    pub fn new(name: String, arity: usize, chunk: Chunk<'gc>) -> Self {
+    pub fn new(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Self {
 
         Self {
             arity,

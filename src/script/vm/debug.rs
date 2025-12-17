@@ -1,3 +1,5 @@
+use gc_arena::{Gc, lock::RefLock};
+
 use crate::script::vm::{chunk::{ConstIndex, Offset}, object::ObjFunction, value::Value};
 
 use super::chunk::{Chunk, OpCode};
@@ -5,7 +7,7 @@ use super::chunk::{Chunk, OpCode};
 pub struct DisassembleData<'gc, 'a> {
     pub name:      &'a str,
     pub lines:     &'a [usize],
-    pub stack:     &'a [Value<'gc>],
+    pub stack:     &'a [Gc<'gc, RefLock<Value<'gc>>>],
     pub constants: &'a [Value<'gc>],
 }
 
@@ -91,7 +93,7 @@ fn print_line_info(data: &DisassembleData, offset: usize) {
 
 pub fn print_stack(data: &DisassembleData) {
     for x in data.stack {
-        print!("[ {} ]", x.display())
+        print!("[ {} ]", x.borrow().display())
     }
 }
 

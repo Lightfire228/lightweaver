@@ -1,3 +1,4 @@
+use std::cell::{Ref, RefMut};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap};
 use std::fmt::Write;
@@ -42,19 +43,21 @@ pub fn interpret(root: ArenaRoot) -> RuntimeResult<()> {
 }
 
 // TODO: String interning
-pub struct Vm<'gc> {
-    root:       ArenaRoot,
+pub struct Vm {
+    root: ArenaRoot,
+    ip:   BytecodeIndex,
 }
 
 #[derive(Collect)]
 #[collect(no_drop)]
 pub struct Root<'gc> {
-    pub call_stack: Vec<CallFrame  <'gc>>,
-    pub stack:      Vec<Value      <'gc>>,
-    pub constants:  Vec<Value      <'gc>>,
-    pub upvalues:   Vec<Obj        <'gc>>,
-    pub functions:  Vec<ObjFunction<'gc>>,
-    pub globals:    HashMap<String, Value<'gc>>,
+    pub call_stack:  Vec    <Gc<'gc, RefLock<CallFrame<'gc>>>>,
+    pub stack:       Vec    <Gc<'gc, RefLock<Value    <'gc>>>>,
+
+    pub functions:   Vec    <Gc<'gc, ObjFunction<'gc>>>,
+
+    pub constants:   Vec    <        Value<'gc>>,
+    pub globals:     HashMap<String, Value<'gc>>,
 }
 
 pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
@@ -63,8 +66,8 @@ pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
 #[collect(no_drop)]
 struct CallFrame<'gc> {
     pub stack_len:    StackIndex,
-    pub ip:           BytecodeIndex,
-    pub closure:      Gc<'gc, ObjClosure<'gc>>,
+    pub ret_ip:       BytecodeIndex,
+    pub closure:      Gc<'gc, RefLock<Obj<'gc>>>,
     pub arity:        usize,
 }
 
@@ -95,119 +98,154 @@ impl Vm {
 
         root.mutate_root(|ctx, root| {
 
-            let script_func    = root.functions.first().expect("Function list cannot be empty");
-            let script_closure = ObjClosure::new(Gc::new(ctx, *script_func), 0, vec![]);
+            let script_func = root.functions.pop().expect("expect top level script function");
+
+            let script_closure = ObjClosure::new(script_func, 0, vec![]);
+            let script_closure = Gc::new(
+                ctx,
+                RefLock::new(
+                    Obj::new(script_closure.into())
+                )
+            );
 
             let call_frame = CallFrame {
                 stack_len:    StackIndex   (0),
-                ip:           BytecodeIndex(0),
-                closure:      Gc::new(ctx, script_closure),
+                ret_ip:       BytecodeIndex(0),
+                closure:      script_closure,
                 arity:        0,
             };
+            let call_frame = Gc::new(ctx, RefLock::new(call_frame));
+
+            root.call_stack.push(call_frame);
+
 
             def_natives(&mut root.globals, ctx);
 
+
             let mut stack = Vec::with_capacity(INITIAL_STACK_CAPACITY);
-            stack.push(Value::new_obj(*script_closure.into()));
+            stack.push(
+                Gc::new(
+                    ctx,
+                    RefLock::new(
+                        Value::new_obj_mut(script_closure)
+                    )
+                )
+            );
+
+            root.stack = stack;
         });
 
 
         Self {
             root,
+            ip: BytecodeIndex(0),
         }
     }
 
-    fn run(&mut self) -> RuntimeResult<()> {
+    fn run<'gc>(&mut self) -> RuntimeResult<()> {
 
-        println!(">>>>>>>>>>>>>>>>>>>>> ");
 
         loop {
 
             if DEBUG_TRACE_EXECUTION {
-                let chunk = self.get_chunk();
-                let data  = DisassembleData {
-                    ctx:       &self.ctx,
-                    lines:     &chunk.lines,
-                    stack:     &self.stack,
-                    constants: &self.constants,
-                };
+                self.root.mutate(|ctx, root| {
+                    self.get_chunk(root, |chunk| {
+                        let data  = DisassembleData {
+                            name:      "",
+                            lines:     &chunk.lines,
+                            stack:     &root.stack,
+                            constants: &root.constants,
+                        };
 
-                chunk.code[**self.ip()].disassemble(&data, **self.ip());
-                print_stack(&data);
-                println!();
+                        chunk.code[*self.ip].disassemble(&data, *self.ip);
+                        print_stack(&data);
+                        println!();
+                    });
+                })
             }
 
-            type O = OpCode;
-            match *self.get_instruction() {
-                O::GetConstant { index }            => self.op_constant    (index),
+            self.root.collect_all();
 
-                O::DefGlobal   { name_idx }         => self.op_def_global  (name_idx),
-                O::GetGlobal   { name_idx }         => self.op_get_global  (name_idx)?,
-                O::SetGlobal   { name_idx }         => self.op_set_global  (name_idx)?,
+            self.root.mutate(|ctx, root| {
 
-                O::GetProperty { name_idx }         => self.op_get_property(name_idx)?,
-                O::SetProperty { name_idx }         => self.op_set_property(name_idx),
+            })
 
-                O::GetLocal    { offset }           => self.op_get_local   (offset),
-                O::SetLocal    { offset }           => self.op_set_local   (offset),
+        }
+    }
 
-                O::GetUpvalue  { index }            => self.op_get_upvalue (index),
-                O::SetUpvalue  { index }            => self.op_set_upvalue (index),
-                O::PushUpvalue { index }            => self.op_push_upvalue(index),
+    fn run_instruction<'gc>(&mut self, ctx: &'gc Mutation<'gc>, root: &'gc Root<'gc>) -> RuntimeResult<()>{
 
-                O::JumpIfFalse { offset }           => self.op_jump_if     (JumpType::IfFalsey, offset),
-                O::JumpIfTrue  { offset }           => self.op_jump_if     (JumpType::IfTruthy, offset),
-                O::Jump        { offset }           => self.op_jump        (offset),
+        match *self.get_instruction(root) {
+            OpCode::GetConstant { index }            => self.op_constant    (index),
 
-                O::Loop        { offset }           => self.op_loop        (offset),
+            OpCode::DefGlobal   { name_idx }         => self.op_def_global  (name_idx),
+            OpCode::GetGlobal   { name_idx }         => self.op_get_global  (name_idx)?,
+            OpCode::SetGlobal   { name_idx }         => self.op_set_global  (name_idx)?,
 
-                O::Call        { arg_count }        => self.op_call        (arg_count)?,
-                O::Class       { name_idx }         => self.op_class       (name_idx),
-                O::Closure     { func_idx }         => self.op_closure     (func_idx),
+            OpCode::GetProperty { name_idx }         => self.op_get_property(name_idx)?,
+            OpCode::SetProperty { name_idx }         => self.op_set_property(name_idx),
 
-                O::Nil                              => self.push_stack     (Value::Nil),
-                O::True                             => self.push_stack     (Value::Bool(true)),
-                O::False                            => self.push_stack     (Value::Bool(false)),
+            OpCode::GetLocal    { offset }           => self.op_get_local   (offset),
+            OpCode::SetLocal    { offset }           => self.op_set_local   (offset),
 
-                O::Pop                              => self.op_pop         (),
+            OpCode::GetUpvalue  { index }            => self.op_get_upvalue (index),
+            OpCode::SetUpvalue  { index }            => self.op_set_upvalue (index),
+            OpCode::PushUpvalue { index }            => self.op_push_upvalue(index),
 
-                O::Equal                            => self.op_equal       (),
-                O::Greater                          => self.op_binary      (BinaryOp::Greater)?,
-                O::Less                             => self.op_binary      (BinaryOp::Less)?,
+            OpCode::JumpIfFalse { offset }           => self.op_jump_if     (JumpType::IfFalsey, offset),
+            OpCode::JumpIfTrue  { offset }           => self.op_jump_if     (JumpType::IfTruthy, offset),
+            OpCode::Jump        { offset }           => self.op_jump        (offset),
 
-                O::Add                              => self.op_add         ()?,
-                O::Subtract                         => self.op_binary      (BinaryOp::Sub)?,
-                O::Multiply                         => self.op_binary      (BinaryOp::Mul)?,
-                O::Divide                           => self.op_binary      (BinaryOp::Div)?,
+            OpCode::Loop        { offset }           => self.op_loop        (offset),
 
-                O::Not                              => self.op_not         (),
+            OpCode::Call        { arg_count }        => self.op_call        (arg_count)?,
+            OpCode::Class       { name_idx }         => self.op_class       (name_idx),
+            OpCode::Closure     { func_idx }         => self.op_closure     (func_idx),
 
-                O::Print                            => self.op_print       (),
-                O::Negate                           => self.op_negate      ()?,
-                O::Return                           => {
-                    let result = self.pop_stack();
-                    let frame  = self.pop_call_stack();
+            OpCode::Nil                              => self.push_stack     (Value::Nil),
+            OpCode::True                             => self.push_stack     (Value::Bool(true)),
+            OpCode::False                            => self.push_stack     (Value::Bool(false)),
 
-                    if self.call_stack.len() == 0 {
-                        return Ok(())
-                    }
+            OpCode::Pop                              => self.op_pop         (),
 
-                    let diff = self.stack.len() - *frame.stack_len;
+            OpCode::Equal                            => self.op_equal       (),
+            OpCode::Greater                          => self.op_binary      (BinaryOp::Greater)?,
+            OpCode::Less                             => self.op_binary      (BinaryOp::Less)?,
 
-                    for _ in 0..diff {
-                        self.stack.pop();
-                    }
+            OpCode::Add                              => self.op_add         ()?,
+            OpCode::Subtract                         => self.op_binary      (BinaryOp::Sub)?,
+            OpCode::Multiply                         => self.op_binary      (BinaryOp::Mul)?,
+            OpCode::Divide                           => self.op_binary      (BinaryOp::Div)?,
 
-                    self.push_stack(result);
+            OpCode::Not                              => self.op_not         (),
+
+            OpCode::Print                            => self.op_print       (),
+            OpCode::Negate                           => self.op_negate      ()?,
+            OpCode::Return                           => {
+                let result = self.pop_stack();
+                let frame  = self.pop_call_stack();
+
+                if self.call_stack.len() == 0 {
+                    return Ok(())
                 }
+
+                let diff = self.stack.len() - *frame.stack_len;
+
+                for _ in 0..diff {
+                    self.stack.pop();
+                }
+
+                self.push_stack(result);
+                self.ip = frame.ret_ip;
+
             }
         }
     }
 
-    fn get_instruction(&mut self) -> &OpCode {
-        **self.ip_mut() += 1;
+    fn get_instruction<'gc>(&mut self, root: &'gc Root<'gc>) -> Gc<'gc, OpCode<'gc>> {
+        *self.ip += 1;
 
-        &self.get_chunk().code[**self.ip() -1]
+        self.get_chunk(root, |chunk| { chunk.code[*self.ip -1] })
     }
 
     fn get_constant(&self, index: ConstIndex) -> Value {
@@ -384,16 +422,16 @@ impl Vm {
         };
 
         if is_falsey == jump_on_false {
-            **self.ip_mut() += *offset;
+            *self.ip += *offset;
         }
     }
 
     fn op_jump(&mut self, offset: Offset) {
-        **self.ip_mut() += *offset;
+        *self.ip += *offset;
     }
 
     fn op_loop(&mut self, offset: Offset) {
-        **self.ip_mut() -= *offset;
+        *self.ip -= *offset;
     }
 
     fn op_call(&mut self, arg_count: usize) -> RuntimeResult<()> {
@@ -537,7 +575,7 @@ impl Vm {
         RuntimeError {
             msg:         msg,
             stack_trace: self.stack_trace(),
-            line:        self.get_chunk().lines[**self.ip() -1],
+            line:        self.get_chunk().lines[**self.ip -1],
         }
     }
 
@@ -548,32 +586,31 @@ impl Vm {
             .to_owned()
     }
 
-    fn get_chunk(&self) -> &Chunk {
-        let obj = self.call_frame();
+    fn get_chunk<'gc, T, R>(&self, root: &'gc Root<'gc>, func: T) -> R
+        where T: Fn(&'gc Chunk) -> R
+    {
+        let frame     = self.call_frame(root);
+        let frame_ref = frame.borrow();
 
-        let obj = self.ctx.get(obj.closure);
-        let obj: &ObjClosure  = obj.try_into().unwrap();
+        let obj     = frame_ref.closure;
+        let obj_ref = obj.borrow();
 
-        let obj = self.ctx.get(obj.function);
-        let obj: &ObjFunction = obj.try_into().unwrap();
+        let ObjType::Closure(closure) = &obj_ref.type_ else {
+            panic!("Object not a closure type: '{}'", obj_ref.as_string());
+        };
 
-        &obj.chunk
+        let chunk = &closure.function.chunk;
+
+        func(chunk)
     }
 
-    fn ip(&self) -> &BytecodeIndex {
-        &self.call_frame().ip
+    fn call_frame<'gc>(&self, root: &'gc Root<'gc>) -> Gc<'gc, RefLock<CallFrame<'gc>>> {
+        *root.call_stack.last().expect("Call stack must not be empty")
     }
 
-    fn ip_mut(&mut self) -> &mut BytecodeIndex {
-        &mut self.call_frame_mut().ip
-    }
-
-    fn call_frame(&self) -> &CallFrame {
-        self.call_stack.last().expect("Call stack must not be empty")
-    }
-
-    fn call_frame_mut(&mut self) -> &mut CallFrame {
-        self.call_stack.last_mut().expect("Call stack must not be empty")
+    fn call_frame_mut<'gc>(&mut self, root: &'gc Root<'gc>, ctx: &'gc Mutation<'gc>) -> RefMut<CallFrame<'gc>> {
+        let frame = self.call_frame(root);
+        frame.borrow_mut(ctx)
     }
 
     // fn stack_index(&self, index: StackIndex) -> usize {
@@ -623,7 +660,7 @@ impl Vm {
 
         self.call_stack.push(CallFrame {
             stack_len:    StackIndex   (self.stack.len() - func_arity -1),
-            ip:           BytecodeIndex(0),
+            ret_ip:       BytecodeIndex(*self.ip +1),
             closure,
             arity:        func_arity,
         });

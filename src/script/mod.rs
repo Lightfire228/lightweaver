@@ -21,9 +21,7 @@ use crate::script::{
     parser::AssignmentTarget,
     resolver::resolve,
     vm::{
-        ArenaRoot,
-        Root,
-        debug::DisassembleData,
+        ArenaRoot, Root, chunk::Chunk, debug::DisassembleData, object::ObjFunction
     }
 };
 
@@ -53,14 +51,16 @@ pub fn run_file(path: &Path) -> &str {
         resolve(&mut ast);
         display_ast(&ast);
 
-        let mut root = ArenaRoot::new(|_| {
+        let mut root = ArenaRoot::new(|_ctx| {
             Root {
-                call_stack: vec![],
-                stack:      vec![],
-                constants:  vec![],
-                upvalues:   vec![],
-                functions:  vec![],
-                globals:    HashMap::new(),
+                call_stack:  vec![],
+                stack:       vec![],
+
+                functions:   vec![],
+                constants:   vec![],
+
+                globals:     HashMap::new(),
+
             }
         });
 
