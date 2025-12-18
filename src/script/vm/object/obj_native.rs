@@ -1,10 +1,10 @@
 
-use gc_arena::{Collect, Gc};
+use gc_arena::{Collect};
 
-use crate::script::vm::{value::Value};
+use crate::script::vm::{object::Obj, value::Value};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NativeFn<'gc>(fn(&[Value<'gc>]) -> Value<'gc>);
+pub struct NativeFn<'gc>(pub fn(&[Value<'gc>]) -> Value<'gc>);
 
 #[derive(Debug, Clone, Eq, Collect)]
 #[collect(no_drop)]
@@ -20,6 +20,12 @@ impl<'gc> ObjNative<'gc> {
             func,
             name,
         }
+    }
+}
+
+impl<'gc> Obj<'gc> {
+    pub fn new_native_fn(name: String, func: NativeFn<'gc>) -> Obj<'gc> {
+        Obj::new(ObjNative::new(name, func).into())
     }
 }
 

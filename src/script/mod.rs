@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use ast::{Ast, AstNode, DisplayArgs, WalkArgs};
-use gc_arena::{Arena, Collect, Gc, Rootable};
 use parser::{parse_ast, ParseErrorType};
 use scanner::{scan_tokens, ScannerErrorType};
 
@@ -21,7 +20,7 @@ use crate::script::{
     parser::AssignmentTarget,
     resolver::resolve,
     vm::{
-        ArenaRoot, Root, chunk::Chunk, debug::DisassembleData, object::ObjFunction
+        ArenaRoot, Root, chunk::{BytecodeIndex}, debug::DisassembleData,
     }
 };
 
@@ -60,6 +59,8 @@ pub fn run_file(path: &Path) -> &str {
                 constants:   vec![],
 
                 globals:     HashMap::new(),
+
+                ip: BytecodeIndex(0)
 
             }
         });

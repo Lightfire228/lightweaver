@@ -1,11 +1,11 @@
-use std::{fmt::Display, marker::PhantomData, ops::{Deref, DerefMut}};
+use std::{fmt::Display, ops::{Deref, DerefMut}};
 
 use ast_macro::derive_all;
 use gc_arena::{Collect, Gc};
 
-use crate::script::vm::object::{Obj, ObjFunction};
+use crate::script::vm::object::{ObjFunction};
 
-#[derive(Debug, Clone, PartialEq, Eq, Collect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Collect)]
 #[collect(no_drop)]
 pub enum OpCode<'gc> {
     GetConstant { index:     ConstIndex },

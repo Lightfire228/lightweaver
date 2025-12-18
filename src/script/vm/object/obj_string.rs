@@ -1,6 +1,6 @@
 use gc_arena::Collect;
 
-use crate::script::vm::object::ObjType;
+use crate::script::vm::object::{Obj, ObjType};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Collect)]
@@ -15,6 +15,12 @@ impl ObjString {
         Self {
             string,
         }
+    }
+}
+
+impl<'gc> Obj<'gc> {
+    pub fn new_string(string: String) -> Obj<'gc> {
+        Obj::new(ObjString::new(string).into())
     }
 }
 

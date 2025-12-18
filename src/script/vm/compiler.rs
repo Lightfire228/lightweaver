@@ -7,7 +7,7 @@ use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        Root, chunk::*, object::{Obj, ObjFunction, ObjNative, ObjString, ObjType}
+        Root, chunk::*, object::{Obj, ObjFunction, ObjString, ObjType}
     }
 };
 
@@ -356,6 +356,8 @@ impl<'gc> Compiler<'gc> {
             Expr::Unary    (expr) => self.compile_unary_expr  (expr),
             Expr::Variable (expr) => self.compile_var_expr    (expr),
         };
+
+        // sdlfkjsdflkjsdf
     }
 
     fn compile_literal_expr(&mut self, literal: Literal) {
@@ -401,7 +403,7 @@ impl<'gc> Compiler<'gc> {
         let set_op = match assign.target.var_type {
             VarType::Local  (offset) => Op::SetLocal   { offset },
             VarType::Upvalue(index)  => Op::SetUpvalue { index },
-            VarType::Global         => {
+            VarType::Global          => {
                 let name_idx = self.make_identifier_constant(assign.target.name);
                 Op::SetGlobal { name_idx }
             }

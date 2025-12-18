@@ -1,8 +1,7 @@
-use std::marker::PhantomData;
 
-use gc_arena::{Arena, Collect, Gc, Mutation, Rootable, lock::RefLock};
+use gc_arena::{Collect, Gc};
 
-use crate::script::vm::{chunk::Chunk};
+use crate::script::vm::{chunk::Chunk, object::Obj};
 
 
 #[derive(Debug, Clone, Collect)]
@@ -26,6 +25,11 @@ impl<'gc> ObjFunction<'gc> {
     }
 }
 
+impl<'gc> Obj<'gc> {
+    pub fn new_function(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Obj<'gc> {
+        Obj::new(ObjFunction::new(name, arity, chunk).into())
+    }
+}
 
 
 impl<'gc> Eq for ObjFunction<'gc> {}

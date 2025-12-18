@@ -1,8 +1,9 @@
-use std::{cell::{Ref, RefMut}, ops::{Deref, DerefMut}};
+
+use std::{cell::{Ref, RefMut}, fmt::Display};
 
 use gc_arena::{Collect, Gc, Mutation, lock::RefLock};
 
-use crate::script::vm::object::{ObjPtr, ObjPtrWritable, ObjString};
+use crate::script::vm::object::{ObjString};
 
 use super::object::{Obj, ObjType};
 
@@ -80,14 +81,12 @@ impl<'gc> Value<'gc> {
         Some(&obj)
     }
 
-    pub fn display(&self) -> String {
-        match self {
-            Value::Obj   (x) => x.as_string(),
-            Value::ObjMut(x) => x.borrow().as_string(),
-            Value::Number(x) => x.to_string(),
-            Value::Bool  (x) => x.to_string(),
-            Value::Nil       => "nil".to_owned(),
-        }
+    pub fn to_str(&self) -> Option<&str> {
+        let Value::Obj(obj) = self else { None? };
+
+        let ObjType::String(obj) = &obj.type_ else { None? };
+
+        Some(&obj.string)
     }
 
     pub fn display_type(&self) -> String {
@@ -111,6 +110,18 @@ impl<'gc> PartialEq for Value<'gc> {
             (Value::ObjMut(a), Value::ObjMut(b)) => a == b,
             (Value::Nil,       Value::Nil)       => true,
             _                                    => false,
+        }
+    }
+}
+
+impl<'gc> Display for Value<'gc> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Obj   (x) => x         .fmt(f),
+            Value::ObjMut(x) => x.borrow().fmt(f),
+            Value::Number(x) => x         .fmt(f),
+            Value::Bool  (x) => x         .fmt(f),
+            Value::Nil       => f.write_str("nil"),
         }
     }
 }

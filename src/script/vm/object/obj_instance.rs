@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gc_arena::{Collect, Gc, Mutation};
+use gc_arena::{Collect, Gc};
 
 use crate::script::vm::{object::{Obj, ObjClass, ObjType}, value::Value};
 
@@ -10,20 +10,25 @@ pub type Fields<'gc> = HashMap<String, Value<'gc>>;
 #[collect(no_drop)]
 pub struct ObjInstance<'gc> {
     pub class:  Gc<'gc, ObjClass>,
-    pub fields: Gc<'gc, Fields<'gc>>,
+    pub fields: Fields<'gc>,
 }
 
 impl<'gc> ObjInstance<'gc> {
-    pub fn new(class: Gc<'gc, ObjClass>, ctx: &Mutation<'gc>) -> Self {
+    pub fn new(class: Gc<'gc, ObjClass>) -> Self {
         Self {
             class,
-            fields: Gc::new(ctx, HashMap::new()),
+            fields: HashMap::new(),
         }
     }
 }
 
 
 impl<'gc> Obj<'gc> {
+    pub fn new_instance(class: Gc<'gc, ObjClass>) -> Obj<'gc> {
+        Obj::new(ObjInstance::new(class).into())
+    }
+
+
     pub fn to_instance(&self) -> Option<&'gc ObjInstance> {
         type T<'a> = ObjType<'a>;
 

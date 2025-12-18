@@ -1,4 +1,4 @@
-use std::cell::{Cell, Ref, RefMut};
+use std::{cell::{Cell}, fmt::Display};
 
 use ast_macro::{ObjTryFrom};
 use gc_arena::{Collect, Gc, lock::RefLock};
@@ -53,16 +53,18 @@ impl<'gc> Obj<'gc> {
             type_,
         }
     }
+}
 
-    pub fn as_string(&self) -> String {
+impl<'gc> Display for Obj<'gc> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.type_ {
-            ObjType::String  (str)   => str.string.clone(),
-            ObjType::Function(func)  => format!("<fn {}>",        func .name),
-            ObjType::NativeFn(func)  => format!("<native fn {}>", func .name),
-            ObjType::Class   (class) => format!("<class {}>",     class.name),
-            ObjType::Instance(inst)  => format!("<{} instance>",  inst.as_str()),
-            ObjType::Closure (func)  => format!("<closure {}>",   func.as_str()),
-            ObjType::Value   (val)   => format!("{}",             val.value.display()),
+            ObjType::String  (str)   => write!(f, "{}",             str.string),
+            ObjType::Function(func)  => write!(f, "<fn {}>",        func .name),
+            ObjType::NativeFn(func)  => write!(f, "<native fn {}>", func .name),
+            ObjType::Class   (class) => write!(f, "<class {}>",     class.name),
+            ObjType::Instance(inst)  => write!(f, "<{} instance>",  inst.as_str()),
+            ObjType::Closure (func)  => write!(f, "<closure {}>",   func.as_str()),
+            ObjType::Value   (val)   => write!(f, "{}",             val.value),
         }
     }
 }

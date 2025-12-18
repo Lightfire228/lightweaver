@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefMut};
+use std::cell::{RefMut};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap};
 use std::fmt::Write;
@@ -45,19 +45,21 @@ pub fn interpret(root: ArenaRoot) -> RuntimeResult<()> {
 // TODO: String interning
 pub struct Vm {
     root: ArenaRoot,
-    ip:   BytecodeIndex,
 }
 
 #[derive(Collect)]
 #[collect(no_drop)]
 pub struct Root<'gc> {
     pub call_stack:  Vec    <Gc<'gc, RefLock<CallFrame<'gc>>>>,
-    pub stack:       Vec    <Gc<'gc, RefLock<Value    <'gc>>>>,
 
     pub functions:   Vec    <Gc<'gc, ObjFunction<'gc>>>,
 
-    pub constants:   Vec    <        Value<'gc>>,
+    pub stack:       Vec    <Value<'gc>>,
+    pub constants:   Vec    <Value<'gc>>,
+
     pub globals:     HashMap<String, Value<'gc>>,
+
+    pub ip:   BytecodeIndex,
 }
 
 pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
@@ -93,6 +95,7 @@ enum JumpType {
     IfTruthy,
 }
 
+
 impl Vm {
     pub fn new(mut root: ArenaRoot) -> Self {
 
@@ -100,11 +103,10 @@ impl Vm {
 
             let script_func = root.functions.pop().expect("expect top level script function");
 
-            let script_closure = ObjClosure::new(script_func, 0, vec![]);
             let script_closure = Gc::new(
                 ctx,
                 RefLock::new(
-                    Obj::new(script_closure.into())
+                    Obj::new_closure(script_func, 0, vec![])
                 )
             );
 
@@ -123,14 +125,7 @@ impl Vm {
 
 
             let mut stack = Vec::with_capacity(INITIAL_STACK_CAPACITY);
-            stack.push(
-                Gc::new(
-                    ctx,
-                    RefLock::new(
-                        Value::new_obj_mut(script_closure)
-                    )
-                )
-            );
+            stack.push(Value::new_obj_mut(script_closure));
 
             root.stack = stack;
         });
@@ -138,44 +133,48 @@ impl Vm {
 
         Self {
             root,
-            ip: BytecodeIndex(0),
         }
     }
 
     fn run<'gc>(&mut self) -> RuntimeResult<()> {
 
-
         loop {
 
             if DEBUG_TRACE_EXECUTION {
-                self.root.mutate(|ctx, root| {
-                    self.get_chunk(root, |chunk| {
-                        let data  = DisassembleData {
-                            name:      "",
-                            lines:     &chunk.lines,
-                            stack:     &root.stack,
-                            constants: &root.constants,
-                        };
+                self.root.mutate(|_ctx, root| {
 
-                        chunk.code[*self.ip].disassemble(&data, *self.ip);
-                        print_stack(&data);
-                        println!();
-                    });
+                    let chunk = root.get_chunk();
+                    let data  = DisassembleData {
+                        name:      "",
+                        lines:     &chunk.lines,
+                        stack:     &root.stack,
+                        constants: &root.constants,
+                    };
+
+                    chunk.code[*root.ip].disassemble(&data, *root.ip);
+                    print_stack(&data);
+                    println!();
                 })
             }
 
             self.root.collect_all();
 
-            self.root.mutate(|ctx, root| {
+            let done = self.root.mutate_root(|ctx, root| {
+                root.run_instruction(ctx)
+            });
 
-            })
-
+            if done? {
+                break Ok(())
+            }
         }
     }
+}
 
-    fn run_instruction<'gc>(&mut self, ctx: &'gc Mutation<'gc>, root: &'gc Root<'gc>) -> RuntimeResult<()>{
+impl<'gc> Root<'gc> {
 
-        match *self.get_instruction(root) {
+    fn run_instruction(&'gc mut self, ctx: &'gc Mutation<'gc>) -> RuntimeResult<bool>{
+
+        match self.get_instruction() {
             OpCode::GetConstant { index }            => self.op_constant    (index),
 
             OpCode::DefGlobal   { name_idx }         => self.op_def_global  (name_idx),
@@ -183,7 +182,7 @@ impl Vm {
             OpCode::SetGlobal   { name_idx }         => self.op_set_global  (name_idx)?,
 
             OpCode::GetProperty { name_idx }         => self.op_get_property(name_idx)?,
-            OpCode::SetProperty { name_idx }         => self.op_set_property(name_idx),
+            OpCode::SetProperty { name_idx }         => self.op_set_property(name_idx, ctx),
 
             OpCode::GetLocal    { offset }           => self.op_get_local   (offset),
             OpCode::SetLocal    { offset }           => self.op_set_local   (offset),
@@ -198,9 +197,9 @@ impl Vm {
 
             OpCode::Loop        { offset }           => self.op_loop        (offset),
 
-            OpCode::Call        { arg_count }        => self.op_call        (arg_count)?,
-            OpCode::Class       { name_idx }         => self.op_class       (name_idx),
-            OpCode::Closure     { func_idx }         => self.op_closure     (func_idx),
+            OpCode::Call        { arg_count }        => self.op_call        (arg_count, ctx)?,
+            OpCode::Class       { name_idx }         => self.op_class       (name_idx, ctx),
+            OpCode::Closure     { func }             => self.op_closure     (func),
 
             OpCode::Nil                              => self.push_stack     (Value::Nil),
             OpCode::True                             => self.push_stack     (Value::Bool(true)),
@@ -212,7 +211,7 @@ impl Vm {
             OpCode::Greater                          => self.op_binary      (BinaryOp::Greater)?,
             OpCode::Less                             => self.op_binary      (BinaryOp::Less)?,
 
-            OpCode::Add                              => self.op_add         ()?,
+            OpCode::Add                              => self.op_add         (ctx)?,
             OpCode::Subtract                         => self.op_binary      (BinaryOp::Sub)?,
             OpCode::Multiply                         => self.op_binary      (BinaryOp::Mul)?,
             OpCode::Divide                           => self.op_binary      (BinaryOp::Div)?,
@@ -223,10 +222,12 @@ impl Vm {
             OpCode::Negate                           => self.op_negate      ()?,
             OpCode::Return                           => {
                 let result = self.pop_stack();
-                let frame  = self.pop_call_stack();
+                let frame  = self.pop_call_stack().borrow();
 
-                if self.call_stack.len() == 0 {
-                    return Ok(())
+                let is_empty = self.call_stack.is_empty();
+
+                if is_empty {
+                    return Ok(true)
                 }
 
                 let diff = self.stack.len() - *frame.stack_len;
@@ -239,28 +240,32 @@ impl Vm {
                 self.ip = frame.ret_ip;
 
             }
-        }
+        };
+
+        Ok(false)
     }
 
-    fn get_instruction<'gc>(&mut self, root: &'gc Root<'gc>) -> Gc<'gc, OpCode<'gc>> {
+    fn get_instruction(&mut self) -> OpCode<'gc> {
+        let ip = *self.ip;
+
         *self.ip += 1;
 
-        self.get_chunk(root, |chunk| { chunk.code[*self.ip -1] })
+        self.get_chunk().code[ip]
     }
 
-    fn get_constant(&self, index: ConstIndex) -> Value {
+    fn get_constant(&self, index: ConstIndex) -> Value<'gc> {
         self.constants[*index]
     }
 
-    fn pop_stack(&mut self) -> Value {
+    fn pop_stack(&mut self) -> Value<'gc> {
         self.stack.pop().expect("Stack cannot be empty")
     }
 
-    fn pop_call_stack(&mut self) -> CallFrame {
+    fn pop_call_stack(&mut self) -> Gc<'gc, RefLock<CallFrame<'gc>>> {
         self.call_stack.pop().expect("Call stack cannot be empty")
     }
 
-    fn push_stack(&mut self, val: Value) {
+    fn push_stack(&mut self, val: Value<'gc>) {
         self.stack.push(val);
     }
 
@@ -274,12 +279,12 @@ impl Vm {
         )
     }
 
-    fn peek_stack(&self, index: usize) -> Value {
+    fn peek_stack(&self, index: usize) -> Value<'gc> {
         let index = self.from_stack_top(index);
         self.stack[index]
     }
 
-    fn stack_swap(&mut self, index: StackIndex, value: Value) -> Value {
+    fn stack_swap(&mut self, index: StackIndex, value: Value<'gc>) -> Value<'gc>  {
         let top   = self.stack.len();
 
         self.stack.push(value);
@@ -294,21 +299,21 @@ impl Vm {
 
     // op codes
 
-    fn op_constant(&mut self, index: ConstIndex) {
+    fn op_constant(&'gc mut self, index: ConstIndex) {
         let constant = self.get_constant(index);
 
         self.push_stack(constant);
     }
 
     fn op_def_global(&mut self, name: ConstIndex) {
-        let name = self.get_constant_as_str(name, &self.ctx);
+        let name = self.get_constant_as_str(name);
         let val  = self.pop_stack();
 
         self.globals.insert(name, val);
     }
 
     fn op_get_global(&mut self, index: ConstIndex) -> RuntimeResult<()> {
-        let name  = self.get_constant_as_str(index, &self.ctx);
+        let name  = self.get_constant_as_str(index);
 
         let value = self.globals
             .get(&name)
@@ -324,7 +329,7 @@ impl Vm {
     }
 
     fn op_set_global(&mut self, index: ConstIndex) -> RuntimeResult<()> {
-        let name = self.get_constant_as_str(index, &self.ctx);
+        let name = self.get_constant_as_str(index);
         let val  = self.peek_stack(0);
 
         self.globals
@@ -339,11 +344,19 @@ impl Vm {
     }
 
     fn op_get_property(&mut self, index: ConstIndex) -> RuntimeResult<()> {
-        let name     = self.get_constant_as_str(index, &self.ctx);
+        let name     = self.get_constant_as_str(index);
         let val      = self.pop_stack();
 
-        let obj      = val.as_obj(&self.ctx).unwrap();
-        let instance = obj.to_instance()    .unwrap();
+
+        let obj = match val {
+            Value::Obj   (gc) => gc.as_ref(),
+            Value::ObjMut(gc) => &*gc.borrow(),
+            x                 => panic!("Value not an object: '{x}'"),
+        };
+
+        let ObjType::Instance(instance) = &obj.type_ else {
+            panic!("Object not an instance: '{}'", obj);
+        };
 
         let value = instance.fields
             .get(&name)
@@ -358,13 +371,20 @@ impl Vm {
         Ok(())
     }
 
-    fn op_set_property(&mut self, index: ConstIndex) {
-        let     name = self.get_constant_as_str(index, &self.ctx);
-        let     val  = self.pop_stack();
-        let mut obj  = self.pop_stack();
-        let     obj  = obj.as_obj_mut(&mut self.ctx);
+    fn op_set_property(&mut self, index: ConstIndex, ctx: &Mutation<'gc>) {
+        let name = self.get_constant_as_str(index);
+        let val  = self.pop_stack();
+        let obj  = self.pop_stack();
 
-        let instance = obj.unwrap().to_instance_mut()        .unwrap();
+        let mut obj = match obj {
+            Value::ObjMut(gc) => gc.borrow_mut(ctx),
+            Value::Obj   (gc) => panic!("Value not a mutable object: '{gc}'"),
+            x                 => panic!("Value not an object: '{x}'"),
+        };
+
+        let ObjType::Instance(instance) = &mut obj.type_ else {
+            panic!("Object not an instance: '{}'", obj);
+        };
 
         instance.fields
             .insert(name, val)
@@ -388,29 +408,32 @@ impl Vm {
         self.stack[index] = value;
     }
 
-    fn op_get_upvalue(&mut self, index: UpvalueIndex) {
-        let upvalue = self.upvalues[*index];
-        self.push_stack(Value::Obj(upvalue));
+    fn op_get_upvalue(&mut self, _index: UpvalueIndex) {
+        // TODO:
+        // let upvalue = self.upvalues[*index];
+        // self.push_stack(Value::Obj(upvalue));
     }
 
-    fn op_set_upvalue(&mut self, index: UpvalueIndex) {
-        let value = self.peek_stack(0);
-        let obj   = self.upvalues[*index];
+    fn op_set_upvalue(&mut self, _index: UpvalueIndex) {
+        // TODO:
+        // let value = self.peek_stack(0);
+        // let obj   = self.upvalues[*index];
 
-        let obj: &mut ObjValue = self.ctx.get_mut(obj).try_into().unwrap();
+        // let obj: &mut ObjValue = self.ctx.get_mut(obj).try_into().unwrap();
 
-        obj.value = value;
+        // obj.value = value;
     }
 
-    fn op_push_upvalue(&mut self, index: StackOffset) {
-        let index = StackIndex(self.from_stack_top(*index));
+    fn op_push_upvalue(&mut self, _index: StackOffset) {
+        // TODO:
+        // let index = StackIndex(self.from_stack_top(*index));
 
-        let val = self.stack_swap(index, Value::Nil);
+        // let val = self.stack_swap(index, Value::Nil);
 
-        let obj = self.ctx.new_obj(ObjValue::new(val).into());
-        self.upvalues.push(obj);
+        // let obj = self.ctx.new_obj(ObjValue::new(val).into());
+        // self.upvalues.push(obj);
 
-        self.stack_swap(index, Value::Obj(obj));
+        // self.stack_swap(index, Value::Obj(obj));
     }
 
     fn op_jump_if(&mut self, jump_type: JumpType, offset: Offset) {
@@ -434,50 +457,51 @@ impl Vm {
         *self.ip -= *offset;
     }
 
-    fn op_call(&mut self, arg_count: usize) -> RuntimeResult<()> {
+    fn op_call(&mut self, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
         let val = self.peek_stack(arg_count);
-        self.call_value(val, arg_count)
+        self.call_value(val, arg_count, ctx)
     }
 
-    fn op_class(&mut self, name_idx: ConstIndex) {
-        let name = self.get_constant_as_str(name_idx, &self.ctx);
-        let obj  = ObjClass::new(name);
-        let id   = self.ctx.new_obj(obj.into());
+    fn op_class(&mut self, name_idx: ConstIndex, ctx: &Mutation<'gc>) {
+        let name = self.get_constant_as_str(name_idx);
+        let obj  = Obj::new_class(name);
+        let obj  = Gc ::new(ctx, obj);
 
-        self.push_stack(Value::Obj(id));
+        self.push_stack(Value::Obj(obj));
     }
 
-    fn op_closure(&mut self, func_idx: ConstIndex) {
+    fn op_closure(&mut self, _func: Gc<'gc, ObjFunction>) {
+        // TODO:
+        // self.pop_stack();
 
-        self.pop_stack();
+        // let func_val           = self.get_constant(func);
+        // let obj                = func_val.as_obj(&self.ctx).unwrap();
+        // let func: &ObjFunction = obj.try_into().unwrap();
 
-        let func_val           = self.get_constant(func_idx);
-        let obj                = func_val.as_obj(&self.ctx).unwrap();
-        let func: &ObjFunction = obj.try_into().unwrap();
+        // let closed_objs = self.stack.iter()
+        //     .filter_map(|v| match v {
+        //         Value::Closed(_) => Some(v.clone()),
+        //         _                => None,
+        //     })
+        //     .collect()
+        // ;
 
-        let closed_objs = self.stack.iter()
-            .filter_map(|v| match v {
-                Value::Closed(_) => Some(v.clone()),
-                _                => None,
-            })
-            .collect()
-        ;
+        // let closure = ObjClosure::new(obj.id, func.arity, closed_objs);
 
-        let closure = ObjClosure::new(obj.id, func.arity, closed_objs);
+        // let id = self.ctx.new_obj(closure.into());
 
-        let id = self.ctx.new_obj(closure.into());
-
-        self.push_stack(Value::Obj(id));
+        // self.push_stack(Value::Obj(id));
     }
 
-    fn op_close_var(&mut self, index: StackIndex) {
-        let val = self.stack_swap(index, Value::Nil);
+    fn op_close_var(&mut self, _index: StackIndex) {
+        // TODO:
+        // let val = self.stack_swap(index, Value::Nil);
 
-        let obj = self.ctx.new_obj(ObjValue::new(val).into());
+        // let obj = self.ctx.new_obj(ObjValue::new(val).into());
 
-        let val = Value::Closed(obj);
+        // let val = Value::Closed(obj);
 
-        self.stack_swap(index, val);
+        // self.stack_swap(index, val);
     }
 
 
@@ -500,19 +524,17 @@ impl Vm {
         Ok(())
     }
 
-    fn op_add(&mut self) -> RuntimeResult<()> {
+    fn op_add(&mut self, ctx: &Mutation<'gc>) -> RuntimeResult<()> {
 
         let b = self.pop_stack();
         let a = self.pop_stack();
 
-        if a.is_lw_string(&self.ctx) && b.is_lw_string(&self.ctx) {
-            let result = {
-                let a  = a.to_str(&self.ctx).unwrap();
-                let b  = b.to_str(&self.ctx).unwrap();
-                format!("{a}{b}")
-            };
+        if let (Some(a), Some(b)) = (a.to_str(), b.to_str()) {
+            let result = format!("{a}{b}");
 
-            let obj = self.ctx.add_string(&result);
+            let obj = Obj::new_string(result);
+            let obj = Gc ::new(ctx, obj);
+
             let val = Value::new_obj(obj);
             self.push_stack(val);
         }
@@ -529,7 +551,7 @@ impl Vm {
     fn op_print(&mut self) {
         let val = self.pop_stack();
 
-        println!("{}", val.display(&self.ctx))
+        println!("{}", val)
     }
 
     fn op_negate(&mut self) -> RuntimeResult<()> {
@@ -560,11 +582,11 @@ impl Vm {
     fn op_return(&mut self) {
         let constant = self.pop_stack();
 
-        println!("{}", constant.display(&self.ctx));
+        println!("{}", constant);
     }
 
-    fn concatenate(&mut self, val1: &str, val2: &str) {
-        let val = concatenate(val1, val2, &mut self.ctx);
+    fn concatenate(&mut self, val1: &str, val2: &str, ctx: &'gc Mutation<'gc>) {
+        let val = concatenate(val1, val2, ctx);
         self.push_stack(val);
     }
 
@@ -575,41 +597,39 @@ impl Vm {
         RuntimeError {
             msg:         msg,
             stack_trace: self.stack_trace(),
-            line:        self.get_chunk().lines[**self.ip -1],
+            line:        self.get_chunk().lines[*self.ip -1],
         }
     }
 
-    fn get_constant_as_str(&self, index: ConstIndex, ctx: &Context) -> String {
+    fn get_constant_as_str(&self, index: ConstIndex) -> String {
         self.constants[*index]
-            .to_str(ctx)
+            .to_str()
             .expect("Expect constant value to be of type ObjString")
             .to_owned()
     }
 
-    fn get_chunk<'gc, T, R>(&self, root: &'gc Root<'gc>, func: T) -> R
-        where T: Fn(&'gc Chunk) -> R
-    {
-        let frame     = self.call_frame(root);
+    fn get_chunk(&self) -> Gc<'gc, Chunk<'gc>> {
+        let frame     = self.call_frame();
         let frame_ref = frame.borrow();
 
         let obj     = frame_ref.closure;
         let obj_ref = obj.borrow();
 
         let ObjType::Closure(closure) = &obj_ref.type_ else {
-            panic!("Object not a closure type: '{}'", obj_ref.as_string());
+            panic!("Object not a closure type: '{}'", obj_ref);
         };
 
         let chunk = &closure.function.chunk;
 
-        func(chunk)
+        *chunk
     }
 
-    fn call_frame<'gc>(&self, root: &'gc Root<'gc>) -> Gc<'gc, RefLock<CallFrame<'gc>>> {
-        *root.call_stack.last().expect("Call stack must not be empty")
+    fn call_frame(&self) -> Gc<'gc, RefLock<CallFrame<'gc>>> {
+        *self.call_stack.last().expect("Call stack must not be empty")
     }
 
-    fn call_frame_mut<'gc>(&mut self, root: &'gc Root<'gc>, ctx: &'gc Mutation<'gc>) -> RefMut<CallFrame<'gc>> {
-        let frame = self.call_frame(root);
+    fn call_frame_mut(&mut self, ctx: &'gc Mutation<'gc>) -> RefMut<CallFrame<'gc>> {
+        let frame = self.call_frame();
         frame.borrow_mut(ctx)
     }
 
@@ -618,27 +638,27 @@ impl Vm {
     //     self.stack.len() -1 -*index
     // }
 
-    fn get_local(&self, index: StackIndex) -> Value {
+    fn get_local(&self, index: StackIndex) -> Value<'gc> {
         self.stack[*index]
     }
 
-    fn call_value(&mut self, value: Value, arg_count: usize) -> RuntimeResult<()> {
+    fn call_value(&mut self, value: Value, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
 
         let obj = match value {
-            Value::Obj  (obj)   => obj,
+            Value::Obj   (obj)   => obj.as_ref(),
+            Value::ObjMut(obj)   => &*obj.borrow(),
 
             _ => Err(self.runtime_error(
                 format!("Value of type '{}' is not callable", value.display_type())
             ))?
         };
 
-        let obj = self.ctx.get(obj);
         match &obj.type_ {
 
-            // ObjType::Function(func)    => self.call       (obj.id, func.arity, arg_count)?,
-            ObjType::NativeFn(func)    => self.call_native(arg_count, func.func),
-            ObjType::Class   (_)       => self.call_class (obj.id, arg_count)?,
-            ObjType::Closure (_)       => self.call       (obj.id, arg_count, arg_count)?,
+            // ObjType::Function(func)    => self.call       (func,           func.arity, arg_count, ctx)?,
+            ObjType::NativeFn(func)    => self.call_native(arg_count,      func.func),
+            ObjType::Class   (class)   => self.call_class (class,          arg_count)?,
+            ObjType::Closure (cls)     => self.call       (cls, arg_count, arg_count,  ctx)?,
 
             _ => Err(self.runtime_error(
                 format!("Object of type '{:?}' is not callable", obj.type_)
@@ -648,7 +668,7 @@ impl Vm {
         Ok(())
     }
 
-    fn call(&mut self, closure: ObjectId, func_arity: usize, arg_count: usize) -> RuntimeResult<()> {
+    fn call(&mut self, closure: &ObjClosure, func_arity: usize, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
 
         if func_arity != arg_count {
             Err(self.runtime_error(format!("Expected {} arguments but got {}", func_arity, arg_count)))?
@@ -658,19 +678,25 @@ impl Vm {
             Err(self.runtime_error("Stack overflow".to_owned()))?
         }
 
-        self.call_stack.push(CallFrame {
+        let closure = Gc::new(ctx, closure);
+
+        let frame = CallFrame {
             stack_len:    StackIndex   (self.stack.len() - func_arity -1),
             ret_ip:       BytecodeIndex(*self.ip +1),
             closure,
             arity:        func_arity,
-        });
+        };
+
+
+
+        self.call_stack.push();
 
         Ok(())
     }
 
-    fn call_native(&mut self, func_arity: usize, func: NativeFn) {
+    fn call_native(&mut self, func_arity: usize, func: NativeFn<'gc>) {
         let stack_top = self.stack.len() - func_arity;
-        let result    = func(&self.stack[stack_top..]);
+        let result    = func.0(&self.stack[stack_top..]);
 
         for _ in 0..func_arity {
             self.stack.pop();
@@ -681,13 +707,13 @@ impl Vm {
     }
 
 
-    fn call_class(&mut self, class_id: ObjectId, _arg_count: usize) -> RuntimeResult<()> {
+    fn call_class(&mut self, class: Gc<'gc, ObjClass>, _arg_count: usize, ctx: &Mutation<'gc>) -> RuntimeResult<()> {
 
-            let obj = ObjInstance::new(class_id);
-            let id  = self.ctx.new_obj(obj.into());
+            let obj = Obj::new_instance(class);
+            let obj = Gc::new(ctx, obj);
 
             self.stack.pop();
-            self.stack.push(Value::Obj(id));
+            self.stack.push(Value::Obj(obj));
 
 
         Ok(())
@@ -699,10 +725,17 @@ impl Vm {
 
         for frame in self.call_stack.iter().rev() {
 
-            let closure: &ObjClosure  = self.ctx.get(frame  .closure) .try_into().unwrap();
-            let func:    &ObjFunction = self.ctx.get(closure.function).try_into().unwrap();
+            let frame = frame.borrow();
 
-            let line = func.chunk.lines[*frame.ip -1];
+
+            // let closure: &ObjClosure  = self.ctx.get(frame  .closure) .try_into().unwrap();
+            let func = frame.closure.borrow();
+
+            let ObjType::Function(func) = &func.type_ else {
+                panic!("Object not a function: '{}'", func);
+            };
+
+            let line = func.chunk.lines[*frame.ret_ip -1];
 
             writeln!(results, "  [line {}] in {}", line, func.name).unwrap();
         }
@@ -713,27 +746,27 @@ impl Vm {
 
 
 
-fn concatenate(val1: &str, val2: &str, ctx: &mut Context) -> Value {
+fn concatenate<'gc>(val1: &str, val2: &str, ctx: &'gc Mutation<'gc>) -> Value<'gc> {
 
     let str = format!("{val1}{val2}");
 
-    let id  = ctx.new_obj(str.into());
+    let obj = Obj::new_string(str);
+    let obj = Gc ::new(ctx, obj);
 
-    Value::new_obj(id)
+    Value::new_obj(obj)
 }
 
-fn def_natives(globals: &mut HashMap<String, Value>, ctx: &Mutation) {
+fn def_natives<'gc>(globals: &'gc mut HashMap<String, Value<'gc>>, ctx: &'gc Mutation<'gc>) {
 
     let mut make_global = |name: &str, func| {
 
-        let obj = ObjNative::new(name.to_owned(), func);
-        let obj = Obj::new(ObjType::NativeFn(obj), 0.into());
-        let obj = Gc::new(ctx, RefLock::new(obj));
+        let obj = Obj::new_native_fn(name.to_owned(), func);
+        let obj = Gc::new(ctx, obj);
 
-        globals.insert(name.to_owned(), Value::Obj(obj))
+        globals.insert(name.to_owned(), Value::new_obj(obj))
     };
 
-    make_global("clock", Gc::new(ctx, clock_native));
+    make_global("clock", NativeFn(clock_native));
 }
 
 fn clock_native<'gc>(_: &[Value<'gc>]) -> Value<'gc> {
@@ -745,78 +778,78 @@ fn clock_native<'gc>(_: &[Value<'gc>]) -> Value<'gc> {
 }
 
 
-#[cfg(test)]
-mod tests {
-    use std::fs;
+// #[cfg(test)]
+// mod tests {
+//     use std::fs;
 
-    use crate::script::{parser, resolver::resolve, scanner, vm::compiler::{CompilerOut, compile}};
+//     use crate::script::{parser, resolver::resolve, scanner, vm::compiler::{CompilerOut, compile}};
 
-    use super::*;
+//     use super::*;
 
-    fn source(file: &str) -> String {
-        let path = format!("./test_scripts/unit_tests/vm/{file}");
-        fs::read_to_string(&path).unwrap()
-    }
+//     fn source(file: &str) -> String {
+//         let path = format!("./test_scripts/unit_tests/vm/{file}");
+//         fs::read_to_string(&path).unwrap()
+//     }
 
-    fn init(source: String) -> Vm {
+//     fn init(source: String) -> Vm {
 
-        let mut ctx    = Context::new();
-        let     tokens = scanner::scan_tokens(&source).unwrap();
-        let mut ast    = parser ::parse_ast  (tokens) .unwrap();
-        resolve(&mut ast, &mut ctx);
+//         let mut ctx    = Context::new();
+//         let     tokens = scanner::scan_tokens(&source).unwrap();
+//         let mut ast    = parser ::parse_ast  (tokens) .unwrap();
+//         resolve(&mut ast, &mut ctx);
 
-        let out = compile(ast, &mut ctx).unwrap();
+//         let out = compile(ast, &mut ctx).unwrap();
 
-        let func = out.function_ids.first().unwrap();
+//         let func = out.function_ids.first().unwrap();
 
-        dbg_funcs(&out, &ctx);
+//         dbg_funcs(&out, &ctx);
 
-        Vm::new(ctx, *func, out.constants)
+//         Vm::new(ctx, *func, out.constants)
 
-    }
+//     }
 
-    fn assert_stack_empty(code: String) {
-        let mut vm = init(code);
+//     fn assert_stack_empty(code: String) {
+//         let mut vm = init(code);
 
-        vm.run().unwrap();
+//         vm.run().unwrap();
 
-        assert!(vm.stack.is_empty());
+//         assert!(vm.stack.is_empty());
 
-    }
+//     }
 
-    fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
-        for f_id in &out.function_ids {
-            let obj = ctx.get(*f_id);
+//     fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
+//         for f_id in &out.function_ids {
+//             let obj = ctx.get(*f_id);
 
-            let func: &ObjFunction = obj.try_into().unwrap();
+//             let func: &ObjFunction = obj.try_into().unwrap();
 
-            func.chunk.disassemble(&DisassembleData {
-                ctx:       &ctx,
-                lines:     &func.chunk.lines,
-                stack:     &[],
-                constants: &out.constants,
-            });
-        }
-    }
+//             func.chunk.disassemble(&DisassembleData {
+//                 ctx:       &ctx,
+//                 lines:     &func.chunk.lines,
+//                 stack:     &[],
+//                 constants: &out.constants,
+//             });
+//         }
+//     }
 
-    #[test]
-    fn test_stack_empty_base_syntax() {
-        assert_stack_empty(source("test_stack_base_syntax.lox"));
-    }
+//     #[test]
+//     fn test_stack_empty_base_syntax() {
+//         assert_stack_empty(source("test_stack_base_syntax.lox"));
+//     }
 
-    #[test]
-    fn test_stack_empty_functions_simple() {
-        assert_stack_empty(source("test_stack_functions_simple.lox"));
-    }
+//     #[test]
+//     fn test_stack_empty_functions_simple() {
+//         assert_stack_empty(source("test_stack_functions_simple.lox"));
+//     }
 
-    #[test]
-    fn test_stack_empty_functions_recursion() {
-        assert_stack_empty(source("test_stack_functions_recursion.lox"));
-    }
+//     #[test]
+//     fn test_stack_empty_functions_recursion() {
+//         assert_stack_empty(source("test_stack_functions_recursion.lox"));
+//     }
 
-    #[test]
-    fn test_stack_empty_functions_nested_2() {
-        assert_stack_empty(source("test_stack_functions_nested_2.lox"));
-    }
+//     #[test]
+//     fn test_stack_empty_functions_nested_2() {
+//         assert_stack_empty(source("test_stack_functions_nested_2.lox"));
+//     }
 
-}
+// }

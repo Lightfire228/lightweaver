@@ -1,6 +1,6 @@
 use gc_arena::Collect;
 
-use crate::script::vm::{value::Value};
+use crate::script::vm::{object::Obj, value::Value};
 
 
 #[derive(Debug, Clone, Collect)]
@@ -16,5 +16,11 @@ impl<'gc> ObjValue<'gc> {
         Self {
             value,
         }
+    }
+}
+
+impl<'gc> Obj<'gc> {
+    pub fn new_value(value: Value<'gc>) -> Obj<'gc> {
+        Obj::new(ObjValue::new(value).into())
     }
 }
