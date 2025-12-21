@@ -1,7 +1,6 @@
-use std::{cell::{Cell}, fmt::Display};
+use std::{cell::Cell, fmt::{Display}};
 
-use ast_macro::{ObjTryFrom};
-use gc_arena::{Collect, Gc, lock::RefLock};
+use gc_arena::{Collect, Gc, lock::{GcRefLock}};
 
 mod obj_native;
 mod obj_string;
@@ -19,76 +18,64 @@ pub use obj_instance::*;
 pub use obj_closure ::*;
 pub use obj_value   ::*;
 
+
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
-pub struct Obj<'gc> {
-    pub id:    usize,
-    pub type_: ObjType<'gc>,
+pub enum Obj<'gc> {
+    Obj   (Object   <'gc>),
+    ObjMut(ObjectMut<'gc>),
 }
 
-pub type ObjPtrWritable<'gc> = Gc<'gc, RefLock<Obj<'gc>>>;
-pub type ObjPtr        <'gc> = Gc<'gc, Obj<'gc>>;
-
-#[derive(Debug, Clone, Collect, ObjTryFrom)]
+#[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
-pub enum ObjType<'gc> {
-    String  (ObjString),
-    Function(ObjFunction<'gc>),
-    NativeFn(ObjNative  <'gc>),
-    Class   (ObjClass),
-    Instance(ObjInstance<'gc>),
-    Closure (ObjClosure <'gc>),
-    Value   (ObjValue   <'gc>),
+pub enum Object<'gc> {
+    String  (Gc<'gc, ObjString>),
+    Function(Gc<'gc, ObjFunction<'gc>>),
+    NativeFn(Gc<'gc, ObjNativeFn<'gc>>),
 }
+
+#[derive(Debug, Clone, Collect)]
+#[collect(no_drop)]
+pub enum ObjectMut<'gc> {
+    Class   (GcRefLock<'gc, ObjClass   <'gc>>),
+    Instance(GcRefLock<'gc, ObjInstance<'gc>>),
+    Closure (GcRefLock<'gc, ObjClosure <'gc>>),
+    Value   (GcRefLock<'gc, ObjValue   <'gc>>),
+}
+
+
 
 const ID: Cell<usize> = Cell::new(0);
 
-impl<'gc> Obj<'gc> {
-    pub fn new(type_: ObjType<'gc>) -> Obj<'gc> {
-        let id = ID.get();
-        ID.set(id +1);
 
-        Self {
-            id,
-            type_,
-        }
-    }
-}
 
 impl<'gc> Display for Obj<'gc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.type_ {
-            ObjType::String  (str)   => write!(f, "{}",             str.string),
-            ObjType::Function(func)  => write!(f, "<fn {}>",        func .name),
-            ObjType::NativeFn(func)  => write!(f, "<native fn {}>", func .name),
-            ObjType::Class   (class) => write!(f, "<class {}>",     class.name),
-            ObjType::Instance(inst)  => write!(f, "<{} instance>",  inst.as_str()),
-            ObjType::Closure (func)  => write!(f, "<closure {}>",   func.as_str()),
-            ObjType::Value   (val)   => write!(f, "{}",             val.value),
+        match &self {
+            Obj::Obj   (obj) => obj.fmt(f),
+            Obj::ObjMut(obj) => obj.fmt(f),
         }
     }
 }
 
-impl<'gc> PartialEq for Obj<'gc> {
-    fn eq(&self, other: &Self) -> bool {
-        match (&self.type_, &other.type_) {
-            (ObjType::String  (a), ObjType::String  (b)) => a.string == b.string,
-            (ObjType::Function(a), ObjType::Function(b)) => a == b,
-            _                                            => false,
+
+impl<'gc> Display for Object<'gc> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Object::String  (str)   => write!(f, "{}",             str.string),
+            Object::Function(func)  => write!(f, "<fn {}>",        func .name),
+            Object::NativeFn(func)  => write!(f, "<native fn {}>", func .name),
         }
     }
 }
 
-impl<'gc> Eq for Obj<'gc> {}
-
-impl<'gc> ObjInstance<'gc> {
-    fn as_str<'a>(&'a self) -> &'a str {
-        &self.class.name
-    }
-}
-
-impl<'gc> ObjClosure<'gc> {
-    fn as_str<'a>(&'a self) -> &'a str {
-        &self.function.name
+impl<'gc> Display for ObjectMut<'gc> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            ObjectMut::Class   (class) => write!(f, "<class {}>",     class.borrow().name),
+            ObjectMut::Instance(inst)  => write!(f, "<{} instance>",  inst .borrow().class.name),
+            ObjectMut::Closure (func)  => write!(f, "<closure {}>",   func .borrow().function.name),
+            ObjectMut::Value   (val)   => write!(f, "{}",             val  .borrow().value),
+        }
     }
 }

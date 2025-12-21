@@ -1,20 +1,20 @@
 
-use gc_arena::{Collect};
+use gc_arena::{Collect, Gc, Mutation};
 
-use crate::script::vm::{object::Obj, value::Value};
+use crate::script::vm::{object::{Obj, Object}, value::Value};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeFn<'gc>(pub fn(&[Value<'gc>]) -> Value<'gc>);
 
-#[derive(Debug, Clone, Eq, Collect)]
+#[derive(Debug, Clone, PartialEq, Eq, Collect)]
 #[collect(no_drop)]
-pub struct ObjNative<'gc> {
+pub struct ObjNativeFn<'gc> {
     pub func: NativeFn<'gc>,
     pub name: String,
 }
 
 
-impl<'gc> ObjNative<'gc> {
+impl<'gc> ObjNativeFn<'gc> {
     pub fn new(name: String, func: NativeFn<'gc>) -> Self {
         Self {
             func,
@@ -23,15 +23,31 @@ impl<'gc> ObjNative<'gc> {
     }
 }
 
-impl<'gc> Obj<'gc> {
-    pub fn new_native_fn(name: String, func: NativeFn<'gc>) -> Obj<'gc> {
-        Obj::new(ObjNative::new(name, func).into())
+// TODO: Macro this
+impl<'gc> Object<'gc> {
+    pub fn new_native_fn(name: String, func: NativeFn<'gc>, ctx: &Mutation<'gc>) -> Self {
+        Object::NativeFn(Gc::new(ctx, ObjNativeFn::new(name, func)))
+    }
+
+    pub fn to_native_fn(&'gc self) -> Option<&ObjNativeFn> {
+        match self {
+            Object::NativeFn(func) => Some(func),
+            _                      => None,
+        }
+
     }
 }
 
-impl<'gc> PartialEq for ObjNative<'gc> {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+impl<'gc> Obj<'gc> {
+    pub fn new_native_fn(name: String, func: NativeFn<'gc>, ctx: &Mutation<'gc>) -> Self {
+        Obj::Obj(Object::new_native_fn(name, func, ctx))
+    }
+
+    pub fn to_native_fn(&'gc self) -> Option<&ObjNativeFn> {
+        match self {
+            Obj::Obj   (obj) => Some(obj.to_native_fn()?),
+            Obj::ObjMut(_)   => None
+        }
     }
 }
 

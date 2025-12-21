@@ -1,6 +1,7 @@
-use gc_arena::Collect;
 
-use crate::script::vm::object::{Obj, ObjType};
+use gc_arena::{Collect, Gc, Mutation};
+
+use crate::script::vm::object::{Obj, Object};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Collect)]
@@ -18,14 +19,52 @@ impl ObjString {
     }
 }
 
-impl<'gc> Obj<'gc> {
-    pub fn new_string(string: String) -> Obj<'gc> {
-        Obj::new(ObjString::new(string).into())
+
+// TODO: Macro this
+impl<'gc> Object<'gc> {
+    pub fn new_string(string: String, ctx: &Mutation<'gc>) -> Self {
+        Object::String(Gc::new(ctx, ObjString::new(string)))
+    }
+
+    pub fn to_string(&self) -> Option<&ObjString> {
+        match self {
+            Object::String (str) => Some(str),
+            _                    => None,
+        }
+
     }
 }
 
-impl<'gc> From<String> for ObjType<'gc> {
-    fn from(value: String) -> Self {
-        ObjType::String(ObjString::new(value))
+impl<'gc> Obj<'gc> {
+    pub fn new_string(string: String, ctx: &Mutation<'gc>) -> Self {
+        Obj::Obj(Object::new_string(string, ctx))
+    }
+
+    pub fn to_string(&self) -> Option<&ObjString> {
+        match self {
+            Obj::Obj   (obj) => Some(obj.to_string()?),
+            Obj::ObjMut(_)   => None
+        }
     }
 }
+
+// impl<'gc> TryFrom<&'gc Obj<'gc>> for &Object<'gc> {
+//     type Error = ();
+
+//     fn try_from(value: &'gc Obj<'gc>) -> Result<Self, Self::Error> {
+//         match value {
+//             Obj::Obj   (obj) => Ok (obj.as_ref()),
+//             Obj::ObjMut(_)   => Err(()),
+//         }
+//     }
+// }
+
+// impl<'gc> Object<'gc> {
+
+//     fn try_from_obj(value: &'gc mut Obj<'gc>, ctx: &Mutation<'gc>) -> Option<RefMut<'gc, ObjectMut<'gc>>> {
+//         match value {
+//             Obj::Obj   (_)   => None,
+//             Obj::ObjMut(obj) => Some(obj.borrow_mut(ctx)),
+//         }
+//     }
+// }

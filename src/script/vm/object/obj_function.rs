@@ -1,7 +1,7 @@
 
-use gc_arena::{Collect, Gc};
+use gc_arena::{Collect, Gc, Mutation};
 
-use crate::script::vm::{chunk::Chunk, object::Obj};
+use crate::script::vm::{chunk::Chunk, object::{Obj, Object}};
 
 
 #[derive(Debug, Clone, Collect)]
@@ -13,7 +13,7 @@ pub struct ObjFunction<'gc> {
 }
 
 
-
+// TODO: Macro this
 impl<'gc> ObjFunction<'gc> {
     pub fn new(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Self {
 
@@ -25,17 +25,30 @@ impl<'gc> ObjFunction<'gc> {
     }
 }
 
-impl<'gc> Obj<'gc> {
-    pub fn new_function(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Obj<'gc> {
-        Obj::new(ObjFunction::new(name, arity, chunk).into())
+
+impl<'gc> Object<'gc> {
+    pub fn new_func(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>, ctx: &Mutation<'gc>) -> Self {
+        Object::Function(Gc::new(ctx, ObjFunction::new(name, arity, chunk)))
+    }
+
+    pub fn to_func(&'gc self) -> Option<&ObjFunction> {
+        match self {
+            Object::Function(func) => Some(func),
+            _                      => None,
+        }
+
     }
 }
 
+impl<'gc> Obj<'gc> {
+    pub fn new_func(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>, ctx: &Mutation<'gc>) -> Self {
+        Obj::Obj(Object::new_func(name, arity, chunk, ctx))
+    }
 
-impl<'gc> Eq for ObjFunction<'gc> {}
-
-impl<'gc> PartialEq for ObjFunction<'gc> {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
+    pub fn to_func(&'gc self) -> Option<&ObjFunction> {
+        match self {
+            Obj::Obj   (obj) => Some(obj.to_func()?),
+            Obj::ObjMut(_)   => None
+        }
     }
 }

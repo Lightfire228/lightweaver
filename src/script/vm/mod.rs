@@ -4,7 +4,7 @@ use std::{collections::HashMap};
 use std::fmt::Write;
 
 use chunk::{Chunk, OpCode};
-use gc_arena::lock::RefLock;
+use gc_arena::lock::{GcRefLock, RefLock};
 use gc_arena::{Arena, Collect, Gc, Mutation, Rootable};
 use value::Value;
 
@@ -50,7 +50,7 @@ pub struct Vm {
 #[derive(Collect)]
 #[collect(no_drop)]
 pub struct Root<'gc> {
-    pub call_stack:  Vec    <Gc<'gc, RefLock<CallFrame<'gc>>>>,
+    pub call_stack:  Vec    <GcRefLock<'gc, CallFrame<'gc>>>,
 
     pub functions:   Vec    <Gc<'gc, ObjFunction<'gc>>>,
 
@@ -69,7 +69,7 @@ pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
 struct CallFrame<'gc> {
     pub stack_len:    StackIndex,
     pub ret_ip:       BytecodeIndex,
-    pub closure:      Gc<'gc, RefLock<Obj<'gc>>>,
+    pub closure:      GcRefLock<'gc, Obj<'gc>>,
     pub arity:        usize,
 }
 
