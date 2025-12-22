@@ -1,7 +1,7 @@
 
 use std::{cell::{Ref, RefMut}, usize};
 
-use gc_arena::{Gc, Mutation, lock::{GcRefLock}};
+use gc_arena::{Gc, Mutation};
 
 use crate::script::{
     ast::*,
@@ -85,7 +85,6 @@ enum FuncType {
 struct Func<'gc> {
     pub type_:    FuncType,
     pub upvalues: Vec<Upvalue>,
-    pub chunk:    GcRefLock<'gc, Chunk<'gc>>,
     pub func_obj: ObjFunction<'gc>,
 }
 
@@ -106,11 +105,10 @@ enum JumpType {
 }
 
 impl<'gc> Func<'gc> {
-    pub fn new(type_: FuncType, func_obj: ObjFunction<'gc>, ctx: &Mutation<'gc>) -> Self {
+    pub fn new(type_: FuncType, func_obj: ObjFunction<'gc>) -> Self {
         Self {
             type_,
             func_obj,
-            chunk:    Chunk::new(ctx),
             upvalues: Vec  ::new(),
         }
     }
@@ -129,7 +127,7 @@ impl<'gc> Compiler<'gc> {
 
             line:           0,
             scope_depth:    0,
-            function_stack: vec![Func::new(FuncType::Script, func, ctx)],
+            function_stack: vec![Func::new(FuncType::Script, func)],
 
             constants:      vec![],
             upvalues:       vec![vec![]],
@@ -216,7 +214,7 @@ impl<'gc> Compiler<'gc> {
 
         let chunk = Chunk::new(self.ctx);
         let func  = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), chunk);
-        let func  = Func::new(func_type, func, self.ctx);
+        let func  = Func::new(func_type, func);
 
         self.function_stack.push(func);
 
@@ -240,10 +238,7 @@ impl<'gc> Compiler<'gc> {
         let func = self.pop_func();
         self.end_scope(0);           // return is responsible for popping func locals off the stack
 
-        let (mut func, chunk) = (func.func_obj, func.chunk);
-
-        func.chunk = chunk;
-        let func   = Gc::new(self.ctx, func);
+        let func   = Gc::new(self.ctx, func.func_obj);
 
         Ok(func)
 
@@ -575,12 +570,12 @@ impl<'gc> Compiler<'gc> {
     }
 
     fn current_chunk(&self) -> Ref<'gc, Chunk<'gc>> {
-        self.current_func().chunk.borrow()
+        self.current_func().func_obj.chunk.borrow()
 
     }
 
     fn current_chunk_mut(&self) -> RefMut<'gc, Chunk<'gc>> {
-        self.current_func().chunk.borrow_mut(self.ctx)
+        self.current_func().func_obj.chunk.borrow_mut(self.ctx)
 
     }
 
