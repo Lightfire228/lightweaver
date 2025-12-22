@@ -3,10 +3,10 @@ use gc_arena::{Collect, Gc, Mutation};
 
 use crate::script::vm::{object::{ObjPtr, Object}, value::Value};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct NativeFn<'gc>(pub fn(&[Value<'gc>]) -> Value<'gc>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Collect)]
+#[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
 pub struct ObjNativeFn<'gc> {
     pub func: NativeFn<'gc>,
@@ -49,6 +49,14 @@ impl<'gc> ObjPtr<'gc> {
         }
     }
 }
+
+impl<'gc> PartialEq for ObjNativeFn<'gc> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl<'gc> Eq for ObjNativeFn<'gc> {}
 
 // SAFETY: It's not possible for this function to squirrel away a GC reference outside of
 //         the current GC mutation, because of lifetime branding.

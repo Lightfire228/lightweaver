@@ -12,7 +12,6 @@ pub struct ObjClosure<'gc> {
 }
 
 
-// TODO: Macro this
 impl<'gc> ObjClosure<'gc> {
     pub fn new(
         function:    Gc<'gc, ObjFunction<'gc>>,
@@ -29,6 +28,7 @@ impl<'gc> ObjClosure<'gc> {
     }
 }
 
+// TODO: Macro this
 impl<'gc> ObjectMut<'gc> {
     pub fn new_closure(
         function:    Gc<'gc, ObjFunction<'gc>>,

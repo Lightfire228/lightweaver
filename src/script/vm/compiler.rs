@@ -579,7 +579,7 @@ impl<'gc> Compiler<'gc> {
 
     }
 
-    fn current_chunk_mut(&self) -> RefMut<Chunk<'gc>> {
+    fn current_chunk_mut(&self) -> RefMut<'gc, Chunk<'gc>> {
         self.current_func().chunk.borrow_mut(self.ctx)
 
     }

@@ -53,7 +53,7 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_obj_mut(&'gc mut self) -> Option<&mut ObjectMut> {
+    pub fn as_obj_mut(&'gc mut self) -> Option<&'gc mut ObjectMut<'gc>> {
         let Value ::Obj   (obj) = self else { None? };
         let ObjPtr::ObjMut(obj) = obj  else { None? };
 

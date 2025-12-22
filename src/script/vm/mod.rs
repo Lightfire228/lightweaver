@@ -629,7 +629,7 @@ impl<'gc> Root<'gc> {
         *self.call_stack.last().expect("Call stack must not be empty")
     }
 
-    fn call_frame_mut(&mut self, ctx: &'gc Mutation<'gc>) -> RefMut<CallFrame<'gc>> {
+    fn call_frame_mut(&mut self, ctx: &'gc Mutation<'gc>) -> RefMut<'gc, CallFrame<'gc>> {
         let frame = self.call_frame();
         frame.borrow_mut(ctx)
     }
