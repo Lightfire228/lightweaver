@@ -1,7 +1,7 @@
 
 use gc_arena::{Collect, Gc, Mutation};
 
-use crate::script::vm::{object::{Obj, Object}, value::Value};
+use crate::script::vm::{object::{ObjPtr, Object}, value::Value};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeFn<'gc>(pub fn(&[Value<'gc>]) -> Value<'gc>);
@@ -29,24 +29,23 @@ impl<'gc> Object<'gc> {
         Object::NativeFn(Gc::new(ctx, ObjNativeFn::new(name, func)))
     }
 
-    pub fn to_native_fn(&'gc self) -> Option<&ObjNativeFn> {
+    pub fn to_native_fn(&self) -> Option<Gc<'gc, ObjNativeFn<'gc>>> {
         match self {
-            Object::NativeFn(func) => Some(func),
+            Object::NativeFn(func) => Some(*func),
             _                      => None,
         }
-
     }
 }
 
-impl<'gc> Obj<'gc> {
+impl<'gc> ObjPtr<'gc> {
     pub fn new_native_fn(name: String, func: NativeFn<'gc>, ctx: &Mutation<'gc>) -> Self {
-        Obj::Obj(Object::new_native_fn(name, func, ctx))
+        ObjPtr::Obj(Object::new_native_fn(name, func, ctx))
     }
 
-    pub fn to_native_fn(&'gc self) -> Option<&ObjNativeFn> {
+    pub fn to_native_fn(&self) -> Option<Gc<'gc, ObjNativeFn<'gc>>> {
         match self {
-            Obj::Obj   (obj) => Some(obj.to_native_fn()?),
-            Obj::ObjMut(_)   => None
+            ObjPtr::Obj   (obj) => Some(obj.to_native_fn()?),
+            ObjPtr::ObjMut(_)   => None
         }
     }
 }

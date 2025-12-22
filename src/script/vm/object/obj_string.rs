@@ -1,7 +1,7 @@
 
 use gc_arena::{Collect, Gc, Mutation};
 
-use crate::script::vm::object::{Obj, Object};
+use crate::script::vm::object::{ObjPtr, Object};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Collect)]
@@ -26,24 +26,23 @@ impl<'gc> Object<'gc> {
         Object::String(Gc::new(ctx, ObjString::new(string)))
     }
 
-    pub fn to_string(&self) -> Option<&ObjString> {
+    pub fn to_string(&self) -> Option<Gc<'gc, ObjString>> {
         match self {
-            Object::String (str) => Some(str),
+            Object::String (str) => Some(*str),
             _                    => None,
         }
-
     }
 }
 
-impl<'gc> Obj<'gc> {
+impl<'gc> ObjPtr<'gc> {
     pub fn new_string(string: String, ctx: &Mutation<'gc>) -> Self {
-        Obj::Obj(Object::new_string(string, ctx))
+        ObjPtr::Obj(Object::new_string(string, ctx))
     }
 
-    pub fn to_string(&self) -> Option<&ObjString> {
+    pub fn to_string(&self) -> Option<Gc<'gc, ObjString>> {
         match self {
-            Obj::Obj   (obj) => Some(obj.to_string()?),
-            Obj::ObjMut(_)   => None
+            ObjPtr::Obj   (obj) => Some(obj.to_string()?),
+            ObjPtr::ObjMut(_)   => None
         }
     }
 }

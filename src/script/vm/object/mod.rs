@@ -19,14 +19,14 @@ pub use obj_closure ::*;
 pub use obj_value   ::*;
 
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Debug, Clone, Copy, Collect)]
 #[collect(no_drop)]
-pub enum Obj<'gc> {
+pub enum ObjPtr<'gc> {
     Obj   (Object   <'gc>),
     ObjMut(ObjectMut<'gc>),
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Debug, Clone, Copy, Collect)]
 #[collect(no_drop)]
 pub enum Object<'gc> {
     String  (Gc<'gc, ObjString>),
@@ -34,7 +34,7 @@ pub enum Object<'gc> {
     NativeFn(Gc<'gc, ObjNativeFn<'gc>>),
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Debug, Clone, Copy, Collect)]
 #[collect(no_drop)]
 pub enum ObjectMut<'gc> {
     Class   (GcRefLock<'gc, ObjClass   <'gc>>),
@@ -49,11 +49,11 @@ const ID: Cell<usize> = Cell::new(0);
 
 
 
-impl<'gc> Display for Obj<'gc> {
+impl<'gc> Display for ObjPtr<'gc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Obj::Obj   (obj) => obj.fmt(f),
-            Obj::ObjMut(obj) => obj.fmt(f),
+            ObjPtr::Obj   (obj) => obj.fmt(f),
+            ObjPtr::ObjMut(obj) => obj.fmt(f),
         }
     }
 }
@@ -73,7 +73,7 @@ impl<'gc> Display for ObjectMut<'gc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             ObjectMut::Class   (class) => write!(f, "<class {}>",     class.borrow().name),
-            ObjectMut::Instance(inst)  => write!(f, "<{} instance>",  inst .borrow().class.name),
+            ObjectMut::Instance(inst)  => write!(f, "<{} instance>",  inst .borrow().class.borrow().name),
             ObjectMut::Closure (func)  => write!(f, "<closure {}>",   func .borrow().function.name),
             ObjectMut::Value   (val)   => write!(f, "{}",             val  .borrow().value),
         }

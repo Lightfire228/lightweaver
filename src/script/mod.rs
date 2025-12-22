@@ -86,10 +86,15 @@ pub fn run_file(path: &Path) -> &str {
 
 fn dbg_funcs(root: &Root) {
 
+
+
     for func in &root.functions {
-        func.chunk.disassemble(&DisassembleData {
+
+        let chunk = func.chunk.borrow();
+
+        chunk.disassemble(&DisassembleData {
             name:      &func.name,
-            lines:     &func.chunk.lines,
+            lines:     &chunk.lines,
             stack:     &[],
             constants: &root.constants,
         });

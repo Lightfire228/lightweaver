@@ -1,8 +1,8 @@
-use std::{cell::RefMut, marker::PhantomData};
+use std::{marker::PhantomData};
 
-use gc_arena::{Collect, Gc, Mutation, lock::RefLock};
+use gc_arena::{Collect, Gc, Mutation, lock::{GcRefLock, RefLock}};
 
-use crate::script::vm::object::{Obj, ObjectMut};
+use crate::script::vm::object::{ObjPtr, ObjectMut};
 
 
 
@@ -35,26 +35,24 @@ impl<'gc> ObjectMut<'gc> {
         )
     }
 
-    pub fn to_class(&'gc self, ctx: &Mutation<'gc>) -> Option<RefMut<ObjClass>> {
+    pub fn to_class(&self) -> Option<GcRefLock<'gc, ObjClass<'gc>>> {
         match self {
-            ObjectMut::Class(class) => Some(class.borrow_mut(ctx)),
+            ObjectMut::Class(class) => Some(*class),
             _                       => None,
         }
     }
 }
 
-impl<'gc> Obj<'gc> {
+impl<'gc> ObjPtr<'gc> {
     pub fn new_class(name: String, ctx: &Mutation<'gc>) -> Self {
-        Obj::ObjMut(ObjectMut::new_class(name, ctx))
+        ObjPtr::ObjMut(ObjectMut::new_class(name, ctx))
     }
 
 
-
-    pub fn to_class(&'gc self, ctx: &Mutation<'gc>) -> Option<RefMut<ObjClass>> {
+    pub fn to_class(&self) -> Option<GcRefLock<'gc, ObjClass<'gc>>> {
         match self {
-            Obj::Obj   (_)   => None,
-            Obj::ObjMut(obj) => obj.to_class(ctx)
+            ObjPtr::Obj   (_)   => None,
+            ObjPtr::ObjMut(obj) => obj.to_class()
         }
-
     }
 }

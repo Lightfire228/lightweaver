@@ -1,8 +1,6 @@
-use std::cell::RefMut;
+use gc_arena::{Collect, Gc, Mutation, lock::{GcRefLock, RefLock}};
 
-use gc_arena::{Collect, Gc, Mutation, lock::RefLock};
-
-use crate::script::vm::{object::{Obj, ObjectMut}, value::Value};
+use crate::script::vm::{object::{ObjPtr, ObjectMut}, value::Value};
 
 
 #[derive(Debug, Clone, Collect)]
@@ -22,6 +20,7 @@ impl<'gc> ObjValue<'gc> {
 }
 
 
+// TODO: Macro this
 impl<'gc> ObjectMut<'gc> {
     pub fn new_value(value: Value<'gc>, ctx: &Mutation<'gc>) -> Self {
         ObjectMut::Value(
@@ -34,25 +33,23 @@ impl<'gc> ObjectMut<'gc> {
         )
     }
 
-    pub fn to_value(&'gc self, ctx: &Mutation<'gc>) -> Option<RefMut<ObjValue>> {
+    pub fn to_value(&self) -> Option<GcRefLock<'gc, ObjValue<'gc>>> {
         match self {
-            ObjectMut::Value(value) => Some(value.borrow_mut(ctx)),
+            ObjectMut::Value(value) => Some(*value),
             _                       => None,
         }
     }
 }
 
-impl<'gc> Obj<'gc> {
+impl<'gc> ObjPtr<'gc> {
     pub fn new_value(value: Value<'gc>, ctx: &Mutation<'gc>) -> Self {
-        Obj::ObjMut(ObjectMut::new_value(value, ctx))
+        ObjPtr::ObjMut(ObjectMut::new_value(value, ctx))
     }
 
-
-
-    pub fn to_value(&'gc self, ctx: &Mutation<'gc>) -> Option<RefMut<ObjValue>> {
+    pub fn to_value(&self) -> Option<GcRefLock<'gc, ObjValue<'gc>>> {
         match self {
-            Obj::Obj   (_)   => None,
-            Obj::ObjMut(obj) => obj.to_value(ctx)
+            ObjPtr::Obj   (_)   => None,
+            ObjPtr::ObjMut(obj) => Some(obj.to_value()?)
         }
 
     }

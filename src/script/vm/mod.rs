@@ -18,7 +18,6 @@ use crate::script::vm::{
         debug ::print_stack,
         object::{
             ObjFunction,
-            ObjType,
         }
     };
 
@@ -66,10 +65,10 @@ pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
 
 #[derive(Collect)]
 #[collect(no_drop)]
-struct CallFrame<'gc> {
+pub struct CallFrame<'gc> {
     pub stack_len:    StackIndex,
     pub ret_ip:       BytecodeIndex,
-    pub closure:      GcRefLock<'gc, Obj<'gc>>,
+    pub closure:      GcRefLock<'gc, ObjClosure<'gc>>,
     pub arity:        usize,
 }
 
@@ -103,17 +102,15 @@ impl Vm {
 
             let script_func = root.functions.pop().expect("expect top level script function");
 
-            let script_closure = Gc::new(
-                ctx,
-                RefLock::new(
-                    Obj::new_closure(script_func, 0, vec![])
-                )
-            );
+            let script_closure = ObjectMut::new_closure(script_func, 0, vec![], ctx);
+            let ObjectMut::Closure(cls) = script_closure else {
+                unreachable!()
+            };
 
             let call_frame = CallFrame {
                 stack_len:    StackIndex   (0),
                 ret_ip:       BytecodeIndex(0),
-                closure:      script_closure,
+                closure:      cls,
                 arity:        0,
             };
             let call_frame = Gc::new(ctx, RefLock::new(call_frame));
@@ -125,7 +122,7 @@ impl Vm {
 
 
             let mut stack = Vec::with_capacity(INITIAL_STACK_CAPACITY);
-            stack.push(Value::new_obj_mut(script_closure));
+            stack.push(Value::new_obj(ObjPtr::ObjMut(script_closure)));
 
             root.stack = stack;
         });
@@ -144,6 +141,8 @@ impl Vm {
                 self.root.mutate(|_ctx, root| {
 
                     let chunk = root.get_chunk();
+                    let chunk = chunk.borrow();
+
                     let data  = DisassembleData {
                         name:      "",
                         lines:     &chunk.lines,
@@ -181,7 +180,7 @@ impl<'gc> Root<'gc> {
             OpCode::GetGlobal   { name_idx }         => self.op_get_global  (name_idx)?,
             OpCode::SetGlobal   { name_idx }         => self.op_set_global  (name_idx)?,
 
-            OpCode::GetProperty { name_idx }         => self.op_get_property(name_idx)?,
+            OpCode::GetProperty { name_idx }         => self.op_get_property(name_idx, ctx)?,
             OpCode::SetProperty { name_idx }         => self.op_set_property(name_idx, ctx),
 
             OpCode::GetLocal    { offset }           => self.op_get_local   (offset),
@@ -198,7 +197,7 @@ impl<'gc> Root<'gc> {
             OpCode::Loop        { offset }           => self.op_loop        (offset),
 
             OpCode::Call        { arg_count }        => self.op_call        (arg_count, ctx)?,
-            OpCode::Class       { name_idx }         => self.op_class       (name_idx, ctx),
+            OpCode::Class       { name_idx }         => self.op_class       (name_idx,  ctx),
             OpCode::Closure     { func }             => self.op_closure     (func),
 
             OpCode::Nil                              => self.push_stack     (Value::Nil),
@@ -249,8 +248,10 @@ impl<'gc> Root<'gc> {
         let ip = *self.ip;
 
         *self.ip += 1;
+        let chunk = self.get_chunk();
+        let chunk = chunk.borrow();
 
-        self.get_chunk().code[ip]
+        chunk.code[ip]
     }
 
     fn get_constant(&self, index: ConstIndex) -> Value<'gc> {
@@ -343,20 +344,19 @@ impl<'gc> Root<'gc> {
             })
     }
 
-    fn op_get_property(&mut self, index: ConstIndex) -> RuntimeResult<()> {
+    fn op_get_property(&mut self, index: ConstIndex, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
         let name     = self.get_constant_as_str(index);
         let val      = self.pop_stack();
 
+        let obj = val.to_obj().unwrap_or_else(|| {
+            panic!("Value not an object: '{val}'")
+        });
 
-        let obj = match val {
-            Value::Obj   (gc) => gc.as_ref(),
-            Value::ObjMut(gc) => &*gc.borrow(),
-            x                 => panic!("Value not an object: '{x}'"),
-        };
-
-        let ObjType::Instance(instance) = &obj.type_ else {
+        let instance = obj.to_instance().unwrap_or_else(|| {
             panic!("Object not an instance: '{}'", obj);
-        };
+        });
+
+        let instance = instance.borrow_mut(ctx);
 
         let value = instance.fields
             .get(&name)
@@ -376,15 +376,15 @@ impl<'gc> Root<'gc> {
         let val  = self.pop_stack();
         let obj  = self.pop_stack();
 
-        let mut obj = match obj {
-            Value::ObjMut(gc) => gc.borrow_mut(ctx),
-            Value::Obj   (gc) => panic!("Value not a mutable object: '{gc}'"),
-            x                 => panic!("Value not an object: '{x}'"),
-        };
+        let obj = obj.to_obj().unwrap_or_else(|| {
+            panic!("Value not an object: '{obj}'");
+        });
 
-        let ObjType::Instance(instance) = &mut obj.type_ else {
-            panic!("Object not an instance: '{}'", obj);
-        };
+        let obj = obj.to_instance().unwrap_or_else(|| {
+            panic!("Object not an instance: '{obj}'");
+        });
+
+        let mut instance = obj.borrow_mut(ctx);
 
         instance.fields
             .insert(name, val)
@@ -409,13 +409,13 @@ impl<'gc> Root<'gc> {
     }
 
     fn op_get_upvalue(&mut self, _index: UpvalueIndex) {
-        // TODO:
+        todo!()
         // let upvalue = self.upvalues[*index];
         // self.push_stack(Value::Obj(upvalue));
     }
 
     fn op_set_upvalue(&mut self, _index: UpvalueIndex) {
-        // TODO:
+        todo!()
         // let value = self.peek_stack(0);
         // let obj   = self.upvalues[*index];
 
@@ -425,7 +425,7 @@ impl<'gc> Root<'gc> {
     }
 
     fn op_push_upvalue(&mut self, _index: StackOffset) {
-        // TODO:
+        todo!()
         // let index = StackIndex(self.from_stack_top(*index));
 
         // let val = self.stack_swap(index, Value::Nil);
@@ -464,19 +464,23 @@ impl<'gc> Root<'gc> {
 
     fn op_class(&mut self, name_idx: ConstIndex, ctx: &Mutation<'gc>) {
         let name = self.get_constant_as_str(name_idx);
-        let obj  = Obj::new_class(name);
-        let obj  = Gc ::new(ctx, obj);
+        let obj  = ObjPtr::new_class(name, ctx);
 
         self.push_stack(Value::Obj(obj));
     }
 
     fn op_closure(&mut self, _func: Gc<'gc, ObjFunction>) {
-        // TODO:
-        // self.pop_stack();
+        todo!()
+        // let func = self.pop_stack();
+        // let func = func.to_obj().unwrap_or_else(|| {
+        //     panic!("Expect value to be an object: {func}")
+        // });
 
-        // let func_val           = self.get_constant(func);
-        // let obj                = func_val.as_obj(&self.ctx).unwrap();
-        // let func: &ObjFunction = obj.try_into().unwrap();
+        // let func = func.to_func().unwrap_or_else(|| {
+        //     panic!("Expect object to be a script function: {func}");
+        // });
+
+
 
         // let closed_objs = self.stack.iter()
         //     .filter_map(|v| match v {
@@ -494,7 +498,7 @@ impl<'gc> Root<'gc> {
     }
 
     fn op_close_var(&mut self, _index: StackIndex) {
-        // TODO:
+        todo!()
         // let val = self.stack_swap(index, Value::Nil);
 
         // let obj = self.ctx.new_obj(ObjValue::new(val).into());
@@ -524,16 +528,15 @@ impl<'gc> Root<'gc> {
         Ok(())
     }
 
-    fn op_add(&mut self, ctx: &Mutation<'gc>) -> RuntimeResult<()> {
+    fn op_add(&mut self, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
 
         let b = self.pop_stack();
         let a = self.pop_stack();
 
-        if let (Some(a), Some(b)) = (a.to_str(), b.to_str()) {
-            let result = format!("{a}{b}");
+        if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
+            let result = format!("{}{}", a.string, b.string);
 
-            let obj = Obj::new_string(result);
-            let obj = Gc ::new(ctx, obj);
+            let obj = ObjPtr::new_string(result, ctx);
 
             let val = Value::new_obj(obj);
             self.push_stack(val);
@@ -594,34 +597,32 @@ impl<'gc> Root<'gc> {
 
     fn runtime_error(&self, msg: String) -> RuntimeError {
 
+        let chunk = self.get_chunk();
+        let chunk = chunk.borrow();
+
         RuntimeError {
             msg:         msg,
             stack_trace: self.stack_trace(),
-            line:        self.get_chunk().lines[*self.ip -1],
+            line:        chunk.lines[*self.ip -1],
         }
     }
 
     fn get_constant_as_str(&self, index: ConstIndex) -> String {
         self.constants[*index]
-            .to_str()
+            .as_str()
             .expect("Expect constant value to be of type ObjString")
+            .string
             .to_owned()
     }
 
-    fn get_chunk(&self) -> Gc<'gc, Chunk<'gc>> {
+    fn get_chunk(&self) -> GcRefLock<'gc, Chunk<'gc>> {
         let frame     = self.call_frame();
         let frame_ref = frame.borrow();
 
-        let obj     = frame_ref.closure;
-        let obj_ref = obj.borrow();
+        let cls = frame_ref.closure;
+        let cls = cls.borrow();
 
-        let ObjType::Closure(closure) = &obj_ref.type_ else {
-            panic!("Object not a closure type: '{}'", obj_ref);
-        };
-
-        let chunk = &closure.function.chunk;
-
-        *chunk
+        cls.function.chunk
     }
 
     fn call_frame(&self) -> Gc<'gc, RefLock<CallFrame<'gc>>> {
@@ -642,33 +643,32 @@ impl<'gc> Root<'gc> {
         self.stack[*index]
     }
 
-    fn call_value(&mut self, value: Value, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
+    fn call_value(&mut self, value: Value<'gc>, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
 
-        let obj = match value {
-            Value::Obj   (obj)   => obj.as_ref(),
-            Value::ObjMut(obj)   => &*obj.borrow(),
-
-            _ => Err(self.runtime_error(
+        let obj = value.to_obj().ok_or_else(|| {
+            self.runtime_error(
                 format!("Value of type '{}' is not callable", value.display_type())
+            )
+        })?;
+
+        match obj {
+            ObjPtr::Obj   (Object   ::NativeFn(func))  => self.call_native(       arg_count, func.func.clone()),
+            ObjPtr::ObjMut(ObjectMut::Closure (cls))   => self.call       (cls,   arg_count, ctx)?,
+            ObjPtr::ObjMut(ObjectMut::Class   (class)) => self.call_class (class, arg_count, ctx)?,
+            _                                          => Err(self.runtime_error(
+                format!("Object of type '{:?}' is not callable", obj)
             ))?
+
         };
-
-        match &obj.type_ {
-
-            // ObjType::Function(func)    => self.call       (func,           func.arity, arg_count, ctx)?,
-            ObjType::NativeFn(func)    => self.call_native(arg_count,      func.func),
-            ObjType::Class   (class)   => self.call_class (class,          arg_count)?,
-            ObjType::Closure (cls)     => self.call       (cls, arg_count, arg_count,  ctx)?,
-
-            _ => Err(self.runtime_error(
-                format!("Object of type '{:?}' is not callable", obj.type_)
-            ))?
-        }
 
         Ok(())
     }
 
-    fn call(&mut self, closure: &ObjClosure, func_arity: usize, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
+    fn call(&mut self, closure: GcRefLock<'gc, ObjClosure<'gc>>, arg_count: usize, ctx: &'gc Mutation<'gc>) -> RuntimeResult<()> {
+
+        let func       = closure.borrow();
+        let func       = func.function;
+        let func_arity = func.arity;
 
         if func_arity != arg_count {
             Err(self.runtime_error(format!("Expected {} arguments but got {}", func_arity, arg_count)))?
@@ -678,8 +678,6 @@ impl<'gc> Root<'gc> {
             Err(self.runtime_error("Stack overflow".to_owned()))?
         }
 
-        let closure = Gc::new(ctx, closure);
-
         let frame = CallFrame {
             stack_len:    StackIndex   (self.stack.len() - func_arity -1),
             ret_ip:       BytecodeIndex(*self.ip +1),
@@ -688,8 +686,7 @@ impl<'gc> Root<'gc> {
         };
 
 
-
-        self.call_stack.push();
+        self.call_stack.push(Gc::new(ctx, RefLock::new(frame)));
 
         Ok(())
     }
@@ -707,14 +704,13 @@ impl<'gc> Root<'gc> {
     }
 
 
-    fn call_class(&mut self, class: Gc<'gc, ObjClass>, _arg_count: usize, ctx: &Mutation<'gc>) -> RuntimeResult<()> {
+    fn call_class(&mut self, class: Gc<'gc, RefLock<ObjClass<'gc>>>, _arg_count: usize, ctx: &Mutation<'gc>) -> RuntimeResult<()> {
 
-            let obj = Obj::new_instance(class);
-            let obj = Gc::new(ctx, obj);
 
-            self.stack.pop();
-            self.stack.push(Value::Obj(obj));
+        let obj = ObjPtr::new_instance(class, ctx);
 
+        self.stack.pop();
+        self.stack.push(Value::Obj(obj));
 
         Ok(())
     }
@@ -729,13 +725,10 @@ impl<'gc> Root<'gc> {
 
 
             // let closure: &ObjClosure  = self.ctx.get(frame  .closure) .try_into().unwrap();
-            let func = frame.closure.borrow();
-
-            let ObjType::Function(func) = &func.type_ else {
-                panic!("Object not a function: '{}'", func);
-            };
-
-            let line = func.chunk.lines[*frame.ret_ip -1];
+            let func  = frame.closure.borrow();
+            let func  = func .function;
+            let chunk = func .chunk  .borrow();
+            let line  = chunk.lines[*frame.ret_ip -1];
 
             writeln!(results, "  [line {}] in {}", line, func.name).unwrap();
         }
@@ -750,8 +743,7 @@ fn concatenate<'gc>(val1: &str, val2: &str, ctx: &'gc Mutation<'gc>) -> Value<'g
 
     let str = format!("{val1}{val2}");
 
-    let obj = Obj::new_string(str);
-    let obj = Gc ::new(ctx, obj);
+    let obj = ObjPtr::new_string(str, ctx);
 
     Value::new_obj(obj)
 }
@@ -760,8 +752,7 @@ fn def_natives<'gc>(globals: &'gc mut HashMap<String, Value<'gc>>, ctx: &'gc Mut
 
     let mut make_global = |name: &str, func| {
 
-        let obj = Obj::new_native_fn(name.to_owned(), func);
-        let obj = Gc::new(ctx, obj);
+        let obj = ObjPtr::new_native_fn(name.to_owned(), func, ctx);
 
         globals.insert(name.to_owned(), Value::new_obj(obj))
     };

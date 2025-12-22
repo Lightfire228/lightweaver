@@ -1,21 +1,21 @@
 
-use gc_arena::{Collect, Gc, Mutation};
+use gc_arena::{Collect, Gc, Mutation, lock::GcRefLock};
 
-use crate::script::vm::{chunk::Chunk, object::{Obj, Object}};
+use crate::script::vm::{chunk::Chunk, object::{ObjPtr, Object}};
 
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Debug, Clone, Collect, PartialEq, Eq)]
 #[collect(no_drop)]
 pub struct ObjFunction<'gc> {
     pub arity: usize,
-    pub chunk: Gc<'gc, Chunk<'gc>>,
+    pub chunk: GcRefLock<'gc, Chunk<'gc>>,
     pub name:  String,
 }
 
 
 // TODO: Macro this
 impl<'gc> ObjFunction<'gc> {
-    pub fn new(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Self {
+    pub fn new(name: String, arity: usize, chunk: GcRefLock<'gc, Chunk<'gc>>) -> Self {
 
         Self {
             arity,
@@ -27,28 +27,27 @@ impl<'gc> ObjFunction<'gc> {
 
 
 impl<'gc> Object<'gc> {
-    pub fn new_func(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>, ctx: &Mutation<'gc>) -> Self {
+    pub fn new_func(name: String, arity: usize, chunk: GcRefLock<'gc, Chunk<'gc>>, ctx: &Mutation<'gc>) -> Self {
         Object::Function(Gc::new(ctx, ObjFunction::new(name, arity, chunk)))
     }
 
-    pub fn to_func(&'gc self) -> Option<&ObjFunction> {
+    pub fn to_func(&self) -> Option<Gc<'gc, ObjFunction<'gc>>> {
         match self {
-            Object::Function(func) => Some(func),
+            Object::Function(func) => Some(*func),
             _                      => None,
         }
-
     }
 }
 
-impl<'gc> Obj<'gc> {
-    pub fn new_func(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>, ctx: &Mutation<'gc>) -> Self {
-        Obj::Obj(Object::new_func(name, arity, chunk, ctx))
+impl<'gc> ObjPtr<'gc> {
+    pub fn new_func(name: String, arity: usize, chunk: GcRefLock<'gc, Chunk<'gc>>, ctx: &Mutation<'gc>) -> Self {
+        ObjPtr::Obj(Object::new_func(name, arity, chunk, ctx))
     }
 
-    pub fn to_func(&'gc self) -> Option<&ObjFunction> {
+    pub fn to_func(&self) -> Option<Gc<'gc, ObjFunction<'gc>>> {
         match self {
-            Obj::Obj   (obj) => Some(obj.to_func()?),
-            Obj::ObjMut(_)   => None
+            ObjPtr::Obj   (obj) => Some(obj.to_func()?),
+            ObjPtr::ObjMut(_)   => None
         }
     }
 }

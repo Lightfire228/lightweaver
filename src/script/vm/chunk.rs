@@ -1,7 +1,7 @@
 use std::{fmt::Display, ops::{Deref, DerefMut}};
 
 use ast_macro::derive_all;
-use gc_arena::{Collect, Gc};
+use gc_arena::{Collect, Gc, Mutation, lock::{GcRefLock, RefLock}};
 
 use crate::script::vm::object::{ObjFunction};
 
@@ -52,7 +52,7 @@ pub enum OpCode<'gc> {
     Return,
 }
 
-#[derive(Debug, Clone, Collect)]
+#[derive(Debug, Clone, Collect, PartialEq, Eq)]
 #[collect(no_drop)]
 pub struct Chunk<'gc> {
     pub code:      Vec<OpCode<'gc>>,
@@ -60,11 +60,11 @@ pub struct Chunk<'gc> {
 }
 
 impl<'gc> Chunk<'gc> {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(ctx: &Mutation<'gc>) -> GcRefLock<'gc, Self> {
+        Gc::new(ctx, RefLock::new(Self {
             code:  vec![],
             lines: vec![],
-        }
+        }))
     }
 
     pub fn write_op(&mut self, op: OpCode<'gc>, line: usize) -> BytecodeIndex {

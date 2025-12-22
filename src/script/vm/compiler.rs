@@ -1,13 +1,13 @@
 
-use std::usize;
+use std::{cell::{Ref, RefMut}, usize};
 
-use gc_arena::{Gc, Mutation};
+use gc_arena::{Gc, Mutation, lock::{GcRefLock}};
 
 use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        Root, chunk::*, object::{Obj, ObjFunction, ObjString, ObjType}
+        Root, chunk::*, object::{ObjPtr, ObjFunction}
     }
 };
 
@@ -29,9 +29,12 @@ pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>)
 
     compiler.write_op(Op::Return);
 
+    let len = compiler.function_stack.len();
+    assert_eq!(len, 1, "expect function stack to only contain top level script object: {} elements found", len);
+
     let script_func = compiler.function_stack
         .pop()
-        .expect("expect top level script function")
+        .unwrap()
         .func_obj
     ;
 
@@ -51,7 +54,7 @@ struct Compiler<'gc> {
     scope_depth:    usize,
     function_stack: Vec<Func<'gc>>,
 
-    upvalues:       Vec<Vec<Obj<'gc>>>,
+    upvalues:       Vec<Vec<ObjPtr<'gc>>>,
 
     constants:      Vec<Value<'gc>>,
 }
@@ -82,7 +85,7 @@ enum FuncType {
 struct Func<'gc> {
     pub type_:    FuncType,
     pub upvalues: Vec<Upvalue>,
-    pub chunk:    Chunk<'gc>,
+    pub chunk:    GcRefLock<'gc, Chunk<'gc>>,
     pub func_obj: ObjFunction<'gc>,
 }
 
@@ -103,11 +106,11 @@ enum JumpType {
 }
 
 impl<'gc> Func<'gc> {
-    pub fn new(type_: FuncType, func_obj: ObjFunction<'gc>) -> Self {
+    pub fn new(type_: FuncType, func_obj: ObjFunction<'gc>, ctx: &Mutation<'gc>) -> Self {
         Self {
             type_,
             func_obj,
-            chunk:    Chunk::new(),
+            chunk:    Chunk::new(ctx),
             upvalues: Vec  ::new(),
         }
     }
@@ -117,12 +120,8 @@ impl<'gc> Compiler<'gc> {
 
     fn new(root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
 
-        let chunk = Gc::new(ctx, Chunk::new());
-        let func  = new_func("script".to_owned(), 0, chunk);
-
-        let ObjType::Function(func) = func.type_ else {
-            unreachable!();
-        };
+        let chunk = Chunk::new(ctx);
+        let func  = ObjFunction::new("script".to_owned(), 0, chunk);
 
         Self {
             root,
@@ -130,7 +129,7 @@ impl<'gc> Compiler<'gc> {
 
             line:           0,
             scope_depth:    0,
-            function_stack: vec![Func::new(FuncType::Script, func)],
+            function_stack: vec![Func::new(FuncType::Script, func, ctx)],
 
             constants:      vec![],
             upvalues:       vec![vec![]],
@@ -215,9 +214,9 @@ impl<'gc> Compiler<'gc> {
         -> CompilerResult<Gc<'gc, ObjFunction<'gc>>>
     {
 
-        let chunk = Gc::new(self.ctx, Chunk::new());
-        let func = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), chunk);
-        let func = Func::new(func_type, func);
+        let chunk = Chunk::new(self.ctx);
+        let func  = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), chunk);
+        let func  = Func::new(func_type, func, self.ctx);
 
         self.function_stack.push(func);
 
@@ -243,7 +242,7 @@ impl<'gc> Compiler<'gc> {
 
         let (mut func, chunk) = (func.func_obj, func.chunk);
 
-        func.chunk = Gc::new(self.ctx, chunk);
+        func.chunk = chunk;
         let func   = Gc::new(self.ctx, func);
 
         Ok(func)
@@ -525,7 +524,7 @@ impl<'gc> Compiler<'gc> {
     fn patch_jump(&mut self, index: BytecodeIndex) {
         let index = index.0;
 
-        let chunk = self.current_chunk_mut();
+        let mut chunk = self.current_chunk_mut();
 
         let new_offset = chunk.code.len() - index -1;
         let new_offset = Offset(new_offset);
@@ -575,13 +574,13 @@ impl<'gc> Compiler<'gc> {
         ConstIndex(index)
     }
 
-    fn current_chunk(&self) -> &Chunk<'gc> {
-        &self.current_func().chunk
+    fn current_chunk(&self) -> Ref<'gc, Chunk<'gc>> {
+        self.current_func().chunk.borrow()
 
     }
 
-    fn current_chunk_mut(&mut self) -> &mut Chunk<'gc> {
-        &mut self.current_func_mut().chunk
+    fn current_chunk_mut(&self) -> RefMut<Chunk<'gc>> {
+        self.current_func().chunk.borrow_mut(self.ctx)
 
     }
 
@@ -607,7 +606,7 @@ impl<'gc> Compiler<'gc> {
     }
     fn write_ops(&mut self, op1: OpCode<'gc>, op2: OpCode<'gc>) -> BytecodeIndex {
         let line = self.line;
-        let chunk = self.current_chunk_mut();
+        let mut chunk = self.current_chunk_mut();
         chunk.write_op(op1, line);
         chunk.write_op(op2, line)
     }
@@ -630,10 +629,8 @@ impl<'gc> Compiler<'gc> {
     }
 
     // TODO: string interning
-    fn new_str_obj(&mut self, s: String) -> Gc<'gc, Obj<'gc>> {
-        let obj   = ObjString::new(s);
-        let obj   = Obj::new(obj.into());
-        Gc::new(self.ctx, obj)
+    fn new_str_obj(&self, s: String) -> ObjPtr<'gc> {
+        ObjPtr::new_string(s, self.ctx)
     }
 
     // TODO: string interning
@@ -645,10 +642,4 @@ impl<'gc> Compiler<'gc> {
 
 fn to_number(lexeme: &str) -> f64 {
     lexeme.parse().expect("Unable lexeme to convert to f64")
-}
-
-fn new_func<'gc>(name: String, arity: usize, chunk: Gc<'gc, Chunk<'gc>>) -> Obj<'gc> {
-    let func = ObjFunction::new(name.to_owned(), arity, chunk);
-
-    Obj::new(func.into())
 }
