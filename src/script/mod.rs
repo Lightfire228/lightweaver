@@ -60,7 +60,7 @@ pub fn run_file(path: &Path) -> &str {
 
                 globals:     HashMap::new(),
 
-                ip: BytecodeIndex(0)
+                ip:          BytecodeIndex(0)
 
             }
         });
@@ -85,9 +85,6 @@ pub fn run_file(path: &Path) -> &str {
 }
 
 fn dbg_funcs(root: &Root) {
-
-
-
     for func in &root.functions {
 
         let chunk = func.chunk.borrow();

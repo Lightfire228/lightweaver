@@ -14,6 +14,7 @@ pub enum Value<'gc> {
     Number(f64),
     Bool  (bool),
     Obj   (ObjPtr<'gc>),
+    Closed(ObjPtr<'gc>),
     Nil,
 }
 
@@ -36,6 +37,7 @@ impl<'gc> Value<'gc> {
             Value::Bool  (x) => !(*x),
             Value::Number(_) => false,
             Value::Obj   (_) => false,
+            Value::Closed(_) => false,
         }
     }
 
@@ -78,6 +80,7 @@ impl<'gc> Value<'gc> {
     pub fn display_type(&self) -> String {
         match self {
             Value::Obj   (_) => "Object" .to_owned(),
+            Value::Closed(_) => "Closed" .to_owned(),
             Value::Number(_) => "Number" .to_owned(),
             Value::Bool  (_) => "Boolean".to_owned(),
             Value::Nil       => "Nil"    .to_owned(),
@@ -102,6 +105,7 @@ impl<'gc> Display for Value<'gc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Obj   (x) => x.fmt(f),
+            Value::Closed(x) => x.fmt(f),
             Value::Number(x) => x.fmt(f),
             Value::Bool  (x) => x.fmt(f),
             Value::Nil       => f.write_str("nil"),

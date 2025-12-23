@@ -28,8 +28,8 @@ pub mod compiler;
 pub mod object;
 
 
-// static DEBUG_TRACE_EXECUTION: bool = true;
-static DEBUG_TRACE_EXECUTION: bool = false;
+static DEBUG_TRACE_EXECUTION: bool = true;
+// static DEBUG_TRACE_EXECUTION: bool = false;
 
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
@@ -58,7 +58,7 @@ pub struct Root<'gc> {
 
     pub globals:     HashMap<String, Value<'gc>>,
 
-    pub ip:   BytecodeIndex,
+    pub ip:          BytecodeIndex,
 }
 
 pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
@@ -156,7 +156,7 @@ impl Vm {
                 })
             }
 
-            self.root.collect_all();
+            self.root.collect_debt();
 
             let done = self.root.mutate_root(|ctx, root| {
                 root.run_instruction(ctx)
@@ -187,8 +187,8 @@ impl<'gc> Root<'gc> {
             OpCode::SetLocal    { offset }           => self.op_set_local   (offset),
 
             OpCode::GetUpvalue  { index }            => self.op_get_upvalue (index),
-            OpCode::SetUpvalue  { index }            => self.op_set_upvalue (index),
-            OpCode::PushUpvalue { index }            => self.op_push_upvalue(index),
+            OpCode::SetUpvalue  { index }            => self.op_set_upvalue (index, ctx),
+            OpCode::PushUpvalue { index }            => self.op_push_upvalue(index, ctx),
 
             OpCode::JumpIfFalse { offset }           => self.op_jump_if     (JumpType::IfFalsey, offset),
             OpCode::JumpIfTrue  { offset }           => self.op_jump_if     (JumpType::IfTruthy, offset),
@@ -198,7 +198,7 @@ impl<'gc> Root<'gc> {
 
             OpCode::Call        { arg_count }        => self.op_call        (arg_count, ctx)?,
             OpCode::Class       { name_idx }         => self.op_class       (name_idx,  ctx),
-            OpCode::Closure     { func }             => self.op_closure     (func),
+            OpCode::Closure     { func }             => self.op_closure     (func,      ctx),
 
             OpCode::Nil                              => self.push_stack     (Value::Nil),
             OpCode::True                             => self.push_stack     (Value::Bool(true)),
@@ -408,32 +408,42 @@ impl<'gc> Root<'gc> {
         self.stack[index] = value;
     }
 
-    fn op_get_upvalue(&mut self, _index: UpvalueIndex) {
-        todo!()
-        // let upvalue = self.upvalues[*index];
-        // self.push_stack(Value::Obj(upvalue));
+    fn op_get_upvalue(&mut self, index: UpvalueIndex) {
+        let closure = self.call_frame().borrow().closure;
+        let upvalue = closure.borrow().closed_vals[*index];
+
+        self.push_stack(upvalue);
     }
 
-    fn op_set_upvalue(&mut self, _index: UpvalueIndex) {
-        todo!()
-        // let value = self.peek_stack(0);
-        // let obj   = self.upvalues[*index];
+    fn op_set_upvalue(&self, index: UpvalueIndex, ctx: &'gc Mutation<'gc>) {
+        let value = self.peek_stack(0);
 
-        // let obj: &mut ObjValue = self.ctx.get_mut(obj).try_into().unwrap();
+        let closure = self.call_frame().borrow().closure;
+        let upvalue = closure.borrow().closed_vals[*index];
 
-        // obj.value = value;
+        let obj   = upvalue.to_obj_mut().expect("expect mutable object");
+        let obj   = obj.to_value().unwrap_or_else(|| {
+            panic!("expect object of type Value: '{}'", obj)
+        });
+
+        let mut obj = obj.borrow_mut(ctx);
+
+        obj.value = value;
     }
 
-    fn op_push_upvalue(&mut self, _index: StackOffset) {
-        todo!()
-        // let index = StackIndex(self.from_stack_top(*index));
+    fn op_push_upvalue(&mut self, index: StackOffset, ctx: &'gc Mutation<'gc>) {
+        let index = StackIndex(self.from_stack_top(*index));
 
-        // let val = self.stack_swap(index, Value::Nil);
+        let val = self.stack_swap(index, Value::Nil);
+        let obj = ObjPtr::new_value(val, ctx);
+        let val = Value::Obj(obj);
 
-        // let obj = self.ctx.new_obj(ObjValue::new(val).into());
-        // self.upvalues.push(obj);
+        let closure = self.call_frame().borrow().closure;
+        let mut closure = closure.borrow_mut(ctx);
 
-        // self.stack_swap(index, Value::Obj(obj));
+        closure.closed_vals.push(val);
+
+        self.stack_swap(index, val);
     }
 
     fn op_jump_if(&mut self, jump_type: JumpType, offset: Offset) {
@@ -469,43 +479,29 @@ impl<'gc> Root<'gc> {
         self.push_stack(Value::Obj(obj));
     }
 
-    fn op_closure(&mut self, _func: Gc<'gc, ObjFunction>) {
-        todo!()
-        // let func = self.pop_stack();
-        // let func = func.to_obj().unwrap_or_else(|| {
-        //     panic!("Expect value to be an object: {func}")
-        // });
+    fn op_closure(&mut self, func: Gc<'gc, ObjFunction<'gc>>, ctx: &Mutation<'gc>) {
+        self.pop_stack();
 
-        // let func = func.to_func().unwrap_or_else(|| {
-        //     panic!("Expect object to be a script function: {func}");
-        // });
+        let closed_vals = self.stack.iter()
+            .filter_map(|v| match v {
+                Value::Closed(_) => Some(v.clone()),
+                _                => None,
+            })
+            .collect()
+        ;
 
+        let closure = ObjPtr::new_closure(func, func.arity, closed_vals, ctx);
 
-
-        // let closed_objs = self.stack.iter()
-        //     .filter_map(|v| match v {
-        //         Value::Closed(_) => Some(v.clone()),
-        //         _                => None,
-        //     })
-        //     .collect()
-        // ;
-
-        // let closure = ObjClosure::new(obj.id, func.arity, closed_objs);
-
-        // let id = self.ctx.new_obj(closure.into());
-
-        // self.push_stack(Value::Obj(id));
+        self.push_stack(Value::Obj(closure));
     }
 
-    fn op_close_var(&mut self, _index: StackIndex) {
-        todo!()
-        // let val = self.stack_swap(index, Value::Nil);
+    fn op_close_var(&mut self, index: StackIndex, ctx: &Mutation<'gc>) {
+        let val = self.stack_swap(index, Value::Nil);
+        let obj = ObjPtr::new_value(val, ctx);
 
-        // let obj = self.ctx.new_obj(ObjValue::new(val).into());
+        let val = Value::Obj(obj);
 
-        // let val = Value::Closed(obj);
-
-        // self.stack_swap(index, val);
+        self.stack_swap(index, val);
     }
 
 
@@ -608,9 +604,12 @@ impl<'gc> Root<'gc> {
     }
 
     fn get_constant_as_str(&self, index: ConstIndex) -> String {
+
         self.constants[*index]
             .as_str()
-            .expect("Expect constant value to be of type ObjString")
+            .unwrap_or_else(|| {
+                panic!("Expect constant value to be of type ObjString: {}", self.constants[*index])
+            })
             .string
             .to_owned()
     }
@@ -633,11 +632,6 @@ impl<'gc> Root<'gc> {
         let frame = self.call_frame();
         frame.borrow_mut(ctx)
     }
-
-    // fn stack_index(&self, index: StackIndex) -> usize {
-
-    //     self.stack.len() -1 -*index
-    // }
 
     fn get_local(&self, index: StackIndex) -> Value<'gc> {
         self.stack[*index]
@@ -685,8 +679,8 @@ impl<'gc> Root<'gc> {
             arity:        func_arity,
         };
 
-
         self.call_stack.push(Gc::new(ctx, RefLock::new(frame)));
+        self.ip = BytecodeIndex(0);
 
         Ok(())
     }
@@ -728,7 +722,7 @@ impl<'gc> Root<'gc> {
             let func  = frame.closure.borrow();
             let func  = func .function;
             let chunk = func .chunk  .borrow();
-            let line  = chunk.lines[*frame.ret_ip -1];
+            let line  = chunk.lines[*frame.ret_ip];
 
             writeln!(results, "  [line {}] in {}", line, func.name).unwrap();
         }
@@ -769,78 +763,98 @@ fn clock_native<'gc>(_: &[Value<'gc>]) -> Value<'gc> {
 }
 
 
-// #[cfg(test)]
-// mod tests {
-//     use std::fs;
+#[cfg(test)]
+mod tests {
+    use std::fs;
 
-//     use crate::script::{parser, resolver::resolve, scanner, vm::compiler::{CompilerOut, compile}};
+    use crate::script::{parser, resolver::resolve, scanner, vm::compiler::{compile}};
 
-//     use super::*;
+    use super::*;
 
-//     fn source(file: &str) -> String {
-//         let path = format!("./test_scripts/unit_tests/vm/{file}");
-//         fs::read_to_string(&path).unwrap()
-//     }
+    fn source(file: &str) -> String {
+        let path = format!("./test_scripts/unit_tests/vm/{file}");
+        fs::read_to_string(&path).unwrap()
+    }
 
-//     fn init(source: String) -> Vm {
+    fn init(source: String) -> Vm {
 
-//         let mut ctx    = Context::new();
-//         let     tokens = scanner::scan_tokens(&source).unwrap();
-//         let mut ast    = parser ::parse_ast  (tokens) .unwrap();
-//         resolve(&mut ast, &mut ctx);
+        let     tokens = scanner::scan_tokens(&source).unwrap();
+        let mut ast    = parser ::parse_ast  (tokens) .unwrap();
+        resolve(&mut ast);
 
-//         let out = compile(ast, &mut ctx).unwrap();
+        let mut root = ArenaRoot::new(|_ctx| {
+            Root {
+                call_stack:  vec![],
+                stack:       vec![],
 
-//         let func = out.function_ids.first().unwrap();
+                functions:   vec![],
+                constants:   vec![],
 
-//         dbg_funcs(&out, &ctx);
+                globals:     HashMap::new(),
 
-//         Vm::new(ctx, *func, out.constants)
+                ip:          BytecodeIndex(0)
 
-//     }
+            }
+        });
 
-//     fn assert_stack_empty(code: String) {
-//         let mut vm = init(code);
+        root.mutate_root(|ctx, root| {
+            compile(ast, root, ctx).unwrap();
+        });
 
-//         vm.run().unwrap();
+        root.mutate(|_ctx, root| {
+            dbg_funcs(&root);
+        });
 
-//         assert!(vm.stack.is_empty());
 
-//     }
+        Vm::new(root)
 
-//     fn dbg_funcs(out: &CompilerOut, ctx: &Context) {
-//         for f_id in &out.function_ids {
-//             let obj = ctx.get(*f_id);
+    }
 
-//             let func: &ObjFunction = obj.try_into().unwrap();
+    fn assert_stack_empty(code: String) {
+        let mut vm = init(code);
 
-//             func.chunk.disassemble(&DisassembleData {
-//                 ctx:       &ctx,
-//                 lines:     &func.chunk.lines,
-//                 stack:     &[],
-//                 constants: &out.constants,
-//             });
-//         }
-//     }
+        vm.run().unwrap();
 
-//     #[test]
-//     fn test_stack_empty_base_syntax() {
-//         assert_stack_empty(source("test_stack_base_syntax.lox"));
-//     }
+        vm.root.mutate(|_ctx, root| {
+            assert!(root.stack.is_empty());
+        });
 
-//     #[test]
-//     fn test_stack_empty_functions_simple() {
-//         assert_stack_empty(source("test_stack_functions_simple.lox"));
-//     }
+    }
 
-//     #[test]
-//     fn test_stack_empty_functions_recursion() {
-//         assert_stack_empty(source("test_stack_functions_recursion.lox"));
-//     }
+    fn dbg_funcs(root: &Root) {
+        for func in &root.functions {
 
-//     #[test]
-//     fn test_stack_empty_functions_nested_2() {
-//         assert_stack_empty(source("test_stack_functions_nested_2.lox"));
-//     }
+            let chunk = func.chunk.borrow();
 
-// }
+            chunk.disassemble(&DisassembleData {
+                name:      &func.name,
+                lines:     &chunk.lines,
+                stack:     &[],
+                constants: &root.constants,
+            });
+        }
+    }
+
+
+
+    #[test]
+    fn test_stack_empty_base_syntax() {
+        assert_stack_empty(source("test_stack_base_syntax.lox"));
+    }
+
+    #[test]
+    fn test_stack_empty_functions_simple() {
+        assert_stack_empty(source("test_stack_functions_simple.lox"));
+    }
+
+    #[test]
+    fn test_stack_empty_functions_recursion() {
+        assert_stack_empty(source("test_stack_functions_recursion.lox"));
+    }
+
+    #[test]
+    fn test_stack_empty_functions_nested_2() {
+        assert_stack_empty(source("test_stack_functions_nested_2.lox"));
+    }
+
+}

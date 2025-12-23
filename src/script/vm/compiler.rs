@@ -55,8 +55,6 @@ struct Compiler<'gc> {
     function_stack: Vec<Func<'gc>>,
 
     upvalues:       Vec<Vec<ObjPtr<'gc>>>,
-
-    constants:      Vec<Value<'gc>>,
 }
 
 #[derive(Debug)]
@@ -129,7 +127,6 @@ impl<'gc> Compiler<'gc> {
             scope_depth:    0,
             function_stack: vec![Func::new(FuncType::Script, func)],
 
-            constants:      vec![],
             upvalues:       vec![vec![]],
         }
     }
@@ -562,7 +559,7 @@ impl<'gc> Compiler<'gc> {
     // utils
 
     pub fn add_constant(&mut self, value: Value<'gc>) -> ConstIndex {
-        let index = self.constants.len();
+        let index = self.root.constants.len();
 
         self.root.constants.push(value);
 
