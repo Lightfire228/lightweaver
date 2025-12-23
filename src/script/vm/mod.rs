@@ -674,13 +674,14 @@ impl<'gc> Root<'gc> {
 
         let frame = CallFrame {
             stack_len:    StackIndex   (self.stack.len() - func_arity -1),
-            ret_ip:       BytecodeIndex(*self.ip +1),
+            ret_ip:       self.ip,
             closure,
             arity:        func_arity,
         };
 
+
         self.call_stack.push(Gc::new(ctx, RefLock::new(frame)));
-        self.ip = BytecodeIndex(0);
+        *self.ip = 0;
 
         Ok(())
     }

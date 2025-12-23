@@ -7,7 +7,7 @@ use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        Root, chunk::*, object::{ObjPtr, ObjFunction}
+        Root, chunk::*, object::{ObjFunction, ObjPtr, Object}
     }
 };
 
@@ -235,7 +235,8 @@ impl<'gc> Compiler<'gc> {
         let func = self.pop_func();
         self.end_scope(0);           // return is responsible for popping func locals off the stack
 
-        let func   = Gc::new(self.ctx, func.func_obj);
+        let func = Gc::new(self.ctx, func.func_obj);
+        self.emit_constant(Value::Obj(ObjPtr::Obj(Object::Function(func))));
 
         Ok(func)
 
