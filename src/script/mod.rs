@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{fs, path::Path};
 
 use ast::{Ast, AstNode, DisplayArgs, WalkArgs};
 use parser::{parse_ast, ParseErrorType};
@@ -20,7 +20,7 @@ use crate::script::{
     parser::AssignmentTarget,
     resolver::resolve,
     vm::{
-        ArenaRoot, Root, chunk::{BytecodeIndex}, debug::DisassembleData,
+        ArenaRoot, Root
     }
 };
 
@@ -50,29 +50,15 @@ pub fn run_file(path: &Path) -> &str {
         resolve(&mut ast);
         display_ast(&ast);
 
-        let mut root = ArenaRoot::new(|_ctx| {
-            Root {
-                call_stack:  vec![],
-                stack:       vec![],
-
-                functions:   vec![],
-                constants:   vec![],
-
-                globals:     HashMap::new(),
-
-                ip:          BytecodeIndex(0)
-
-            }
-        });
+        let mut root = ArenaRoot::new(|_ctx| { Root::new() });
 
         root.mutate_root(|ctx, root| {
             compile(ast, root, ctx).unwrap();
         });
 
         root.mutate(|_ctx, root| {
-            dbg_funcs(&root);
+            root.dbg_funcs();
         });
-
 
         vm::interpret(root).map_err(|err| Re::RuntimeError(err))?;
 
@@ -81,20 +67,6 @@ pub fn run_file(path: &Path) -> &str {
         Err(err) => display_error(err),
 
         Ok (val) => val,
-    }
-}
-
-fn dbg_funcs(root: &Root) {
-    for func in &root.functions {
-
-        let chunk = func.chunk.borrow();
-
-        chunk.disassemble(&DisassembleData {
-            name:      &func.name,
-            lines:     &chunk.lines,
-            stack:     &[],
-            constants: &root.constants,
-        });
     }
 }
 

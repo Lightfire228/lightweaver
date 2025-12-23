@@ -18,7 +18,7 @@ type Op<'gc> = OpCode<'gc>;
 // type Func = (FuncType, ObjectId);
 
 pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) ->
-    CompilerResult<Gc<'gc, ObjFunction<'gc>>>
+    CompilerResult<()>
 {
 
     let mut compiler = Compiler::new(root, ctx);
@@ -32,17 +32,7 @@ pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>)
     let len = compiler.function_stack.len();
     assert_eq!(len, 1, "expect function stack to only contain top level script object: {} elements found", len);
 
-    let script_func = compiler.function_stack
-        .pop()
-        .unwrap()
-        .func_obj
-    ;
-
-    let script_func = Gc::new(ctx, script_func);
-
-    compiler.root.functions.push(script_func);
-
-    Ok(script_func)
+    Ok(())
 }
 
 
@@ -83,7 +73,7 @@ enum FuncType {
 struct Func<'gc> {
     pub type_:    FuncType,
     pub upvalues: Vec<Upvalue>,
-    pub func_obj: ObjFunction<'gc>,
+    pub func_obj: Gc<'gc, ObjFunction<'gc>>,
 }
 
 
@@ -103,7 +93,7 @@ enum JumpType {
 }
 
 impl<'gc> Func<'gc> {
-    pub fn new(type_: FuncType, func_obj: ObjFunction<'gc>) -> Self {
+    pub fn new(type_: FuncType, func_obj: Gc<'gc, ObjFunction<'gc>>) -> Self {
         Self {
             type_,
             func_obj,
@@ -117,7 +107,8 @@ impl<'gc> Compiler<'gc> {
     fn new(root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
 
         let chunk = Chunk::new(ctx);
-        let func  = ObjFunction::new("script".to_owned(), 0, chunk);
+        let func  = Gc::new(ctx, ObjFunction::new("script".to_owned(), 0, chunk));
+        root.functions.push(func);
 
         Self {
             root,
@@ -210,9 +201,10 @@ impl<'gc> Compiler<'gc> {
     {
 
         let chunk = Chunk::new(self.ctx);
-        let func  = ObjFunction::new(stmt.name.lexeme, stmt.params.len(), chunk);
+        let func  = Gc::new(self.ctx, ObjFunction::new(stmt.name.lexeme, stmt.params.len(), chunk));
         let func  = Func::new(func_type, func);
 
+        self.root.functions.push(func.func_obj);
         self.function_stack.push(func);
 
         self.begin_scope();
@@ -235,7 +227,8 @@ impl<'gc> Compiler<'gc> {
         let func = self.pop_func();
         self.end_scope(0);           // return is responsible for popping func locals off the stack
 
-        let func = Gc::new(self.ctx, func.func_obj);
+        let func = func.func_obj;
+
         self.emit_constant(Value::Obj(ObjPtr::Obj(Object::Function(func))));
 
         Ok(func)

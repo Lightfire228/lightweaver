@@ -49,16 +49,19 @@ pub struct Vm {
 #[derive(Collect)]
 #[collect(no_drop)]
 pub struct Root<'gc> {
-    pub call_stack:  Vec    <GcRefLock<'gc, CallFrame<'gc>>>,
+    call_stack:  Vec    <GcRefLock<'gc, CallFrame<'gc>>>,
 
-    pub functions:   Vec    <Gc<'gc, ObjFunction<'gc>>>,
+    functions:   Vec    <Gc<'gc, ObjFunction<'gc>>>,
 
-    pub stack:       Vec    <Value<'gc>>,
-    pub constants:   Vec    <Value<'gc>>,
+    stack:       Vec    <Value<'gc>>,
+    constants:   Vec    <Value<'gc>>,
 
-    pub globals:     HashMap<String, Value<'gc>>,
+    globals:     HashMap<String, Value<'gc>>,
 
-    pub ip:          BytecodeIndex,
+    ip:          BytecodeIndex,
+
+    capture_out: bool,
+    out:         Vec<String>,
 }
 
 pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
@@ -99,10 +102,9 @@ impl Vm {
     pub fn new(mut root: ArenaRoot) -> Self {
 
         root.mutate_root(|ctx, root| {
+            let script_func = root.functions.first().expect("expect top level script function");
 
-            let script_func = root.functions.pop().expect("expect top level script function");
-
-            let script_closure = ObjectMut::new_closure(script_func, 0, vec![], ctx);
+            let script_closure = ObjectMut::new_closure(*script_func, 0, vec![], ctx);
             let ObjectMut::Closure(cls) = script_closure else {
                 unreachable!()
             };
@@ -136,26 +138,6 @@ impl Vm {
     fn run<'gc>(&mut self) -> RuntimeResult<()> {
 
         loop {
-
-            if DEBUG_TRACE_EXECUTION {
-                self.root.mutate(|_ctx, root| {
-
-                    let chunk = root.get_chunk();
-                    let chunk = chunk.borrow();
-
-                    let data  = DisassembleData {
-                        name:      "",
-                        lines:     &chunk.lines,
-                        stack:     &root.stack,
-                        constants: &root.constants,
-                    };
-
-                    chunk.code[*root.ip].disassemble(&data, *root.ip);
-                    print_stack(&data);
-                    println!();
-                })
-            }
-
             self.root.collect_debt();
 
             let done = self.root.mutate_root(|ctx, root| {
@@ -171,7 +153,65 @@ impl Vm {
 
 impl<'gc> Root<'gc> {
 
-    fn run_instruction(&'gc mut self, ctx: &'gc Mutation<'gc>) -> RuntimeResult<bool>{
+    pub fn new() -> Self {
+        Self {
+            call_stack:  vec![],
+            stack:       vec![],
+
+            functions:   vec![],
+            constants:   vec![],
+
+            globals:     HashMap::new(),
+
+            ip:          BytecodeIndex(0),
+
+            capture_out: false,
+            out:         vec![],
+        }
+    }
+
+    pub fn new_test() -> Self {
+        let mut x = Self::new();
+
+        x.capture_out = true;
+
+        x
+    }
+
+    pub fn dbg_funcs(&self) {
+
+        for func in &self.functions {
+
+            let chunk = func.chunk.borrow();
+
+            chunk.disassemble(&DisassembleData {
+                name:      &func.name,
+                lines:     &chunk.lines,
+                stack:     &[],
+                constants: &self.constants,
+            });
+        }
+    }
+
+
+    fn run_instruction(&'gc mut self, ctx: &'gc Mutation<'gc>) -> RuntimeResult<bool> {
+
+        if DEBUG_TRACE_EXECUTION {
+
+            let chunk = self.get_chunk();
+            let chunk = chunk.borrow();
+
+            let data  = DisassembleData {
+                name:      "",
+                lines:     &chunk.lines,
+                stack:     &self.stack,
+                constants: &self.constants,
+            };
+
+            chunk.code[*self.ip].disassemble(&data, *self.ip);
+            print_stack(&data);
+                println!();
+        }
 
         match self.get_instruction() {
             OpCode::GetConstant { index }            => self.op_constant    (index),
@@ -550,7 +590,12 @@ impl<'gc> Root<'gc> {
     fn op_print(&mut self) {
         let val = self.pop_stack();
 
-        println!("{}", val)
+        let out = format!("{}", val);
+        if self.capture_out {
+            self.out.push(out.clone());
+        }
+
+        println!("{}", out)
     }
 
     fn op_negate(&mut self) -> RuntimeResult<()> {
@@ -714,18 +759,20 @@ impl<'gc> Root<'gc> {
 
         let mut results = String::new();
 
+        let mut prv_ip  = self.ip;
+
         for frame in self.call_stack.iter().rev() {
 
             let frame = frame.borrow();
 
-
-            // let closure: &ObjClosure  = self.ctx.get(frame  .closure) .try_into().unwrap();
             let func  = frame.closure.borrow();
             let func  = func .function;
             let chunk = func .chunk  .borrow();
-            let line  = chunk.lines[*frame.ret_ip];
+            let line  = chunk.lines[*prv_ip];
 
             writeln!(results, "  [line {}] in {}", line, func.name).unwrap();
+
+            prv_ip = frame.ret_ip;
         }
 
         results
@@ -783,27 +830,14 @@ mod tests {
         let mut ast    = parser ::parse_ast  (tokens) .unwrap();
         resolve(&mut ast);
 
-        let mut root = ArenaRoot::new(|_ctx| {
-            Root {
-                call_stack:  vec![],
-                stack:       vec![],
-
-                functions:   vec![],
-                constants:   vec![],
-
-                globals:     HashMap::new(),
-
-                ip:          BytecodeIndex(0)
-
-            }
-        });
+        let mut root = ArenaRoot::new(|_ctx| Root::new_test());
 
         root.mutate_root(|ctx, root| {
             compile(ast, root, ctx).unwrap();
         });
 
         root.mutate(|_ctx, root| {
-            dbg_funcs(&root);
+            root.dbg_funcs();
         });
 
 
@@ -821,22 +855,6 @@ mod tests {
         });
 
     }
-
-    fn dbg_funcs(root: &Root) {
-        for func in &root.functions {
-
-            let chunk = func.chunk.borrow();
-
-            chunk.disassemble(&DisassembleData {
-                name:      &func.name,
-                lines:     &chunk.lines,
-                stack:     &[],
-                constants: &root.constants,
-            });
-        }
-    }
-
-
 
     #[test]
     fn test_stack_empty_base_syntax() {
@@ -856,6 +874,43 @@ mod tests {
     #[test]
     fn test_stack_empty_functions_nested_2() {
         assert_stack_empty(source("test_stack_functions_nested_2.lox"));
+    }
+
+    #[test]
+    fn test_recursion_fib() {
+        let mut vm = init(source("test_recursion_fib.lox"));
+
+        vm.run().unwrap();
+
+        vm.root.mutate(|_ctx, root| {
+            assert!(root.stack.is_empty());
+
+            assert_eq!(&root.out[0],  "1");
+            assert_eq!(&root.out[1],  "1");
+            assert_eq!(&root.out[2],  "2");
+            assert_eq!(&root.out[3],  "3");
+            assert_eq!(&root.out[4],  "5");
+            assert_eq!(&root.out[5],  "8");
+            assert_eq!(&root.out[6], "13");
+            assert_eq!(&root.out[7], "21");
+        });
+    }
+
+    #[test]
+    fn test_closure_mutation_1() {
+        let mut vm = init(source("test_closure_mutation_1.lox"));
+
+        vm.run().unwrap();
+
+        vm.root.mutate(|_ctx, root| {
+            assert!(root.stack.is_empty());
+
+            assert_eq!(&root.out[0],  "closed");
+            assert_eq!(&root.out[1],  "1");
+
+            assert_eq!(&root.out[2],  "changed");
+            assert_eq!(&root.out[3],  "2");
+        });
     }
 
 }
