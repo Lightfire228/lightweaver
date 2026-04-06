@@ -85,6 +85,7 @@ impl<'a> Resolver<'a> {
             self.resolve_stmt(stmt);
         }
 
+        // TODO:
         block.locals = self.end_scope();
     }
 
@@ -594,6 +595,52 @@ mod tests {
 
         assert_eq!(print_a.var_type, VarType::Upvalue(UpvalueIndex(0)));
         assert_eq!(print_d.var_type, VarType::Upvalue(UpvalueIndex(1)));
+    }
+
+    #[test]
+    fn test_closure_mutation_1() {
+
+        let mut ast = get_ast("test_closure_mutation_1.lox");
+
+        resolve(&mut ast);
+        println!("{}", ast);
+
+        let ast:         &Block          = get!(& ast        .stmts [0]);
+
+
+        let decl_a:      &VarStmt        = get!(& ast        .stmts [0]);
+        let decl_b:      &VarStmt        = get!(& ast        .stmts [1]);
+
+        let decl_fn_1:   &FunctionStmt   = get!(& ast        .stmts [2]);
+        let set_a:       &ExpressionStmt = get!(& decl_fn_1  .body  [0]);
+        let set_b:       &ExpressionStmt = get!(& decl_fn_1  .body  [1]);
+
+        let set_a:       &Assign         = get!(& set_a      .expr);
+        let set_b:       &Assign         = get!(& set_b      .expr);
+
+        let set_a:       &Variable       = get!(& set_a      .target);
+        let set_b:       &Variable       = get!(& set_b      .target);
+
+        let print_a_1:   &PrintStmt      = get!(& ast        .stmts  [3]);
+        let print_b_1:   &PrintStmt      = get!(& ast        .stmts  [4]);
+        let print_a_2:   &PrintStmt      = get!(& ast        .stmts  [6]);
+        let print_b_2:   &PrintStmt      = get!(& ast        .stmts  [4]);
+
+        let print_a_1:   &Variable       = get!(&  print_a_1 .expr);
+        let print_b_1:   &Variable       = get!(&  print_b_1 .expr);
+        let print_a_2:   &Variable       = get!(&  print_a_2 .expr);
+        let print_b_2:   &Variable       = get!(&  print_b_2 .expr);
+
+        assert_eq!(decl_a   .var_type, VarDeclType::Upvalue);
+        assert_eq!(decl_b   .var_type, VarDeclType::Upvalue);
+
+        assert_eq!(set_a    .var_type, VarType::Upvalue(UpvalueIndex(0)));
+        assert_eq!(set_b    .var_type, VarType::Upvalue(UpvalueIndex(1)));
+
+        assert_eq!(print_a_1.var_type, VarType::Upvalue(UpvalueIndex(0)));
+        assert_eq!(print_b_1.var_type, VarType::Upvalue(UpvalueIndex(1)));
+        assert_eq!(print_a_2.var_type, VarType::Upvalue(UpvalueIndex(0)));
+        assert_eq!(print_b_2.var_type, VarType::Upvalue(UpvalueIndex(1)));
     }
 
 

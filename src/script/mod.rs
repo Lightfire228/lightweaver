@@ -1,6 +1,5 @@
 use std::{fs, path::Path};
 
-use ast::{Ast, AstNode, DisplayArgs, WalkArgs};
 use parser::{parse_ast, ParseErrorType};
 use scanner::{scan_tokens, ScannerErrorType};
 
@@ -48,7 +47,7 @@ pub fn run_file(path: &Path) -> &str {
 
         let mut ast = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
         resolve(&mut ast);
-        display_ast(&ast);
+        println!("{}", ast);
 
         let mut root = ArenaRoot::new(|_ctx| { Root::new() });
 
@@ -146,62 +145,4 @@ fn display_parser_err(err: ParseErrorList) -> ! {
 
 fn display_runtime_err(err: RuntimeError) -> ! {
     panic!("Runtime error: [line {}] {} \n{}", err.line, err.msg, err.stack_trace)
-}
-
-
-fn display_ast(ast: &Ast) {
-
-    let args = DisplayArgs { depth: 0 };
-
-    let disp = ast.display(args);
-    println!("{}", disp.primary);
-
-    let args = WalkArgs;
-    for node in ast.walk(args) {
-        display(node, 1, None);
-    }
-
-}
-
-
-// This is a little kludgey.
-// The idea is to walk the AST and display each node at a particular indent level
-// while also allowing for the previous node to optionally label it's children
-fn display(node: Box<&dyn AstNode>, depth: usize, prefix: Option<String>) {
-    let args = DisplayArgs {
-        depth,
-    };
-    let disp   = node.display(args);
-    let spaces = spaces(disp.depth);
-
-    println!(
-        "{}{}{}",
-        spaces,
-        prefix.unwrap_or("".to_owned()),
-        disp.primary,
-    );
-
-    let args     = WalkArgs;
-    let children = node.walk(args);
-
-    let depth = depth +1;
-
-    match disp.labels {
-        Some(fields) => {
-            assert_eq!(children.len(), fields.len(), "The number of display field labels must match the number of node children");
-
-            for (child, prefix) in children.into_iter().zip(fields) {
-                display(child, depth, Some(prefix));
-            }
-        }
-        None => {
-            for child in children {
-                display(child, depth, None);
-            }
-        }
-    }
-}
-
-fn spaces(depth: usize) -> String {
-    " ".repeat(depth * 4)
 }

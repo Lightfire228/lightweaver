@@ -191,6 +191,8 @@ impl<'gc> Root<'gc> {
                 constants: &self.constants,
             });
         }
+
+        println!("=======================================================================|");
     }
 
 
@@ -210,7 +212,7 @@ impl<'gc> Root<'gc> {
 
             chunk.code[*self.ip].disassemble(&data, *self.ip);
             print_stack(&data);
-                println!();
+            println!();
         }
 
         match self.get_instruction() {
