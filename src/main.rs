@@ -1,16 +1,19 @@
 #![allow(dead_code)]
 
-// use script::{ast::display::AstDisplayOpts, parser::Parser, scanner::Scanner};
-use std::{fs::File, io::BufWriter, path::Path};
+use std::{path::Path};
 
 mod script;
 mod macros;
 mod utils;
+mod vulkan;
+mod app;
 
 
 pub fn main() {
 
-    lox();
+    app::main().unwrap();
+
+    // lox();
 
 }
 
