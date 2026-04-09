@@ -1,15 +1,18 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod validation_layers;
+mod device_properties;
 
 use anyhow::{Result, Ok, anyhow};
-use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
+use vulkanalia::vk::{ExtDebugUtilsExtensionInstanceCommands, PhysicalDevice};
 use winit::window::Window;
 use log::*;
 use vulkanalia::Version;
 use vulkanalia::loader::{LIBRARY, LibloadingLoader};
 use vulkanalia::prelude::v1_4::*;
 use vulkanalia::window as vk_window;
+
+use crate::vulkan::device_properties::QueueFamilyIndices;
 
 type VkAllocator<'a> = Option<&'a vk::AllocationCallbacks>;
 const ALLOCATOR: VkAllocator = None;
@@ -32,8 +35,12 @@ pub struct VulkanApp {
 
 #[derive(Debug, Default)]
 struct AppData {
-    messenger: vk::DebugUtilsMessengerEXT,
+    messenger:       vk::DebugUtilsMessengerEXT,
+    physical_device: vk::PhysicalDevice,
+
+    surface: vk::SurfaceKHR
 }
+
 
 impl VulkanApp {
     pub unsafe fn new(window: &Window) -> Result<Self> { unsafe {
@@ -44,6 +51,9 @@ impl VulkanApp {
         let entry    = Entry::new(loader).map_err(|b| anyhow!("{}", b))?;
         let instance = data.create_instance(window, &entry)?;
 
+        data.pick_physical_device(&instance)?;
+
+        
         Ok(Self {
             entry,
             instance,
