@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ffi::{CStr, c_void}, marker::PhantomData, ops::{Deref, DerefMut}};
 use log::*;
 
-use vulkanalia::{prelude::v1_0::*, vk::{DebugUtilsMessengerEXT}};
+use vulkanalia::vk::{DebugUtilsMessengerEXT, EntryV1_0, HasBuilder, InstanceV1_0};
 use vulkanalia::{Entry, vk::{self}, window as vk_window};
 use crate::rendering::{ALLOCATOR, AppData, PORTABILITY_MACOS_VERSION};
 
@@ -130,11 +130,11 @@ impl<'a> Instance<'a> {
 
 impl<'a> Drop for Instance<'a> {
     fn drop(&mut self) {
-        println!("hi");
+        trace!("dropping instance");
         unsafe {
             self.instance.destroy_instance(ALLOCATOR);
         }
-        println!("hi again");
+        trace!("dropped instance");
     }
 }
 

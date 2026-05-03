@@ -5,7 +5,7 @@
     clippy::unnecessary_wraps
 )]
 
-use std::mem::size_of;
+use std::mem::{ManuallyDrop, MaybeUninit, size_of};
 use cgmath::{vec2, vec3};
 use winit::application::ApplicationHandler;
 use std::result::Result::Ok;
@@ -63,7 +63,8 @@ pub const DEVICE_EXTENSIONS:          &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN
 
 pub const MAX_FRAMES_IN_FLIGHT:       usize                = 2;
 
-mod types;
+mod instance;
+mod device;
 
 pub fn main() -> Result<()> {
     pretty_env_logger::init();
@@ -123,7 +124,6 @@ impl<'a> ApplicationHandler for AppWindow<'a> {
                 if let Some(mut app) = self.app.take() {
                     unsafe { app.destroy(); }
                 }
-                println!("test 3");
 
                 event_loop.exit();
             },
@@ -148,9 +148,9 @@ impl<'a> ApplicationHandler for AppWindow<'a> {
 
 #[derive(Debug)]
 struct App<'a> {
-    instance: types::Instance<'a>,
+    instance: ManuallyDrop<instance::Instance<'a>>,
+    device:   ManuallyDrop<device  ::Device  <'a>>,
     data:     AppData,
-    device:   Device,
 
     frame:    usize,
     resized:  bool,
@@ -214,50 +214,73 @@ struct AppData {
 impl<'a> App<'a> {
     unsafe fn create(window: &Window, entry: &'a Entry) -> Result<Self> {
 
-        let mut data = AppData::default();
+        let mut this = MaybeUninit::<Self>::uninit();
+        let     ptr  = this.as_mut_ptr();
 
-        let (instance, messenger) = types::Instance::new(window, &entry)?;
+        macro_rules! init {
+            ($x:ident, $val:expr) => {{
+                (&raw mut (*ptr).$x).write($val);
+                &(*ptr).$x
+            }};
+        }
+        macro_rules! init_mut {
+            ($x:ident, $val:expr) => {{
+                (&raw mut (*ptr).$x).write($val);
+                &mut (*ptr).$x
+            }};
+        }
+
+        let (instance, messenger) = instance::Instance::new(window, &entry)?;
+
+        let     instance = init!    (instance, ManuallyDrop::new(instance));
+        let mut data     = init_mut!(data,     AppData::default());
 
         data.messenger = messenger;
 
 
-        data.surface = vk_window::create_surface(&instance, &window, &window)?;
-        pick_physical_device(&instance, &mut data)?;
+        data.surface = vk_window::create_surface(instance,    &window, &window)?;
+        data.physical_device = pick_physical_device(instance, &mut data)?;
 
-        let device = create_logical_device(&entry, &instance, &mut data)?;
+        // let device = create_logical_device(&entry, &instance, &mut data)?;
+        let (device, graphics_queue, present_queue) = device::Device::new(&entry, instance, data.physical_device, data.surface)?;
+        data.graphics_queue = graphics_queue;
+        data.present_queue  = present_queue;
 
-        create_swapchain            (window,  &instance, &device, &mut data)?;
-        create_swapchain_image_views(                    &device, &mut data)?;
-        create_render_pass          (         &instance, &device, &mut data)?;
-        create_descriptor_set_layout(                    &device, &mut data)?;
-        create_pipeline             (                    &device, &mut data)?;
-        create_depth_objects        (         &instance, &device, &mut data)?;
-        create_framebuffers         (                    &device, &mut data)?;
-        create_command_pool         (         &instance, &device, &mut data)?;
-        create_texture_image        (         &instance, &device, &mut data)?;
-        create_texture_image_view   (                    &device, &mut data)?;
-        create_texture_sampler      (                    &device, &mut data)?;
-        load_model                  (                             &mut data)?;
-        create_vertex_buffer        (         &instance, &device, &mut data)?;
-        create_index_buffer         (         &instance, &device, &mut data)?;
-        create_uniform_buffers      (         &instance, &device, &mut data)?;
-        create_descriptor_pool      (                    &device, &mut data)?;
-        create_descriptor_sets      (                    &device, &mut data)?;
-        create_command_buffers      (                    &device, &mut data)?;
-        create_sync_objects         (                    &device, &mut data)?;
+        let device = init!(device, ManuallyDrop::new(device));
 
-        Ok(Self {
-            instance,
-            data,
-            device,
-            frame:   0,
-            resized: false,
-            start:   Instant::now(),
-        })
+
+        create_swapchain            (window,  instance, device, &mut data)?;
+        create_swapchain_image_views(                   device, &mut data)?;
+        create_render_pass          (         instance, device, &mut data)?;
+        create_descriptor_set_layout(                   device, &mut data)?;
+        create_pipeline             (                   device, &mut data)?;
+        create_depth_objects        (         instance, device, &mut data)?;
+        create_framebuffers         (                   device, &mut data)?;
+        create_command_pool         (         instance, device, &mut data)?;
+        create_texture_image        (         instance, device, &mut data)?;
+        create_texture_image_view   (                   device, &mut data)?;
+        create_texture_sampler      (                   device, &mut data)?;
+        load_model                  (                           &mut data)?;
+        create_vertex_buffer        (         instance, device, &mut data)?;
+        create_index_buffer         (         instance, device, &mut data)?;
+        create_uniform_buffers      (         instance, device, &mut data)?;
+        create_descriptor_pool      (                   device, &mut data)?;
+        create_descriptor_sets      (                   device, &mut data)?;
+        create_command_buffers      (                   device, &mut data)?;
+        create_sync_objects         (                   device, &mut data)?;
+
+        _ = init!(frame,   0);
+        _ = init!(resized, false);
+        _ = init!(start,   Instant::now());
+
+        println!("hi again");
+
+        Ok(this.assume_init())
     }
 
 
     unsafe fn destroy(&mut self) {
+        println!("start destroy");
         self.device.device_wait_idle().unwrap();
 
         self.destroy_swapchain();
@@ -279,13 +302,14 @@ impl<'a> App<'a> {
 
         self.device.destroy_command_pool(self.data.command_pool, ALLOCATOR);
 
-        self.device.destroy_device(ALLOCATOR);
+        // self.device.destroy_device(ALLOCATOR);
 
         if VALIDATION_ENABLED {
             self.instance.destroy_debug_utils_messenger_ext(self.data.messenger, ALLOCATOR);
         }
 
         self.instance.destroy_surface_khr(self.data.surface, ALLOCATOR);
+        println!("done destroy");
         // self.instance.destroy_instance   (ALLOCATOR);
     }
 
@@ -333,6 +357,15 @@ impl<'a> App<'a> {
         self.data.swapchain_image_views.iter().for_each(|v| self.device.destroy_image_view(*v, ALLOCATOR));
 
         self.device.destroy_swapchain_khr(self.data.swapchain, ALLOCATOR);
+    }
+}
+
+impl<'a> Drop for App<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(&mut self.device);
+            ManuallyDrop::drop(&mut self.instance);
+        }
     }
 }
 
@@ -577,198 +610,7 @@ struct SuitabilityError(&'static str);
 
 
 
-unsafe fn create_instance(
-    window: &Window,
-    entry:  &Entry,
-    data:   &mut AppData,
-) -> Result<Instance> {
-    let application_info = vk::ApplicationInfo::builder()
-        .application_name   (b"Vulkan Tutorial\0")
-        .application_version(vk::make_version(1, 0, 0))
-        .engine_name        (b"No Engine\0")
-        .engine_version     (vk::make_version(1, 0, 0))
-        .api_version        (vk::make_version(1, 0, 0))
-    ;
-
-    let available_layers: HashSet<_> = entry
-        .enumerate_instance_layer_properties()?
-
-        .iter   ()
-        .map    (|l| l.layer_name)
-        .collect()
-    ;
-
-
-    if VALIDATION_ENABLED && !available_layers.contains(&VALIDATION_LAYER) {
-        return Err(anyhow!("Validation layer requested but not supported"));
-    }
-
-    let layers = if VALIDATION_ENABLED {
-        vec![VALIDATION_LAYER.as_ptr()]
-    }
-    else {
-        vec![]
-    };
-
-    let mut extensions: Vec<_> = vk_window::get_required_instance_extensions(window)
-        .iter   ()
-        .map    (|e| e.as_ptr())
-        .collect()
-    ;
-
-    if VALIDATION_ENABLED {
-        extensions.push(vk::EXT_DEBUG_UTILS_EXTENSION.name.as_ptr());
-    }
-
-    // Required by Vulkan SDK on macOS since 1.3.216.
-    let flags = if
-           cfg!(target_os = "macos")
-        && entry.version()? >= PORTABILITY_MACOS_VERSION
-    {
-        info!("Enabling extensions for macOS portability");
-        extensions.push(vk::KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_EXTENSION.name.as_ptr());
-        extensions.push(vk::KHR_PORTABILITY_ENUMERATION_EXTENSION        .name.as_ptr());
-
-        vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR
-    }
-    else {
-        vk::InstanceCreateFlags::empty()
-    };
-
-    let mut info = vk::InstanceCreateInfo::builder()
-        .application_info       (&application_info)
-        .enabled_layer_names    (&layers)
-        .enabled_extension_names(&extensions)
-        .flags                  (flags)
-    ;
-
-    type Severity  = vk::DebugUtilsMessageSeverityFlagsEXT;
-    type Type      = vk::DebugUtilsMessageTypeFlagsEXT;
-    type Messenger = vk::DebugUtilsMessengerCreateInfoEXT;
-
-    let mut debug_info = Messenger::builder()
-        .message_severity(Severity::all())
-        .message_type    (
-              Type::GENERAL
-            | Type::VALIDATION
-            | Type::PERFORMANCE
-        )
-        .user_callback(Some(debug_callback))
-        .user_data    (data)
-    ;
-
-
-    if VALIDATION_ENABLED {
-        // Enable debugging during the creation and destruction of an instance
-        info = info.push_next(&mut debug_info);
-    }
-
-    let instance = entry.create_instance(&info, ALLOCATOR)?;
-
-    if VALIDATION_ENABLED {
-        // Enable debugging for everything else
-        data.messenger = instance.create_debug_utils_messenger_ext(&debug_info, ALLOCATOR)?;
-    }
-
-    Ok(instance)
-}
-
-extern "system" fn debug_callback(
-    severity: vk::DebugUtilsMessageSeverityFlagsEXT,
-    type_:    vk::DebugUtilsMessageTypeFlagsEXT,
-    data:     *const vk::DebugUtilsMessengerCallbackDataEXT,
-    app_data: *mut   c_void,
-)
-    -> vk::Bool32
-{
-    let data     = unsafe { *data };
-    let message  = unsafe { CStr::from_ptr(data.message) }.to_string_lossy();
-
-    type F = vk::DebugUtilsMessageSeverityFlagsEXT;
-
-    if      severity >= F::ERROR {
-        error!("({:?}) {}", type_, message);
-    }
-    else if severity >= F::WARNING {
-        warn! ("({:?}) {}", type_, message);
-    }
-    else if severity >= F::INFO {
-        debug!("({:?}) {}", type_, message);
-    }
-    else {
-        trace!("({:?}) {}", type_, message);
-    }
-
-    vk::FALSE
-}
-
-
-unsafe fn create_logical_device(
-    entry:    &Entry,
-    instance: &Instance,
-    data:     &mut AppData,
-)
-    -> Result<Device>
-{
-    let indices = QueueFamilyIndices::get(instance, data, data.physical_device)?;
-
-    let mut unique_indices = HashSet::new();
-
-    unique_indices.insert(indices.graphics);
-    unique_indices.insert(indices.present);
-
-    let queue_priorities   = &[1.0];
-    let queue_info: Vec<_> = unique_indices
-        .iter()
-        .map(|i| vk::DeviceQueueCreateInfo::builder()
-            .queue_family_index(*i)
-            .queue_priorities  (queue_priorities)
-        )
-        .collect()
-    ;
-
-    // set layers for compatibility with older vulkan versions
-    let layers = if VALIDATION_ENABLED {
-        vec![VALIDATION_LAYER.as_ptr()]
-    }
-    else {
-        vec![]
-    };
-
-
-    let mut extensions: Vec<_> = DEVICE_EXTENSIONS
-        .iter()
-        .map(|n| n.as_ptr())
-        .collect()
-    ;
-
-    // Required by Vulkan on macOS since 1.3.216
-    if cfg!(target_os = "macos") && entry.version()? >= PORTABILITY_MACOS_VERSION {
-        extensions.push(vk::KHR_PORTABILITY_SUBSET_EXTENSION.name.as_ptr());
-    }
-
-    let features = vk::PhysicalDeviceFeatures::builder()
-        .sampler_anisotropy(true)
-    ;
-
-    let info     = vk::DeviceCreateInfo::builder()
-        .queue_create_infos     (&queue_info)
-        .enabled_layer_names    (&layers)
-        .enabled_extension_names(&extensions)
-        .enabled_features       (&features)
-    ;
-
-    let device = instance.create_device(data.physical_device, &info, ALLOCATOR)?;
-
-    data.graphics_queue = device.get_device_queue(indices.graphics, 0);
-    data.present_queue  = device.get_device_queue(indices.present,  0);
-
-    Ok(device)
-
-}
-
-
-unsafe fn pick_physical_device(instance: &Instance, data: &mut AppData) -> Result<()> {
+unsafe fn pick_physical_device(instance: &Instance, data: &mut AppData) -> Result<vk::PhysicalDevice> {
 
     for physical_device in instance.enumerate_physical_devices()? {
 
@@ -779,8 +621,7 @@ unsafe fn pick_physical_device(instance: &Instance, data: &mut AppData) -> Resul
         }
         else {
             info!("Selected physical device (`{}`)", properties.device_name);
-            data.physical_device = physical_device;
-            return Ok(());
+            return Ok(physical_device);
         }
     }
 
@@ -794,7 +635,7 @@ unsafe fn check_physical_device(
 )
     -> Result<()>
 {
-    QueueFamilyIndices::get(instance, data, physical_device)?;
+    QueueFamilyIndices::get(instance, data.surface, physical_device)?;
     check_physical_device_extensions(instance, physical_device)?;
 
     let support = SwapchainSupport::get(instance, data, physical_device)?;
@@ -893,8 +734,8 @@ unsafe fn create_swapchain(
 )
     -> Result<()>
 {
-    let indicies = QueueFamilyIndices::get(instance, data, data.physical_device)?;
-    let support  = SwapchainSupport  ::get(instance, data, data.physical_device)?;
+    let indicies = QueueFamilyIndices::get(instance, data.surface, data.physical_device)?;
+    let support  = SwapchainSupport  ::get(instance, data,         data.physical_device)?;
 
     let surface_format = get_swapchain_surface_format(&support.formats);
     let present_mode   = get_swapchain_present_mode  (&support.present_modes);
@@ -1159,7 +1000,7 @@ unsafe fn create_command_pool(
     -> Result<()>
 {
 
-    let indicies = QueueFamilyIndices::get(instance, data, data.physical_device)?;
+    let indicies = QueueFamilyIndices::get(instance, data.surface, data.physical_device)?;
 
     let info = vk::CommandPoolCreateInfo::builder()
         .flags             (vk::CommandPoolCreateFlags::empty())
@@ -2137,7 +1978,7 @@ unsafe fn create_render_pass(
 impl QueueFamilyIndices {
     unsafe fn get(
         instance:        &Instance,
-        data:            &AppData,
+        surface:         vk::SurfaceKHR,
         physical_device: vk::PhysicalDevice,
     )
         -> Result<Self>
@@ -2150,8 +1991,8 @@ impl QueueFamilyIndices {
         ;
 
         let mut present = None;
-        for (index, properties) in properties.iter().enumerate() {
-            if instance.get_physical_device_surface_support_khr(physical_device, index as u32, data.surface)? {
+        for (index, _properties) in properties.iter().enumerate() {
+            if instance.get_physical_device_surface_support_khr(physical_device, index as u32, surface)? {
                 present = Some(index as u32);
                 break;
             }
