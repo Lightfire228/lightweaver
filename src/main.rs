@@ -5,15 +5,13 @@ use std::{path::Path};
 mod script;
 mod macros;
 mod utils;
-mod vulkan;
-mod app;
+mod rendering;
+mod shapes;
 
 
 pub fn main() {
 
-    app::main().unwrap();
-
-    // lox();
+    lox();
 
 }
 
