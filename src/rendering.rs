@@ -64,7 +64,6 @@ pub const DEVICE_EXTENSIONS:          &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN
 pub const MAX_FRAMES_IN_FLIGHT:       usize                = 2;
 
 mod types;
-pub use types::*;
 
 pub fn main() -> Result<()> {
     pretty_env_logger::init();
@@ -110,10 +109,16 @@ impl ApplicationHandler for AppWindow {
     ) {
         match event {
             WindowEvent::CloseRequested => {
+
                 if let Some(mut app) = self.app.take() {
                     unsafe { app.destroy(); }
-                    event_loop.exit();
+                    // TODO: add PhantomData<&Entry> to Instance
+                    let entry = app.entry;
+                    drop(app.instance);
                 }
+                println!("test 3");
+
+                event_loop.exit();
             },
             WindowEvent::RedrawRequested => {
 
@@ -137,7 +142,7 @@ impl ApplicationHandler for AppWindow {
 #[derive(Debug)]
 struct App {
     entry:    Entry,
-    instance: Instance,
+    instance: types::Instance,
     data:     AppData,
     device:   Device,
 
@@ -207,7 +212,10 @@ impl App {
 
         let loader   = LibloadingLoader::new(LIBRARY)?;
         let entry    = Entry::new(loader).map_err(|b| anyhow!("{}", b))?;
-        let instance = create_instance(window, &entry, &mut data)?;
+
+        let (instance, messenger) = types::Instance::new(window, &entry)?;
+
+        data.messenger = messenger;
 
 
         data.surface = vk_window::create_surface(&instance, &window, &window)?;
@@ -234,7 +242,6 @@ impl App {
         create_descriptor_sets      (                    &device, &mut data)?;
         create_command_buffers      (                    &device, &mut data)?;
         create_sync_objects         (                    &device, &mut data)?;
-
 
         Ok(Self {
             entry,
@@ -277,7 +284,7 @@ impl App {
         }
 
         self.instance.destroy_surface_khr(self.data.surface, ALLOCATOR);
-        self.instance.destroy_instance   (ALLOCATOR);
+        // self.instance.destroy_instance   (ALLOCATOR);
     }
 
     unsafe fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
