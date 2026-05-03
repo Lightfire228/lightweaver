@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ffi::{CStr, c_void}, ops::{Deref, DerefMut}};
+use std::{collections::HashSet, ffi::{CStr, c_void}, marker::PhantomData, ops::{Deref, DerefMut}};
 use log::*;
 
 use vulkanalia::{prelude::v1_0::*, vk::{DebugUtilsMessengerEXT}};
@@ -15,12 +15,15 @@ use winit::window::Window;
 use vulkanalia::vk::{ExtDebugUtilsExtensionInstanceCommands};
 
 #[derive(Debug)]
-pub struct Instance(vulkanalia::Instance);
+pub struct Instance<'a> {
+    instance: vulkanalia::Instance,
+    p:        PhantomData<&'a Entry>,
+}
 
-impl Instance {
-    pub unsafe fn new(
+impl<'a> Instance<'a> {
+    pub unsafe fn new<'b: 'a>(
         window: &Window,
-        entry:  &Entry,
+        entry:  &'b Entry,
     )
         -> Result<(Self, DebugUtilsMessengerEXT)>
     {
@@ -116,31 +119,36 @@ impl Instance {
             Default::default()
         };
 
-        Ok((Instance(instance), messenger))
+        let instance = Instance {
+            instance,
+            p: PhantomData::<&'b Entry>,
+        };
+
+        Ok((instance, messenger))
     }
 }
 
-impl Drop for Instance {
+impl<'a> Drop for Instance<'a> {
     fn drop(&mut self) {
         println!("hi");
         unsafe {
-            self.0.destroy_instance(ALLOCATOR);
+            self.instance.destroy_instance(ALLOCATOR);
         }
         println!("hi again");
     }
 }
 
-impl DerefMut for Instance {
+impl<'a> DerefMut for Instance<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.instance
     }
 }
 
-impl Deref for Instance {
+impl<'a> Deref for Instance<'a> {
     type Target = vulkanalia::Instance;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.instance
     }
 }
 

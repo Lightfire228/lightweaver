@@ -72,21 +72,31 @@ pub fn main() -> Result<()> {
 
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = AppWindow::default();
+
+    let loader   = unsafe { LibloadingLoader::new(LIBRARY)? };
+    let entry    = unsafe { Entry::new(loader).map_err(|b| anyhow!("{}", b))? };
+
+    let mut app = AppWindow {
+        window:   None,
+        app:      None,
+        minimize: false,
+        entry:    &entry,
+    };
 
     event_loop.run_app(&mut app)?;
 
     Ok(())
 }
 
-#[derive(Default)]
-struct AppWindow {
+struct AppWindow<'a> {
     window:   Option<Window>,
-    app:      Option<App>,
+    app:      Option<App<'a>>,
     minimize: bool,
+
+    entry:    &'a Entry,
 }
 
-impl ApplicationHandler for AppWindow {
+impl<'a> ApplicationHandler for AppWindow<'a> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
 
         let window = event_loop.create_window(
@@ -95,7 +105,7 @@ impl ApplicationHandler for AppWindow {
                 .with_inner_size(LogicalSize::new(1024, 768))
         ).unwrap();
 
-        let app = unsafe { App::create(&window) }.unwrap();
+        let app = unsafe { App::create(&window, &self.entry) }.unwrap();
 
         self.window = Some(window);
         self.app    = Some(app);
@@ -112,9 +122,6 @@ impl ApplicationHandler for AppWindow {
 
                 if let Some(mut app) = self.app.take() {
                     unsafe { app.destroy(); }
-                    // TODO: add PhantomData<&Entry> to Instance
-                    let entry = app.entry;
-                    drop(app.instance);
                 }
                 println!("test 3");
 
@@ -140,9 +147,8 @@ impl ApplicationHandler for AppWindow {
 
 
 #[derive(Debug)]
-struct App {
-    entry:    Entry,
-    instance: types::Instance,
+struct App<'a> {
+    instance: types::Instance<'a>,
     data:     AppData,
     device:   Device,
 
@@ -205,13 +211,10 @@ struct AppData {
 }
 
 
-impl App {
-    unsafe fn create(window: &Window) -> Result<Self> {
+impl<'a> App<'a> {
+    unsafe fn create(window: &Window, entry: &'a Entry) -> Result<Self> {
 
         let mut data = AppData::default();
-
-        let loader   = LibloadingLoader::new(LIBRARY)?;
-        let entry    = Entry::new(loader).map_err(|b| anyhow!("{}", b))?;
 
         let (instance, messenger) = types::Instance::new(window, &entry)?;
 
@@ -244,7 +247,6 @@ impl App {
         create_sync_objects         (                    &device, &mut data)?;
 
         Ok(Self {
-            entry,
             instance,
             data,
             device,
@@ -335,7 +337,7 @@ impl App {
 }
 
 
-impl App {
+impl<'a> App<'a> {
 
     unsafe fn render(&mut self, window: &Window) -> Result<()> {
 
