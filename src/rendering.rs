@@ -1,7 +1,5 @@
 #![allow(
     unsafe_op_in_unsafe_fn,
-    unused_variables,
-    unused_imports,
     clippy::manual_slice_size_calculation,
     clippy::too_many_arguments,
     clippy::unnecessary_wraps
@@ -9,12 +7,13 @@
 
 use std::mem::size_of;
 use cgmath::{vec2, vec3};
+use winit::application::ApplicationHandler;
 use std::result::Result::Ok;
 use anyhow::{Result, anyhow};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::EventLoop;
-use winit::window::{Window, WindowBuilder};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::{Window, WindowAttributes};
 use log::*;
 use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::{window as vk_window};
@@ -53,67 +52,89 @@ type Mat4            = cgmath::Matrix4<f32>;
 
 type VkAllocator<'a> = Option<&'a vk::AllocationCallbacks>;
 
-const ALLOCATOR:                  VkAllocator          = None;
+pub const ALLOCATOR:                  VkAllocator          = None;
 
-const PORTABILITY_MACOS_VERSION:  Version              = Version::new(1, 3, 216);
+pub const PORTABILITY_MACOS_VERSION:  Version              = Version::new(1, 3, 216);
 
-const VALIDATION_ENABLED:         bool                 = cfg!(debug_assertions);
-const VALIDATION_LAYER:           vk::ExtensionName    = vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
+pub const VALIDATION_ENABLED:         bool                 = cfg!(debug_assertions);
+pub const VALIDATION_LAYER:           vk::ExtensionName    = vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
 
-const DEVICE_EXTENSIONS:          &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
+pub const DEVICE_EXTENSIONS:          &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
 
-const MAX_FRAMES_IN_FLIGHT:       usize                = 2;
+pub const MAX_FRAMES_IN_FLIGHT:       usize                = 2;
 
-fn main() -> Result<()> {
+mod types;
+pub use types::*;
+
+pub fn main() -> Result<()> {
     pretty_env_logger::init();
 
-    let event_loop = EventLoop    ::new()?;
-    let window     = WindowBuilder::new()
-        .with_title     ("Vulkan Tutorial (Rust)")
-        .with_inner_size(LogicalSize::new(1024, 768))
-        .build          (&event_loop)?;
+    let event_loop = EventLoop::new()?;
 
+    event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app       = unsafe { App::create(&window)? };
-    let mut minimized = false;
+    let mut app = AppWindow::default();
 
-    event_loop.run(move |event, elwt| {
-        match event {
-
-            // Request a redraw when all events were processed.
-            Event::AboutToWait               => window.request_redraw(),
-
-            Event::WindowEvent { event, .. } => match event {
-
-                WindowEvent::Resized(size) => {
-                    if size.width == 0 || size.height == 0 {
-                        minimized = true;
-                    }
-                    else {
-                        minimized   = false;
-                        app.resized = true;
-                    }
-                },
-
-                WindowEvent::RedrawRequested if !elwt.exiting() && !minimized =>
-                    unsafe { app.render(&window) }.unwrap()
-                ,
-
-                WindowEvent::CloseRequested => {
-                    elwt.exit();
-                    unsafe { app.destroy(); }
-                }
-                _ => {}
-            }
-            _ => {}
-        }
-    })?;
+    event_loop.run_app(&mut app)?;
 
     Ok(())
 }
 
+#[derive(Default)]
+struct AppWindow {
+    window:   Option<Window>,
+    app:      Option<App>,
+    minimize: bool,
+}
 
-#[derive(Clone, Debug)]
+impl ApplicationHandler for AppWindow {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+
+        let window = event_loop.create_window(
+            WindowAttributes::default()
+                .with_title     ("Lightweaver")
+                .with_inner_size(LogicalSize::new(1024, 768))
+        ).unwrap();
+
+        let app = unsafe { App::create(&window) }.unwrap();
+
+        self.window = Some(window);
+        self.app    = Some(app);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id:   winit::window    ::WindowId,
+        event:       WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => {
+                if let Some(mut app) = self.app.take() {
+                    unsafe { app.destroy(); }
+                    event_loop.exit();
+                }
+            },
+            WindowEvent::RedrawRequested => {
+
+                let (Some(app), Some(window)) = (self.app.as_mut(), self.window.as_ref()) else {
+                    return;
+                };
+
+                unsafe { app.render(window).unwrap(); }
+
+                window.request_redraw();
+            },
+            _ => (),
+
+        }
+    }
+}
+
+
+
+
+#[derive(Debug)]
 struct App {
     entry:    Entry,
     instance: Instance,
@@ -177,7 +198,6 @@ struct AppData {
     depth_image_memory:        vk::DeviceMemory,
     depth_image_view:          vk::ImageView,
 }
-
 
 
 impl App {
@@ -966,6 +986,8 @@ unsafe fn create_descriptor_set_layout(
 }
 
 unsafe fn create_pipeline(device: &Device, data: &mut AppData) -> Result<()> {
+    // TODO: compile shaders at runtime
+    // https://stackoverflow.com/a/73591683
     let vert = include_bytes!("../shaders/vert.spv");
     let frag = include_bytes!("../shaders/frag.spv");
 

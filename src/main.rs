@@ -11,7 +11,8 @@ mod shapes;
 
 pub fn main() {
 
-    lox();
+    // lox();
+    rendering::main().unwrap()
 
 }
 

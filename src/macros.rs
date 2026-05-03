@@ -9,6 +9,7 @@ macro_rules! multi_line {
             )*
 
             tmp.join("\n")
+
         }
     };
 }
