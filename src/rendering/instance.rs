@@ -1,9 +1,9 @@
-use std::{collections::HashSet, ffi::{CStr, c_void}, marker::PhantomData, ops::{Deref, DerefMut}};
+use std::{collections::HashSet, ffi::{CStr, c_void}, ops::{Deref, DerefMut}, rc::Rc};
 use log::*;
 
 use vulkanalia::vk::{DebugUtilsMessengerEXT, EntryV1_0, HasBuilder, InstanceV1_0};
 use vulkanalia::{Entry, vk::{self}, window as vk_window};
-use crate::rendering::{ALLOCATOR, AppData, PORTABILITY_MACOS_VERSION};
+use crate::rendering::{ALLOCATOR, PORTABILITY_MACOS_VERSION};
 
 use super::{VALIDATION_ENABLED, VALIDATION_LAYER};
 
@@ -15,17 +15,17 @@ use winit::window::Window;
 use vulkanalia::vk::{ExtDebugUtilsExtensionInstanceCommands};
 
 #[derive(Debug)]
-pub struct Instance<'a> {
+pub struct Instance {
     instance: vulkanalia::Instance,
-    p:        PhantomData<&'a Entry>,
+    entry:    Rc<Entry>,
 }
 
-impl<'a> Instance<'a> {
-    pub unsafe fn new<'b: 'a>(
+impl Instance {
+    pub unsafe fn new(
         window: &Window,
-        entry:  &'b Entry,
+        entry:  Rc<Entry>,
     )
-        -> Result<(Self, DebugUtilsMessengerEXT)>
+        -> Result<(Rc<Self>, DebugUtilsMessengerEXT)>
     {
 
         let application_info = vk::ApplicationInfo::builder()
@@ -119,16 +119,16 @@ impl<'a> Instance<'a> {
             Default::default()
         };
 
-        let instance = Instance {
+        let instance = Rc::new(Instance {
             instance,
-            p: PhantomData::<&'b Entry>,
-        };
+            entry,
+        });
 
         Ok((instance, messenger))
     }
 }
 
-impl<'a> Drop for Instance<'a> {
+impl Drop for Instance {
     fn drop(&mut self) {
         trace!("dropping instance");
         unsafe {
@@ -138,13 +138,13 @@ impl<'a> Drop for Instance<'a> {
     }
 }
 
-impl<'a> DerefMut for Instance<'a> {
+impl DerefMut for Instance {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.instance
     }
 }
 
-impl<'a> Deref for Instance<'a> {
+impl Deref for Instance {
     type Target = vulkanalia::Instance;
 
     fn deref(&self) -> &Self::Target {

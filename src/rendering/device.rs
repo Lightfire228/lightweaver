@@ -1,6 +1,6 @@
 
 
-use std::{collections::HashSet,  ops::{Deref, DerefMut}};
+use std::{collections::HashSet,  ops::{Deref, DerefMut}, rc::Rc};
 
 use vulkanalia::vk::{DeviceV1_0, HasBuilder, Queue};
 use vulkanalia::{Entry, vk::{self}};
@@ -13,21 +13,25 @@ use log::*;
 
 
 #[derive(Debug)]
-pub struct Device<'a> {
+pub struct Device {
     device:   vulkanalia::Device,
-    instance: &'a Instance<'a>,
+    instance: Rc<Instance>,
+
+    pub graphics_queue: Queue,
+    pub present_queue:  Queue,
+    pub physical_device: vk::PhysicalDevice,
 }
 
-impl<'a> Device<'a> {
-    pub unsafe fn new<'b: 'a>(
-        entry:           &'b Entry,
-        instance:        &'b Instance,
+impl Device {
+    pub unsafe fn new(
+        entry:           Rc<Entry>,
+        instance:        Rc<Instance>,
         physical_device: vk::PhysicalDevice,
         surface:         vk::SurfaceKHR,
     )
-        -> Result<(Self, Queue, Queue)>
+        -> Result<Rc<Self>>
     {
-        let indices = QueueFamilyIndices::get(instance, surface, physical_device)?;
+        let indices = QueueFamilyIndices::get(instance.as_ref(), surface, physical_device)?;
 
         let mut unique_indices = HashSet::new();
 
@@ -77,18 +81,19 @@ impl<'a> Device<'a> {
 
         let device = instance.create_device(physical_device, &info, ALLOCATOR)?;
 
-        let graphics_queue = device.get_device_queue(indices.graphics, 0);
-        let present_queue  = device.get_device_queue(indices.present,  0);
-
-        let device = Self {
-            device,
+        let device = Rc::new(Self {
+            physical_device,
+            graphics_queue: device.get_device_queue(indices.graphics, 0),
+            present_queue:  device.get_device_queue(indices.present,  0),
             instance,
-        };
-        Ok((device, graphics_queue, present_queue))
+            device,
+        });
+
+        Ok(device)
     }
 }
 
-impl<'a> Drop for Device<'a> {
+impl Drop for Device {
     fn drop(&mut self) {
         trace!("dropping device");
         unsafe {
@@ -98,13 +103,13 @@ impl<'a> Drop for Device<'a> {
     }
 }
 
-impl<'a> DerefMut for Device<'a> {
+impl DerefMut for Device {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.device
     }
 }
 
-impl<'a> Deref for Device<'a> {
+impl Deref for Device {
     type Target = vulkanalia::Device;
 
     fn deref(&self) -> &Self::Target {
