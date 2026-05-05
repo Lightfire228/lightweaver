@@ -33,7 +33,7 @@ use std::hash::{Hash, Hasher};
 use std::io::BufReader;
 
 
-use std::ptr::copy_nonoverlapping as memcpy;
+use std::ptr::{copy_nonoverlapping as memcpy, drop_in_place};
 
 // Note: This trait was called `ExtDebugUtilsExtension` in versions of `vulkanalia` prior to `v0.31.0`.
 use vulkanalia::vk::{CommandBuffer, DescriptorSetLayout, ExtDebugUtilsExtensionInstanceCommands};
@@ -45,7 +45,7 @@ use vulkanalia::vk::KhrSurfaceExtensionInstanceCommands;
 use vulkanalia::vk::KhrSwapchainExtensionDeviceCommands;
 
 use crate::rendering::swapchain::depth_objects::DepthImage;
-use crate::rendering::swapchain::{create_image_view, get_swapchain_extent};
+use crate::rendering::swapchain::{Swapchain, create_image_view, get_swapchain_extent};
 use crate::rendering::texture_image::TextureImage;
 
 
@@ -133,7 +133,7 @@ impl ApplicationHandler for AppWindow {
         match event {
             WindowEvent::CloseRequested => {
 
-                if let Some(mut app) = self.app.take() {
+                if let Some(app) = self.app.take() {
                     unsafe { app.destroy(); }
                 }
 
@@ -186,7 +186,6 @@ struct AppData {
 
     descriptor_set_layout:     vk::DescriptorSetLayout,
 
-    frame_buffers:             Vec<vk::Framebuffer>,
     command_pool:              vk::CommandPool,
 
     texture_image:             TextureImage,
@@ -223,7 +222,7 @@ impl App {
         let (vertices, indices)        = load_model                  ()?;
         let vertex_buffer              = create_vertex_buffer        (&device, &instance, command_pool, graphics_queue, &vertices)?;
         let index_buffer               = create_index_buffer         (&device, &instance, command_pool, graphics_queue, &indices)?;
-        let (swapchain, frame_buffers) = swapchain::Swapchain::create(device.clone(), instance.clone(), surface, descriptor_set_layout, &texture_image, command_pool, &vertex_buffer, &index_buffer, &indices, swapchain_support, extent)?;
+        let swapchain                  = swapchain::Swapchain::new   (device.clone(), instance.clone(), surface, descriptor_set_layout, &texture_image, command_pool, &vertex_buffer, &index_buffer, &indices, swapchain_support, extent)?;
         let sync_objects               = create_sync_objects         (&device, &swapchain)?;
 
         Ok(Self {
@@ -242,7 +241,6 @@ impl App {
                 surface,
                 swapchain,
                 descriptor_set_layout,
-                frame_buffers,
                 command_pool,
                 texture_image,
                 vertices,
@@ -255,11 +253,12 @@ impl App {
     }
 
 
-    unsafe fn destroy(&mut self) {
+    unsafe fn destroy(self) {
         println!("start destroy");
         self.device.device_wait_idle().unwrap();
 
-        self.destroy_swapchain();
+        drop(self.data.swapchain);
+
         self.device.destroy_sampler              (self.data.texture_image.sampler, ALLOCATOR);
         self.device.destroy_image_view           (self.data.texture_image.view,    ALLOCATOR);
         self.device.destroy_image                (self.data.texture_image.image,   ALLOCATOR);
@@ -288,10 +287,9 @@ impl App {
         // self.instance.destroy_instance   (ALLOCATOR);
     }
 
-    unsafe fn recreate_swapchain(&mut self, window: &Window) -> Result<()> {
+    unsafe fn recreate_swapchain(&mut self) -> Result<()> {
 
         self.device.device_wait_idle()?;
-        self.destroy_swapchain();
 
 
         let support = mem::take(&mut self.data.swapchain.support);
@@ -303,6 +301,10 @@ impl App {
              self.data.surface,
              self.data.descriptor_set_layout,
             &self.data.texture_image,
+             self.data.command_pool,
+            &self.data.vertex_buffer,
+            &self.data.index_buffer,
+            &self.data.indices,
             support,
             extent,
         )?;
@@ -311,37 +313,37 @@ impl App {
     }
 
 
-    // todo: move this to swapchain's drop
-    unsafe fn destroy_swapchain(&mut self) {
-        self.device.destroy_image_view(self.data.swapchain.depth_image.view,   ALLOCATOR);
-        self.device.free_memory       (self.data.swapchain.depth_image.memory, ALLOCATOR);
-        self.device.destroy_image     (self.data.swapchain.depth_image.image,  ALLOCATOR);
+    // // todo: move this to swapchain's drop
+    // unsafe fn destroy_swapchain(&mut self) {
+    //     self.device.destroy_image_view(self.data.swapchain.depth_image.view,   ALLOCATOR);
+    //     self.device.free_memory       (self.data.swapchain.depth_image.memory, ALLOCATOR);
+    //     self.device.destroy_image     (self.data.swapchain.depth_image.image,  ALLOCATOR);
 
-        self.device.destroy_descriptor_pool(self.data.swapchain.descriptor_pool, ALLOCATOR);
+    //     self.device.destroy_descriptor_pool(self.data.swapchain.descriptor_pool, ALLOCATOR);
 
-        self.data.swapchain.uniform_buffers.iter().for_each(|b| {
-            self.device.destroy_buffer     (*&b.buffer, ALLOCATOR);
-            self.device.free_memory        (*&b.memory, ALLOCATOR)
-        });
+    //     self.data.swapchain.uniform_buffers.iter().for_each(|b| {
+    //         self.device.destroy_buffer     (*&b.buffer, ALLOCATOR);
+    //         self.device.free_memory        (*&b.memory, ALLOCATOR)
+    //     });
 
-        self.data.frame_buffers.iter().for_each(|f| self.device.destroy_framebuffer(*f, ALLOCATOR));
+    //     self.data.frame_buffers.iter().for_each(|f| self.device.destroy_framebuffer(*f, ALLOCATOR));
 
-        self.device.free_command_buffers(self.data.command_pool, &self.data.swapchain.command_buffers);
+    //     self.device.free_command_buffers(self.data.command_pool, &self.data.swapchain.command_buffers);
 
-        self.device.destroy_pipeline       (self.data.swapchain.pipeline.pipeline,       ALLOCATOR);
-        self.device.destroy_pipeline_layout(self.data.swapchain.pipeline.layout,         ALLOCATOR);
-        self.device.destroy_render_pass    (self.data.swapchain.render_pass.render_pass, ALLOCATOR);
+    //     self.device.destroy_pipeline       (self.data.swapchain.pipeline.pipeline,       ALLOCATOR);
+    //     self.device.destroy_pipeline_layout(self.data.swapchain.pipeline.layout,         ALLOCATOR);
+    //     self.device.destroy_render_pass    (self.data.swapchain.render_pass.render_pass, ALLOCATOR);
 
-        self.data.swapchain.image_views.iter().for_each(|v| self.device.destroy_image_view(*v, ALLOCATOR));
+    //     self.data.swapchain.image_views.iter().for_each(|v| self.device.destroy_image_view(*v, ALLOCATOR));
 
-        self.device.destroy_swapchain_khr(self.data.swapchain.swapchain, ALLOCATOR);
-    }
+    //     self.device.destroy_swapchain_khr(self.data.swapchain.swapchain, ALLOCATOR);
+    // }
 }
 
 
 impl App {
 
-    unsafe fn render(&mut self, window: &Window) -> Result<()> {
+    unsafe fn render(&mut self, _window: &Window) -> Result<()> {
 
         self.device.wait_for_fences(
             &[self.data.sync_objects.in_flight_fences[self.frame]],
@@ -362,7 +364,7 @@ impl App {
         let image_index = match result {
             Ok ((image_index, _))               => image_index as usize,
 
-            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => return self.recreate_swapchain(window),
+            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => return self.recreate_swapchain(),
             Err(e)                              => return Err(anyhow!(e)),
         };
 
@@ -411,7 +413,7 @@ impl App {
 
         if self.resized || changed {
             self.resized = false;
-            self.recreate_swapchain(window)?;
+            self.recreate_swapchain()?;
         }
         else if let Err(e) = result {
             return Err(anyhow!(e));

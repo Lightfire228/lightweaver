@@ -1,7 +1,7 @@
 
 use log::trace;
 use vulkanalia::vk::{self, DeviceV1_0, Handle, HasBuilder, KhrSwapchainExtensionDeviceCommands};
-use crate::rendering::{ALLOCATOR, Buffer, Index, QueueFamilyIndices, SwapchainSupport, UniformBufferObject, Vertex, create_buffer, device::Device, instance::Instance, swapchain::{depth_objects::DepthImage, pipeline::Pipeline, render_pass::RenderPass}, texture_image::TextureImage };
+use crate::rendering::{ALLOCATOR, Buffer, Index, QueueFamilyIndices, SwapchainSupport, UniformBufferObject, Vertex, create_buffer, create_command_pool, device::Device, instance::Instance, swapchain::{depth_objects::DepthImage, pipeline::Pipeline, render_pass::RenderPass}, texture_image::TextureImage };
 
 use std::{rc::Rc, result::Result::Ok};
 use anyhow::{Result};
@@ -14,8 +14,9 @@ pub mod depth_objects;
 
 #[derive(Debug)]
 pub struct Swapchain {
-    instance: Rc<Instance>,
-    device:   Rc<device::Device>,
+    instance:     Rc<Instance>,
+    device:       Rc<device::Device>,
+    command_pool: vk::CommandPool,
 
     pub swapchain:   vk::SwapchainKHR,
     pub support:     SwapchainSupport,
@@ -35,11 +36,12 @@ pub struct Swapchain {
 
     pub uniform_buffers:           Vec<Buffer>,
     pub command_buffers:           Vec<vk::CommandBuffer>,
+    pub frame_buffers:             Vec<vk::Framebuffer>,
 }
 
 impl Swapchain {
 
-    pub unsafe fn create(
+    pub unsafe fn new(
         device:                Rc<device::Device>,
         instance:              Rc<Instance>,
         surface:               vk::SurfaceKHR,
@@ -51,35 +53,6 @@ impl Swapchain {
         indices:               &[Index],
         support:               SwapchainSupport,
         extent:                vk::Extent2D,
-    )
-        -> Result<(Self, Vec<vk::Framebuffer>)>
-    {
-        let mut swapchain = Self::new(
-            device.clone(),
-            instance,
-            surface,
-            descriptor_set_layout,
-            texture_image,
-            support,
-            extent,
-        )?;
-
-
-        let framebuffers          = create_framebuffers   (&device, &swapchain)?;
-        swapchain.command_buffers = create_command_buffers(&device, &swapchain, extent, command_pool, &vertex_buffer, &index_buffer, &indices, &framebuffers)?;
-
-        Ok((swapchain, framebuffers))
-    }
-
-    pub unsafe fn new(
-        device:                Rc<device::Device>,
-        instance:              Rc<Instance>,
-        surface:               vk::SurfaceKHR,
-        descriptor_set_layout: vk::DescriptorSetLayout,
-        texture_image:         &TextureImage,
-        support:               SwapchainSupport,
-        extent:                vk::Extent2D,
-
     )
         -> Result<Self>
     {
@@ -142,9 +115,13 @@ impl Swapchain {
 
         let depth_image = DepthImage::new(device.clone(), instance.clone(), extent)?;
 
+        let frame_buffers   = create_framebuffers   (&device, &depth_image, &image_views, &render_pass, extent)?;
+        let command_buffers = create_command_buffers(&device, &render_pass, &pipeline, &descriptor_sets, extent, command_pool, vertex_buffer, index_buffer, indices, &frame_buffers)?;
+
         Ok(Self {
             instance,
             device,
+            command_pool,
 
             swapchain,
             support,
@@ -157,17 +134,12 @@ impl Swapchain {
             pipeline,
             depth_image,
 
-            command_buffers: Vec::new(),
             descriptor_pool,
             descriptor_sets,
             uniform_buffers,
+            command_buffers,
+            frame_buffers,
         })
-    }
-
-    pub fn refresh(self) -> Result<Self> {
-
-
-        todo!()
     }
 }
 
@@ -176,9 +148,32 @@ impl Swapchain {
 impl Drop for Swapchain {
     fn drop(&mut self) {
         trace!("dropping swapchain");
+
         unsafe {
+            self.device.destroy_image_view(self.depth_image.view,   ALLOCATOR);
+            self.device.free_memory       (self.depth_image.memory, ALLOCATOR);
+            self.device.destroy_image     (self.depth_image.image,  ALLOCATOR);
+
+            self.device.destroy_descriptor_pool(self.descriptor_pool, ALLOCATOR);
+
+            self.uniform_buffers.iter().for_each(|b| {
+                self.device.destroy_buffer     (*&b.buffer, ALLOCATOR);
+                self.device.free_memory        (*&b.memory, ALLOCATOR)
+            });
+
+            self.frame_buffers.iter().for_each(|f| self.device.destroy_framebuffer(*f, ALLOCATOR));
+
+            self.device.free_command_buffers(self.command_pool, &self.command_buffers);
+
+            self.device.destroy_pipeline       (self.pipeline.pipeline,       ALLOCATOR);
+            self.device.destroy_pipeline_layout(self.pipeline.layout,         ALLOCATOR);
+            self.device.destroy_render_pass    (self.render_pass.render_pass, ALLOCATOR);
+
+            self.image_views.iter().for_each(|v| self.device.destroy_image_view(*v, ALLOCATOR));
+
             self.device.destroy_swapchain_khr(self.swapchain, ALLOCATOR);
         }
+
         trace!("dropped swapchain");
     }
 }
@@ -422,7 +417,10 @@ unsafe fn create_descriptor_sets(
 
 unsafe fn create_command_buffers(
     device:          &Device,
-    swapchain:       &Swapchain,
+    // swapchain:       &Swapchain,
+    render_pass:     &RenderPass,
+    pipeline:        &Pipeline,
+    descriptor_sets: &[vk::DescriptorSet],
     extent:          vk::Extent2D,
     command_pool:    vk::CommandPool,
     vertex_buffer:   &Buffer,
@@ -471,14 +469,14 @@ unsafe fn create_command_buffers(
 
         let clear_values = &[color_clear_value, depth_clear_value];
         let info = vk::RenderPassBeginInfo::builder()
-            .render_pass (swapchain.render_pass.render_pass)
+            .render_pass (render_pass.render_pass)
             .framebuffer (frame_buffers[i])
             .render_area (render_area)
             .clear_values(clear_values)
         ;
 
         device.cmd_begin_render_pass   (*command_buffer, &info, vk::SubpassContents::INLINE);
-        device.cmd_bind_pipeline       (*command_buffer, vk::PipelineBindPoint::GRAPHICS, swapchain.pipeline.pipeline);
+        device.cmd_bind_pipeline       (*command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
 
 
         device.cmd_bind_vertex_buffers (*command_buffer, 0, &[vertex_buffer.buffer], &[0]);
@@ -486,9 +484,9 @@ unsafe fn create_command_buffers(
         device.cmd_bind_descriptor_sets(
             *command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
-            swapchain.pipeline.layout,
+            pipeline.layout,
             0,
-            &[swapchain.descriptor_sets[i]],
+            &[descriptor_sets[i]],
             &[],
         );
         device.cmd_draw_indexed        (*command_buffer, indices.len() as u32, 1, 0, 0, 0);
@@ -504,26 +502,28 @@ unsafe fn create_command_buffers(
 
 unsafe fn create_framebuffers(
     device:      &Device,
-    swapchain:   &Swapchain,
+    depth_image: &DepthImage,
+    image_views: &[vk::ImageView],
+    render_pass: &RenderPass,
+    extent:      vk::Extent2D,
 
 )
     -> Result<Vec<vk::Framebuffer>>
 {
 
-    Ok(swapchain
-        .image_views
+    Ok(image_views
         .iter()
         .map(|i| {
             // The color attachment differs for every swapchain image, but the same depth image can be
             // used by all of them because only a single subpass is running at the same time due to
             // our semaphores.
-            let attachments = &[*i, swapchain.depth_image.view];
+            let attachments = &[*i, depth_image.view];
 
             let create_info = vk::FramebufferCreateInfo::builder()
-                .render_pass(swapchain.render_pass.render_pass)
+                .render_pass(render_pass.render_pass)
                 .attachments(attachments)
-                .width      (swapchain.extent.width)
-                .height     (swapchain.extent.height)
+                .width      (extent.width)
+                .height     (extent.height)
                 .layers     (1)
             ;
 
