@@ -7,7 +7,7 @@ use crate::script::{
     ast::*,
     tokens::{Token, TokenType},
     vm::{
-        Root, chunk::*, object::{ObjFunction, ObjPtr, Object}
+        State, chunk::*, object::{ObjFunction, ObjPtr, Object}
     }
 };
 
@@ -17,7 +17,7 @@ type Op<'gc> = OpCode<'gc>;
 
 // type Func = (FuncType, ObjectId);
 
-pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) ->
+pub fn compile<'gc>(ast: Ast, root: &'gc mut State<'gc>, ctx: &'gc Mutation<'gc>) ->
     CompilerResult<()>
 {
 
@@ -38,7 +38,7 @@ pub fn compile<'gc>(ast: Ast, root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>)
 
 
 struct Compiler<'gc> {
-    root:           &'gc mut Root<'gc>,
+    root:           &'gc mut State<'gc>,
     ctx:            &'gc Mutation<'gc>,
     line:           usize,
     scope_depth:    usize,
@@ -104,7 +104,7 @@ impl<'gc> Func<'gc> {
 
 impl<'gc> Compiler<'gc> {
 
-    fn new(root: &'gc mut Root<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
+    fn new(root: &'gc mut State<'gc>, ctx: &'gc Mutation<'gc>) -> Self {
 
         let chunk = Chunk::new(ctx);
         let func  = Gc::new(ctx, ObjFunction::new("script".to_owned(), 0, chunk));

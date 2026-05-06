@@ -25,6 +25,9 @@ pub enum TokenType {
   Print, Return, Super, This,
   True,  Var,    While,
 
+  // Shapes
+  Rect,
+
   Error, EOF
 }
 

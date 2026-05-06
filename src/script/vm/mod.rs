@@ -11,6 +11,7 @@ use value::Value;
 use crate::script::vm::chunk::{StackOffset, UpvalueIndex};
 use crate::script::vm::debug::DisassembleData;
 use crate::script::vm::object::*;
+use crate::script::vm::vm_shape::VmShape;
 use crate::script::vm::{
         chunk::{
             BytecodeIndex, ConstIndex, Offset, StackIndex
@@ -20,12 +21,15 @@ use crate::script::vm::{
             ObjFunction,
         }
     };
+use crate::shapes::{Rect, Shape};
 
 pub mod chunk;
 pub mod debug;
 pub mod value;
 pub mod compiler;
 pub mod object;
+
+mod vm_shape;
 
 
 static DEBUG_TRACE_EXECUTION: bool = true;
@@ -34,7 +38,7 @@ static DEBUG_TRACE_EXECUTION: bool = true;
 static STACK_FRAMES_MAX:       usize = 10000; // ¯\_(ツ)_/¯
 static INITIAL_STACK_CAPACITY: usize = 10000; // ¯\_(ツ)_/¯
 
-pub fn interpret(root: ArenaRoot) -> RuntimeResult<()> {
+pub fn interpret(root: ArenaRoot) -> RuntimeResult<Vec<Shape>> {
 
     let mut vm  = Vm::new(root);
 
@@ -48,13 +52,15 @@ pub struct Vm {
 
 #[derive(Collect)]
 #[collect(no_drop)]
-pub struct Root<'gc> {
+pub struct State<'gc> {
     call_stack:  Vec    <GcRefLock<'gc, CallFrame<'gc>>>,
 
     functions:   Vec    <Gc<'gc, ObjFunction<'gc>>>,
 
     stack:       Vec    <Value<'gc>>,
     constants:   Vec    <Value<'gc>>,
+    shapes:      Vec    <VmShape>,
+
 
     globals:     HashMap<String, Value<'gc>>,
 
@@ -64,7 +70,7 @@ pub struct Root<'gc> {
     out:         Vec<String>,
 }
 
-pub type ArenaRoot = Arena::<Rootable![Root<'_>]>;
+pub type ArenaRoot = Arena::<Rootable![State<'_>]>;
 
 #[derive(Collect)]
 #[collect(no_drop)]
@@ -135,23 +141,38 @@ impl Vm {
         }
     }
 
-    fn run<'gc>(&mut self) -> RuntimeResult<()> {
+    fn run<'gc>(&mut self) -> RuntimeResult<Vec<Shape>> {
 
         loop {
             self.root.collect_debt();
 
             let done = self.root.mutate_root(|ctx, root| {
                 root.run_instruction(ctx)
-            });
+            })?;
 
-            if done? {
-                break Ok(())
+            if done {
+                break;
             }
         }
+
+        Ok(self.get_shapes())
+    }
+
+    pub fn get_shapes(&self) -> Vec<Shape> {
+
+        let mut result = Vec::new();
+
+        self.root.mutate(|_, root| {
+            for _ in &root.shapes {
+                result.push(Shape::Rect(Rect {}));
+            }
+        });
+
+        result
     }
 }
 
-impl<'gc> Root<'gc> {
+impl<'gc> State<'gc> {
 
     pub fn new() -> Self {
         Self {
@@ -160,6 +181,7 @@ impl<'gc> Root<'gc> {
 
             functions:   vec![],
             constants:   vec![],
+            shapes:      vec![],
 
             globals:     HashMap::new(),
 
@@ -734,14 +756,17 @@ impl<'gc> Root<'gc> {
     }
 
     fn call_native(&mut self, func_arity: usize, func: NativeFn<'gc>) {
-        let stack_top = self.stack.len() - func_arity;
-        let result    = func.0(&self.stack[stack_top..]);
+        let mut results = Vec::with_capacity(func_arity);
 
         for _ in 0..func_arity {
-            self.stack.pop();
+            results.push(self.stack.pop().unwrap());
         }
-
         self.stack.pop(); // remove the callee temporary
+
+
+        let result = func.0(self, &results);
+
+
         self.push_stack(result);
     }
 
@@ -802,9 +827,10 @@ fn def_natives<'gc>(globals: &'gc mut HashMap<String, Value<'gc>>, ctx: &'gc Mut
     };
 
     make_global("clock", NativeFn(clock_native));
+    make_global("rect",  NativeFn(rect_native));
 }
 
-fn clock_native<'gc>(_: &[Value<'gc>]) -> Value<'gc> {
+fn clock_native<'gc>(_state: &mut State, _: &[Value<'gc>]) -> Value<'gc> {
     let start = SystemTime::now();
 
     let time_since = start.duration_since(UNIX_EPOCH).unwrap();
@@ -812,6 +838,12 @@ fn clock_native<'gc>(_: &[Value<'gc>]) -> Value<'gc> {
     Value::Number(time_since.as_millis() as f64 / 1000.0)
 }
 
+
+fn rect_native<'gc>(state: &mut State, _: &[Value<'gc>]) -> Value<'gc> {
+    state.shapes.push(VmShape::Rect);
+
+    Value::Nil
+}
 
 #[cfg(test)]
 mod tests {
@@ -832,7 +864,7 @@ mod tests {
         let mut ast    = parser ::parse_ast  (tokens) .unwrap();
         resolve(&mut ast);
 
-        let mut root = ArenaRoot::new(|_ctx| Root::new_test());
+        let mut root = ArenaRoot::new(|_ctx| State::new_test());
 
         root.mutate_root(|ctx, root| {
             compile(ast, root, ctx).unwrap();
@@ -912,6 +944,36 @@ mod tests {
 
             assert_eq!(&root.out[2],  "changed");
             assert_eq!(&root.out[3],  "2");
+        });
+    }
+
+    #[test]
+    fn test_rect() {
+        let mut vm = init("rect();".to_owned());
+
+        vm.run().unwrap();
+
+        vm.root.mutate(|_ctx, root| {
+            assert!(root.stack.is_empty());
+
+            assert_eq!(root.shapes[0], VmShape::Rect);
+        });
+    }
+
+    #[test]
+    fn test_rect_loop() {
+        let mut vm = init("var i = 0; for (i = 0; i < 10; i = i+1) { rect(); }".to_owned());
+
+        vm.run().unwrap();
+
+        vm.root.mutate(|_ctx, root| {
+            assert!(root.stack.is_empty());
+
+            assert_eq!(root.shapes.len(), 10);
+
+            for shape in &root.shapes {
+                assert_eq!(shape, &VmShape::Rect);
+            }
         });
     }
 

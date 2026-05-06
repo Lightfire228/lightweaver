@@ -3,7 +3,7 @@ use std::{fmt::Display};
 
 use gc_arena::{Collect, Gc};
 
-use crate::script::vm::object::{ObjString, ObjectMut};
+use crate::script::vm::{object::{ObjString, ObjectMut}, vm_shape::VmShape};
 
 use super::object::{ObjPtr};
 

@@ -1,10 +1,10 @@
 
 use gc_arena::{Collect, Gc, Mutation};
 
-use crate::script::vm::{object::{ObjPtr, Object}, value::Value};
+use crate::script::vm::{State, object::{ObjPtr, Object}, value::Value};
 
 #[derive(Debug, Clone)]
-pub struct NativeFn<'gc>(pub fn(&[Value<'gc>]) -> Value<'gc>);
+pub struct NativeFn<'gc>(pub fn(&mut State, &[Value<'gc>]) -> Value<'gc>);
 
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]

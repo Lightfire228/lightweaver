@@ -15,18 +15,19 @@ mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
-use crate::script::{
+use crate::{script::{
     parser::AssignmentTarget,
     resolver::resolve,
     vm::{
-        ArenaRoot, Root
+        ArenaRoot, State
     }
-};
+}, shapes::Shape};
 
 type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
 type RunResult      = Result<(), RunError>;
 
+#[derive(Debug)]
 pub enum RunError {
     IOError,
     ScannerError(ScanErrorList),
@@ -37,36 +38,29 @@ pub enum RunError {
 type Re = RunError;
 
 
-pub fn run_file(path: &Path) -> &str {
+pub fn run_file(path: &Path) -> Result<Vec<Shape>, RunError> {
 
-    match (|| {
 
-        let source  = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
+    let source  = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
 
-        let tokens  = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
+    let tokens  = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
 
-        let mut ast = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
-        resolve(&mut ast);
-        println!("{}", ast);
+    let mut ast = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
+    resolve(&mut ast);
+    println!("{}", ast);
 
-        let mut root = ArenaRoot::new(|_ctx| { Root::new() });
+    let mut root = ArenaRoot::new(|_ctx| { State::new() });
 
-        root.mutate_root(|ctx, root| {
-            compile(ast, root, ctx).unwrap();
-        });
+    root.mutate_root(|ctx, root| {
+        compile(ast, root, ctx).unwrap();
+    });
 
-        root.mutate(|_ctx, root| {
-            root.dbg_funcs();
-        });
+    root.mutate(|_ctx, root| {
+        root.dbg_funcs();
+    });
 
-        vm::interpret(root).map_err(|err| Re::RuntimeError(err))?;
+    vm::interpret(root).map_err(|err| Re::RuntimeError(err))
 
-        Ok("test")
-    })() {
-        Err(err) => display_error(err),
-
-        Ok (val) => val,
-    }
 }
 
 

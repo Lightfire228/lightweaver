@@ -34,7 +34,6 @@ pub enum OpCode<'gc> {
     Class       { name_idx:  ConstIndex },
     Closure     { func:      Gc<'gc, ObjFunction<'gc>> },
 
-
     Nil,
     True,
     False,

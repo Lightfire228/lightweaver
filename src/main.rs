@@ -3,6 +3,8 @@
 
 use std::{path::Path};
 
+use crate::{script::RunError, shapes::Shape};
+
 mod script;
 mod macros;
 mod utils;
@@ -12,13 +14,15 @@ mod shapes;
 
 pub fn main() {
 
-    // lox();
-    rendering::main().unwrap()
+    let shapes = lox().unwrap();
+
+    rendering::main(shapes).unwrap()
+
 
 }
 
 
-fn lox() {
+fn lox() -> Result<Vec<Shape>, RunError> {
     let path = Path::new("./test_scripts/test.lox");
-    script::run_file(path);
+    script::run_file(path)
 }

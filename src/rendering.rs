@@ -47,6 +47,7 @@ use vulkanalia::vk::KhrSwapchainExtensionDeviceCommands;
 use crate::rendering::swapchain::depth_objects::DepthImage;
 use crate::rendering::swapchain::{Swapchain, create_image_view, get_swapchain_extent};
 use crate::rendering::texture_image::TextureImage;
+use crate::shapes::Shape;
 
 
 type Vec2            = cgmath::Vector2<f32>;
@@ -71,7 +72,7 @@ mod device;
 mod swapchain;
 mod texture_image;
 
-pub fn main() -> Result<()> {
+pub fn main(shapes: Vec<Shape>) -> Result<()> {
     pretty_env_logger::init();
 
     let event_loop = EventLoop::new()?;
@@ -86,6 +87,7 @@ pub fn main() -> Result<()> {
         window:   None,
         app:      None,
         minimize: false,
+        shapes:   Rc::new(shapes),
         entry:    Rc::new(entry),
     };
 
@@ -105,6 +107,7 @@ struct AppWindow {
     window:   Option<Window>,
     app:      Option<App>,
     minimize: bool,
+    shapes:   Rc<Vec<Shape>>,
 
     entry:    Rc<Entry>,
 }
@@ -118,7 +121,7 @@ impl ApplicationHandler for AppWindow {
                 .with_inner_size(LogicalSize::new(1024, 768))
         ).unwrap();
 
-        let app = unsafe { App::create(&window, self.entry.clone()) }.unwrap();
+        let app = unsafe { App::create(&window, self.entry.clone(), self.shapes.clone()) }.unwrap();
 
         self.window = Some(window);
         self.app    = Some(app);
@@ -190,6 +193,7 @@ struct AppData {
 
     texture_image:             TextureImage,
 
+    shapes:                    Rc<Vec<Shape>>,
     vertices:                  Vec<Vertex>,
     indices:                   Vec<Index>,
     vertex_buffer:             Buffer,
@@ -202,7 +206,7 @@ struct AppData {
 
 
 impl App {
-    unsafe fn create(window: &Window, entry: Rc<Entry>) -> Result<Self> {
+    unsafe fn create(window: &Window, entry: Rc<Entry>, shapes: Rc<Vec<Shape>>) -> Result<Self> {
 
         let (instance, messenger) = instance::Instance::new(window, entry.clone())?;
 
@@ -219,7 +223,7 @@ impl App {
         let descriptor_set_layout      = create_descriptor_set_layout(&device)?;
         let command_pool               = create_command_pool         (&device, &instance,   surface)?;
         let texture_image              = TextureImage        ::new   (device.clone(), instance.clone(), command_pool, graphics_queue)?;
-        let (vertices, indices)        = load_model                  ()?;
+        let (vertices, indices)        = load_shapes                 (&shapes)?;
         let vertex_buffer              = create_vertex_buffer        (&device, &instance, command_pool, graphics_queue, &vertices)?;
         let index_buffer               = create_index_buffer         (&device, &instance, command_pool, graphics_queue, &indices)?;
         let swapchain                  = swapchain::Swapchain::new   (device.clone(), instance.clone(), surface, descriptor_set_layout, &texture_image, command_pool, &vertex_buffer, &index_buffer, &indices, swapchain_support, extent)?;
@@ -243,6 +247,7 @@ impl App {
                 descriptor_set_layout,
                 command_pool,
                 texture_image,
+                shapes,
                 vertices,
                 indices,
                 vertex_buffer,
@@ -254,11 +259,13 @@ impl App {
 
 
     unsafe fn destroy(self) {
-        println!("start destroy");
+        trace!("start destroy");
+
         self.device.device_wait_idle().unwrap();
 
         drop(self.data.swapchain);
 
+        // TODO: move these to their respective drops
         self.device.destroy_sampler              (self.data.texture_image.sampler, ALLOCATOR);
         self.device.destroy_image_view           (self.data.texture_image.view,    ALLOCATOR);
         self.device.destroy_image                (self.data.texture_image.image,   ALLOCATOR);
@@ -276,15 +283,12 @@ impl App {
 
         self.device.destroy_command_pool(self.data.command_pool, ALLOCATOR);
 
-        // self.device.destroy_device(ALLOCATOR);
-
         if VALIDATION_ENABLED {
             self.instance.destroy_debug_utils_messenger_ext(self.data.messenger, ALLOCATOR);
         }
 
         self.instance.destroy_surface_khr(self.data.surface, ALLOCATOR);
-        println!("done destroy");
-        // self.instance.destroy_instance   (ALLOCATOR);
+        trace!("done destroy");
     }
 
     unsafe fn recreate_swapchain(&mut self) -> Result<()> {
@@ -311,35 +315,7 @@ impl App {
 
         Ok(())
     }
-
-
-    // // todo: move this to swapchain's drop
-    // unsafe fn destroy_swapchain(&mut self) {
-    //     self.device.destroy_image_view(self.data.swapchain.depth_image.view,   ALLOCATOR);
-    //     self.device.free_memory       (self.data.swapchain.depth_image.memory, ALLOCATOR);
-    //     self.device.destroy_image     (self.data.swapchain.depth_image.image,  ALLOCATOR);
-
-    //     self.device.destroy_descriptor_pool(self.data.swapchain.descriptor_pool, ALLOCATOR);
-
-    //     self.data.swapchain.uniform_buffers.iter().for_each(|b| {
-    //         self.device.destroy_buffer     (*&b.buffer, ALLOCATOR);
-    //         self.device.free_memory        (*&b.memory, ALLOCATOR)
-    //     });
-
-    //     self.data.frame_buffers.iter().for_each(|f| self.device.destroy_framebuffer(*f, ALLOCATOR));
-
-    //     self.device.free_command_buffers(self.data.command_pool, &self.data.swapchain.command_buffers);
-
-    //     self.device.destroy_pipeline       (self.data.swapchain.pipeline.pipeline,       ALLOCATOR);
-    //     self.device.destroy_pipeline_layout(self.data.swapchain.pipeline.layout,         ALLOCATOR);
-    //     self.device.destroy_render_pass    (self.data.swapchain.render_pass.render_pass, ALLOCATOR);
-
-    //     self.data.swapchain.image_views.iter().for_each(|v| self.device.destroy_image_view(*v, ALLOCATOR));
-
-    //     self.device.destroy_swapchain_khr(self.data.swapchain.swapchain, ALLOCATOR);
-    // }
 }
-
 
 impl App {
 
@@ -434,7 +410,7 @@ impl App {
         );
 
         let view = Mat4::look_at_rh(
-            point3(2.0, 2.0, 2.0),
+            point3(2.0, 2.0, 1.0),
             point3(0.0, 0.0, 0.0),
             vec3  (0.0, 0.0, 1.0),
         );
@@ -450,7 +426,7 @@ impl App {
         let proj = correction * cgmath::perspective(
             Deg(45.0),
             self.data.swapchain.extent.width as f32 / self.data.swapchain.extent.height as f32,
-            0.1,
+            1.0,
             10.0,
         );
 
@@ -473,18 +449,20 @@ impl App {
     }
 }
 
+
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Vertex {
+pub struct Vertex {
     pos:        Vec3,
     color:      Vec3,
     tex_coord:  Vec2,
 }
 
-type Index = u32;
+pub type Index = u32;
 
 impl Vertex {
-    const fn new(pos: Vec3, color: Vec3, tex_coord: Vec2) -> Self {
+    pub const fn new(pos: Vec3, color: Vec3, tex_coord: Vec2) -> Self {
         Self {
             pos,
             color,
@@ -698,50 +676,30 @@ unsafe fn create_command_pool(
 }
 
 
-fn load_model() -> Result<(Vec<Vertex>, Vec<u32>)> {
+fn load_shapes(shapes: &[Shape]) -> Result<(Vec<Vertex>, Vec<u32>)> {
 
-    let mut reader = BufReader::new(File::open("resources/viking_room.obj")?);
+    // let mut unique_vertices = HashMap::new();
 
-    let (models, _) = tobj::load_obj_buf(
-        &mut reader,
-        &tobj::LoadOptions { triangulate: true, ..Default::default() },
-        |_| Ok(Default::default()),
-    )?;
-
-    let mut unique_vertices = HashMap::new();
     let mut vertices        = Vec::new();
     let mut indices         = Vec::new();
 
-    for model in &models {
-        for index in &model.mesh.indices {
-            let pos_offset       = (3 * index) as usize;
-            let tex_coord_offset = (2 * index) as usize;
+    for (i, shape) in shapes.iter().enumerate() {
+        let quad = shape.as_quad(i);
 
-            let vertex = Vertex {
-                pos: vec3(
-                    model.mesh.positions[pos_offset],
-                    model.mesh.positions[pos_offset + 1],
-                    model.mesh.positions[pos_offset + 2],
-                ),
-                color: vec3(1.0, 1.0, 1.0),
-                tex_coord: vec2(
-                          model.mesh.texcoords[tex_coord_offset],
-                    1.0 - model.mesh.texcoords[tex_coord_offset +1],
-                ),
-            };
+        // quad
+        //     .vertices
+        //     .iter_mut()
+        //     .for_each(|v| v.pos.z -= i as f32 * 0.1)
+        // ;
 
-            if let Some(index) = unique_vertices.get(&vertex) {
-                indices.push(*index as u32);
-            }
-            else {
-                let index = vertices.len();
-
-                unique_vertices.insert(vertex, index);
-                vertices       .push  (vertex);
-                indices        .push  (index as u32);
-            }
-        }
+        vertices.extend(quad.vertices.iter());
+        // indices .extend(quad.indices .iter().map(|x| (i * quad.indices.len()) as u32 + x));
+        indices .extend(quad.indices .iter());
     }
+
+    println!("count {}", indices.len());
+
+
 
     Ok((vertices, indices))
 }
@@ -973,6 +931,9 @@ unsafe fn create_buffer(
     properties: vk::MemoryPropertyFlags,
 
 ) -> Result<Buffer> {
+
+    // TODO: for debugging
+    let size = size +1;
 
     let buffer_info = vk::BufferCreateInfo::builder()
         .size        (size)

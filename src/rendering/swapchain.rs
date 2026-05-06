@@ -1,5 +1,5 @@
 
-use log::trace;
+use log::{info, trace};
 use vulkanalia::vk::{self, DeviceV1_0, Handle, HasBuilder, KhrSwapchainExtensionDeviceCommands};
 use crate::rendering::{ALLOCATOR, Buffer, Index, QueueFamilyIndices, SwapchainSupport, UniformBufferObject, Vertex, create_buffer, create_command_pool, device::Device, instance::Instance, swapchain::{depth_objects::DepthImage, pipeline::Pipeline, render_pass::RenderPass}, texture_image::TextureImage };
 
@@ -25,18 +25,18 @@ pub struct Swapchain {
     pub format:      vk::Format,
     pub extent:      vk::Extent2D,
 
-    pub render_pass:               RenderPass,
+    pub render_pass:     RenderPass,
 
-    pub pipeline:                  Pipeline,
+    pub pipeline:        Pipeline,
 
-    pub depth_image:               DepthImage,
+    pub depth_image:     DepthImage,
 
-    pub descriptor_pool:           vk::DescriptorPool,
-    pub descriptor_sets:           Vec<vk::DescriptorSet>,
+    pub descriptor_pool: vk::DescriptorPool,
+    pub descriptor_sets: Vec<vk::DescriptorSet>,
 
-    pub uniform_buffers:           Vec<Buffer>,
-    pub command_buffers:           Vec<vk::CommandBuffer>,
-    pub frame_buffers:             Vec<vk::Framebuffer>,
+    pub uniform_buffers: Vec<Buffer>,
+    pub command_buffers: Vec<vk::CommandBuffer>,
+    pub frame_buffers:   Vec<vk::Framebuffer>,
 }
 
 impl Swapchain {
@@ -57,6 +57,7 @@ impl Swapchain {
         -> Result<Self>
     {
         let indicies = QueueFamilyIndices::get(&instance, surface, device.physical_device)?;
+
 
         let surface_format = get_swapchain_surface_format(&support.formats);
         let present_mode   = get_swapchain_present_mode  (&support.present_modes);
@@ -149,6 +150,7 @@ impl Drop for Swapchain {
     fn drop(&mut self) {
         trace!("dropping swapchain");
 
+        // TODO: move these to respective drops
         unsafe {
             self.device.destroy_image_view(self.depth_image.view,   ALLOCATOR);
             self.device.free_memory       (self.depth_image.memory, ALLOCATOR);
