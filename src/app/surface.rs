@@ -46,8 +46,12 @@ impl Surface {
 impl Drop for Surface {
 
     fn drop(&mut self) {
+        debug!("Dropping Surface");
+
         unsafe {
             self.instance.instance().destroy_surface_khr(self.surface, None);
         }
+
+        debug!("/Dropping Surface");
     }
 }

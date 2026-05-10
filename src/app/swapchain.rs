@@ -15,6 +15,7 @@ use crate::{app::{device::{self, Device}, image_view::{self, ImageView}, instanc
 pub struct Swapchain {
     instance:  Rc<Instance>,
     device:    Rc<Device>,
+    surface:   Surface,
     extent:    vk::Extent2D,
     format:    vk::Format,
 
@@ -30,12 +31,12 @@ impl Swapchain {
         instance: Rc<Instance>,
         device:   Rc<Device>,
         window:   &Window,
-        surface:  &Surface,
+        surface:  Surface,
     )
         -> Result<Self>
     {
-        let support = instance.get_swapchain_support   (surface, device.physical_device)?;
-        let indices = instance.get_queue_family_indices(surface, device.physical_device)?;
+        let support = instance.get_swapchain_support   (&surface, device.physical_device)?;
+        let indices = instance.get_queue_family_indices(&surface, device.physical_device)?;
         let extent  = get_swapchain_extent             (&window, &support.capabilities);
         let format  = get_swapchain_surface_format     (&support.formats);
         let present = get_swapchain_present_mode       (&support.present_modes);
@@ -88,13 +89,19 @@ impl Swapchain {
         };
 
         let views = unsafe {
-            create_swapchain_image_views(device.clone(), &images, format.format)?
+            images
+                .iter()
+                .map (|i| ImageView::new(device.clone(), *i, format.format, vk::ImageAspectFlags::COLOR))
+                .collect
+                    ::<Result<Vec<_>, _>>
+                ()?
         };
 
 
         Ok(Self {
             device,
             instance,
+            surface,
             extent,
             format: format.format,
             swapchain,
@@ -112,12 +119,15 @@ impl Swapchain {
 impl Drop for Swapchain {
 
     fn drop(&mut self) {
+        debug!("Dropping swapchain");
 
         self.views.clear();
 
         unsafe {
             self.device.device().destroy_swapchain_khr(self.swapchain, None);
         }
+
+        debug!("/Dropping swapchain");
     }
 }
 
@@ -171,21 +181,4 @@ pub fn get_swapchain_extent(
             ))
             .build()
     }
-}
-
-
-
-unsafe fn create_swapchain_image_views(
-    device:    Rc<Device>,
-    images:    &[vk::Image],
-    format:    vk::Format,
-
-)
-    -> Result<Vec<ImageView>>
-{
-    Ok(images
-        .iter()
-        .map (|i| ImageView::new(device.clone(), *i, format, vk::ImageAspectFlags::COLOR))
-        .collect::<Result<Vec<_>, _>>()?
-    )
 }

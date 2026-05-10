@@ -63,8 +63,12 @@ impl ImageView {
 impl Drop for ImageView {
 
     fn drop(&mut self) {
+        debug!("Dropping ImageView");
+
         unsafe {
             self.device.device().destroy_image_view(self.view, None);
         }
+
+        debug!("/Dropping ImageView");
     }
 }

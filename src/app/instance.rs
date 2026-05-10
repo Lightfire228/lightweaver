@@ -286,6 +286,7 @@ impl Instance {
 impl Drop for Instance {
 
     fn drop(&mut self) {
+        debug!("Dropping Instance");
 
         unsafe {
             if VALIDATION_ENABLED {
@@ -294,6 +295,8 @@ impl Drop for Instance {
 
             self.instance.destroy_instance(None);
         }
+
+        debug!("/Dropping Instance");
     }
 }
 

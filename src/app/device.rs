@@ -93,8 +93,6 @@ impl Device {
         let graphics_queue = unsafe { device.get_device_queue(indices.graphics, 0) };
         let present_queue  = unsafe { device.get_device_queue(indices.present,  0) };
 
-        info!("ye");
-
         Ok(Rc::new(Self {
             device,
             instance,
@@ -112,8 +110,12 @@ impl Device {
 impl Drop for Device {
 
     fn drop(&mut self) {
+        debug!("Dropping Device");
+
         unsafe {
             self.device.destroy_device(None);
         }
+
+        debug!("/Dropping Device");
     }
 }

@@ -7,6 +7,7 @@ mod image_view;
 use std::rc::Rc;
 
 use anyhow::{Ok, Result, anyhow};
+use log::debug;
 use vulkanalia::vk::{InstanceV1_0, KhrSurfaceExtensionInstanceCommands};
 use vulkanalia::{Entry, vk, Instance as VkInstance};
 use vulkanalia::loader::{LIBRARY, LibloadingLoader};
@@ -95,7 +96,6 @@ struct AppState {
     window:        Window,
     instance:      Rc<Instance>,
     device:        Rc<Device>,
-    surface:       Surface,
     swapchain:     Swapchain,
 
 }
@@ -106,14 +106,21 @@ impl AppState {
         let instance  = Instance ::new(&window,          entry   )?;
         let surface   = Surface  ::new(instance.clone(), &window )?;
         let device    = Device   ::new(instance.clone(), &surface)?;
-        let swapchain = Swapchain::new(instance.clone(), device.clone(), &window, &surface)?;
+        let swapchain = Swapchain::new(instance.clone(), device.clone(), &window, surface)?;
 
         Ok(Self {
             window,
             instance,
-            surface,
             device,
             swapchain,
         })
+    }
+}
+
+impl Drop for AppState {
+    fn drop(&mut self) {
+        debug!("Dropping App State");
+
+        debug!("/Dropping App State");
     }
 }
