@@ -58,6 +58,10 @@ impl ImageView {
         })
     }
 
+    pub unsafe fn view(&self) -> vk::ImageView {
+        self.view
+    }
+
 }
 
 impl Drop for ImageView {

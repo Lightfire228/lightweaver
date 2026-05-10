@@ -9,21 +9,23 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{descriptor_set_layout::{self, DescriptorSetLayout}, device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, pipeline::Pipeline, render_pass::{self, RenderPass}, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{depth_image::{self, DepthImage}, descriptor_set_layout::{self, DescriptorSetLayout}, device::{self, Device}, framebuffers::{self, Framebuffers}, image_view::{self, ImageView}, instance::{self, Instance}, pipeline::Pipeline, render_pass::{self, RenderPass}, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
 
 // TODO: do we need to store an instance ref?
 pub struct Swapchain {
-    instance:  Rc<Instance>,
-    device:    Rc<Device>,
-    surface:   Surface,
-    extent:    vk::Extent2D,
-    format:    vk::Format,
-    swapchain: vk::SwapchainKHR,
+    instance:      Rc<Instance>,
+    device:        Rc<Device>,
+    surface:       Surface,
+    extent:        vk::Extent2D,
+    format:        vk::Format,
+    swapchain:     vk::SwapchainKHR,
 
-    images:    Vec<vk::Image>,
-    views:     Vec<ImageView>,
+    images:        Vec<vk::Image>,
+    views:         Vec<ImageView>,
 
-    pipeline:  Pipeline,
+    pipeline:      Pipeline,
+    depth_image:   DepthImage,
+    frame_buffers: Framebuffers,
 }
 
 
@@ -100,9 +102,11 @@ impl Swapchain {
                 ()?
         };
 
-        let render_pass   = RenderPass::new(device.clone(), &instance, format.format)?;
-        let pipeline      = Pipeline  ::new(device.clone(), extent, descriptor_set_layout, &render_pass)?;
+        let render_pass   = RenderPass  ::new(device.clone(), &instance, format.format)?;
+        let pipeline      = Pipeline    ::new(device.clone(), extent, descriptor_set_layout, &render_pass)?;
 
+        let depth_image   = DepthImage  ::new(device.clone(), &instance, extent)?;
+        let frame_buffers = Framebuffers::new(device.clone(), &depth_image, &views, &render_pass, extent)?;
 
 
         Ok((
@@ -118,6 +122,8 @@ impl Swapchain {
                 views,
 
                 pipeline,
+                depth_image,
+                frame_buffers,
             },
             render_pass
         ))

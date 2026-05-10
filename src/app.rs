@@ -1,5 +1,8 @@
+mod depth_image;
 mod descriptor_set_layout;
 mod device;
+mod framebuffers;
+mod image;
 mod image_view;
 mod instance;
 mod pipeline;
@@ -133,13 +136,13 @@ impl AppState {
     }
 }
 
-impl Drop for AppState {
-    fn drop(&mut self) {
-        debug!("Dropping App State");
+// impl Drop for AppState {
+//     fn drop(&mut self) {
+//         debug!("Dropping App State");
 
-        debug!("/Dropping App State");
-    }
-}
+//         debug!("/Dropping App State");
+//     }
+// }
 
 
 
@@ -229,4 +232,27 @@ struct UniformBufferObject {
     model: Mat4,
     view:  Mat4,
     proj:  Mat4,
+}
+
+
+
+
+
+unsafe fn get_memory_type_index(
+    instance:        &Instance,
+    physical_device: vk::PhysicalDevice,
+    properties:      vk::MemoryPropertyFlags,
+    requirements:    vk::MemoryRequirements,
+) -> Result<u32> {
+
+    let memory = instance.instance().get_physical_device_memory_properties(physical_device);
+
+    (0..memory.memory_heap_count)
+        .find      (|i| {
+            let suitable    = (requirements.memory_type_bits & (1 << i)) != 0;
+            let memory_type = memory.memory_types[*i as usize];
+
+            suitable && memory_type.property_flags.contains(properties)
+        })
+        .ok_or_else(|| anyhow!("Failed to find suitable memory type"))
 }
