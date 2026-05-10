@@ -132,6 +132,7 @@ impl Drop for Instance {
     fn drop(&mut self) {
         trace!("dropping instance");
         unsafe {
+
             self.instance.destroy_instance(ALLOCATOR);
         }
         trace!("dropped instance");

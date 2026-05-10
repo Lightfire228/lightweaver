@@ -1,9 +1,12 @@
 mod instance;
+mod device;
+mod surface;
 
 use std::rc::Rc;
 
 use anyhow::{Ok, Result, anyhow};
-use vulkanalia::Entry;
+use vulkanalia::vk::{InstanceV1_0, KhrSurfaceExtensionInstanceCommands};
+use vulkanalia::{Entry, vk, Instance as VkInstance};
 use vulkanalia::loader::{LIBRARY, LibloadingLoader};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -12,16 +15,38 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowAttributes, WindowId};
 
+
+use crate::app::device::{Device, SuitabilityError};
 use crate::app::instance::Instance;
+use crate::app::surface::Surface;
+
+
+pub fn main() -> Result<()> {
+
+    pretty_env_logger::init();
+
+    let loader   = unsafe { LibloadingLoader::new(LIBRARY)? };
+    let entry    = unsafe { Entry::new(loader).map_err(|b| anyhow!("{}", b))? };
+
+
+    let event_loop = EventLoop::new().unwrap();
+
+    event_loop.set_control_flow(ControlFlow::Poll);
+
+    let mut app = App {
+        entry: Rc::new(entry),
+        state: None,
+    };
+    event_loop.run_app(&mut app)?;
+
+    Ok(())
+
+}
+
 
 struct App {
     entry: Rc<Entry>,
     state: Option<AppState>
-}
-
-struct AppState {
-    window:   Window,
-    instance: Rc<Instance>
 }
 
 impl ApplicationHandler for App {
@@ -36,12 +61,9 @@ impl ApplicationHandler for App {
             .unwrap()
         ;
 
-        let state = AppState {
-            instance: Rc::new(Instance::new(&window, self.entry.clone()).unwrap()),
-            window,
-        };
-
-        self.state = Some(state)
+        self.state = Some(
+            AppState::new(window, self.entry.clone()).unwrap()
+        )
 
     }
 
@@ -64,24 +86,27 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn main() -> Result<()> {
-
-    pretty_env_logger::init();
-
-    let loader   = unsafe { LibloadingLoader::new(LIBRARY)? };
-    let entry    = unsafe { Entry::new(loader).map_err(|b| anyhow!("{}", b))? };
 
 
-    let event_loop = EventLoop::new().unwrap();
+struct AppState {
+    window:   Window,
+    instance: Rc<Instance>,
+    device:   Rc<Device>,
+    surface:  Surface,
+}
 
-    event_loop.set_control_flow(ControlFlow::Poll);
+impl AppState {
+    pub fn new(window: Window, entry: Rc<Entry>) -> Result<Self> {
 
-    let mut app = App {
-        entry: Rc::new(entry),
-        state: None,
-    };
-    event_loop.run_app(&mut app)?;
+        let instance = Rc::new(Instance::new(&window, entry)?);
+        let surface  =         Surface ::new(instance.clone(), &window)?;
+        let device   = Rc::new(Device  ::new(instance.clone(), &surface)?);
 
-    Ok(())
-
+        Ok(Self {
+            window,
+            instance,
+            surface,
+            device,
+        })
+    }
 }
