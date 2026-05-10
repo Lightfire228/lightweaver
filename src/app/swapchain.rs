@@ -9,31 +9,34 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{descriptor_set_layout::{self, DescriptorSetLayout}, device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, pipeline::Pipeline, render_pass::{self, RenderPass}, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
 
-
+// TODO: do we need to store an instance ref?
 pub struct Swapchain {
     instance:  Rc<Instance>,
     device:    Rc<Device>,
     surface:   Surface,
     extent:    vk::Extent2D,
     format:    vk::Format,
-
     swapchain: vk::SwapchainKHR,
 
-    images: Vec<vk::Image>,
-    views:  Vec<ImageView>,
+    images:    Vec<vk::Image>,
+    views:     Vec<ImageView>,
+
+    pipeline:  Pipeline,
 }
 
 
 impl Swapchain {
     pub fn new(
-        instance: Rc<Instance>,
-        device:   Rc<Device>,
-        window:   &Window,
-        surface:  Surface,
+        instance:              Rc<Instance>,
+        device:                Rc<Device>,
+        window:                &Window,
+        surface:               Surface,
+        descriptor_set_layout: &DescriptorSetLayout,
+
     )
-        -> Result<Self>
+        -> Result<(Self, RenderPass)>
     {
         let support = instance.get_swapchain_support   (&surface, device.physical_device)?;
         let indices = instance.get_queue_family_indices(&surface, device.physical_device)?;
@@ -63,8 +66,8 @@ impl Swapchain {
         };
 
 
-        let info = unsafe { vk::SwapchainCreateInfoKHR::builder()
-            .surface             (surface.surface())
+        let info = vk::SwapchainCreateInfoKHR::builder()
+            .surface             (unsafe { surface.surface() })
             .min_image_count     (image_count)
             .image_format        (format.format)
             .image_color_space   (format.color_space)
@@ -78,7 +81,7 @@ impl Swapchain {
             .present_mode        (present)
             .clipped             (true)
             .old_swapchain       (vk::SwapchainKHR::null())
-        };
+        ;
 
         let swapchain = unsafe {
             device.device().create_swapchain_khr(&info, None)?
@@ -97,17 +100,27 @@ impl Swapchain {
                 ()?
         };
 
+        let render_pass   = RenderPass::new(device.clone(), &instance, format.format)?;
+        let pipeline      = Pipeline  ::new(device.clone(), extent, descriptor_set_layout, &render_pass)?;
 
-        Ok(Self {
-            device,
-            instance,
-            surface,
-            extent,
-            format: format.format,
-            swapchain,
-            images,
-            views,
-        })
+
+
+        Ok((
+            Self {
+                device,
+                instance,
+                surface,
+                extent,
+                format: format.format,
+                swapchain,
+
+                images,
+                views,
+
+                pipeline,
+            },
+            render_pass
+        ))
     }
 
     pub fn extent(&self) -> vk::Extent2D {

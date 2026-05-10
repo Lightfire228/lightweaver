@@ -14,16 +14,16 @@ pub mod depth_objects;
 
 #[derive(Debug)]
 pub struct Swapchain {
-    instance:     Rc<Instance>,
-    device:       Rc<device::Device>,
-    command_pool: vk::CommandPool,
+    instance:            Rc<Instance>,
+    device:              Rc<device::Device>,
+    command_pool:        vk::CommandPool,
 
-    pub swapchain:   vk::SwapchainKHR,
-    pub support:     SwapchainSupport,
-    pub images:      Vec<vk::Image>,
-    pub image_views: Vec<vk::ImageView>,
-    pub format:      vk::Format,
-    pub extent:      vk::Extent2D,
+    pub swapchain:       vk::SwapchainKHR,
+    pub support:         SwapchainSupport,
+    pub images:          Vec<vk::Image>,
+    pub image_views:     Vec<vk::ImageView>,
+    pub format:          vk::Format,
+    pub extent:          vk::Extent2D,
 
     pub render_pass:     RenderPass,
 
@@ -376,7 +376,7 @@ unsafe fn create_descriptor_sets(
 
     let descriptor_sets = device.allocate_descriptor_sets(&info)?;
 
-    for i in 0..images.len() {
+    for (i, _) in images.iter().enumerate() {
         let info = vk::DescriptorBufferInfo::builder()
             .buffer(uniform_buffers[i].buffer)
             .offset(0)
