@@ -1,6 +1,8 @@
 mod instance;
 mod device;
 mod surface;
+mod swapchain;
+mod image_view;
 
 use std::rc::Rc;
 
@@ -19,6 +21,7 @@ use winit::window::{Window, WindowAttributes, WindowId};
 use crate::app::device::{Device, SuitabilityError};
 use crate::app::instance::Instance;
 use crate::app::surface::Surface;
+use crate::app::swapchain::Swapchain;
 
 
 pub fn main() -> Result<()> {
@@ -89,24 +92,28 @@ impl ApplicationHandler for App {
 
 
 struct AppState {
-    window:   Window,
-    instance: Rc<Instance>,
-    device:   Rc<Device>,
-    surface:  Surface,
+    window:        Window,
+    instance:      Rc<Instance>,
+    device:        Rc<Device>,
+    surface:       Surface,
+    swapchain:     Swapchain,
+
 }
 
 impl AppState {
     pub fn new(window: Window, entry: Rc<Entry>) -> Result<Self> {
 
-        let instance = Rc::new(Instance::new(&window, entry)?);
-        let surface  =         Surface ::new(instance.clone(), &window)?;
-        let device   = Rc::new(Device  ::new(instance.clone(), &surface)?);
+        let instance  = Instance ::new(&window,          entry   )?;
+        let surface   = Surface  ::new(instance.clone(), &window )?;
+        let device    = Device   ::new(instance.clone(), &surface)?;
+        let swapchain = Swapchain::new(instance.clone(), device.clone(), &window, &surface)?;
 
         Ok(Self {
             window,
             instance,
             surface,
             device,
+            swapchain,
         })
     }
 }

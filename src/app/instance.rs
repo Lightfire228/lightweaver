@@ -38,7 +38,7 @@ pub struct QueueFamilyIndices {
 
 
 impl Instance {
-    pub fn new(window: &Window, entry: Rc<Entry>) -> Result<Self> {
+    pub fn new(window: &Window, entry: Rc<Entry>) -> Result<Rc<Self>> {
 
         let application_info = vk::ApplicationInfo::builder()
             .application_name   (b"Lightweaver\0")
@@ -132,11 +132,11 @@ impl Instance {
             Default::default()
         };
 
-        Ok(Self {
+        Ok(Rc::new(Self {
             entry,
             instance,
             messenger,
-        })
+        }))
     }
 
     /// # safety

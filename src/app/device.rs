@@ -34,7 +34,7 @@ impl Device {
         surface:  &Surface,
 
     )
-        -> Result<Self>
+        -> Result<Rc<Self>>
     {
         let physical_device = instance.pick_physical_device(surface)?;
 
@@ -95,14 +95,17 @@ impl Device {
 
         info!("ye");
 
-        Ok(Self {
+        Ok(Rc::new(Self {
             device,
             instance,
             physical_device,
             graphics_queue,
             present_queue,
-        })
+        }))
+    }
 
+    pub unsafe fn device(&self) -> &vulkanalia::Device {
+        &self.device
     }
 }
 
