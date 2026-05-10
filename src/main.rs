@@ -10,15 +10,15 @@ mod macros;
 mod utils;
 mod rendering;
 mod shapes;
+mod app;
 
 
 pub fn main() {
 
-    let shapes = lox().unwrap();
+    let _shapes = lox().unwrap();
 
-    rendering::main(shapes).unwrap()
-
-
+    // rendering::main(shapes).unwrap()
+    app::main().unwrap();
 }
 
 
