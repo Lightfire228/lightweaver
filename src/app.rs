@@ -375,13 +375,17 @@ impl AppState {
     }
 }
 
-// impl Drop for AppState {
-//     fn drop(&mut self) {
-//         debug!("Dropping App State");
+impl Drop for AppState {
+    fn drop(&mut self) {
+        debug!("Dropping App State");
 
-//         debug!("/Dropping App State");
-//     }
-// }
+        unsafe {
+            ManuallyDrop::drop(&mut self.swapchain);
+        }
+
+        debug!("/Dropping App State");
+    }
+}
 
 
 
