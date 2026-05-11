@@ -8,17 +8,15 @@ use crate::{script::RunError, shapes::Shape};
 mod script;
 mod macros;
 mod utils;
-mod rendering;
 mod shapes;
 mod app;
 
 
 pub fn main() {
 
-    let _shapes = lox().unwrap();
+    let shapes = lox().unwrap();
 
-    // rendering::main(shapes).unwrap()
-    app::main().unwrap();
+    app::main(shapes).unwrap();
 }
 
 

@@ -9,7 +9,8 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{instance::{self, Instance}, surface::Surface}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::app::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER, instance::{self, Instance}, surface::Surface};
+
 
 
 pub struct Device {
@@ -102,7 +103,7 @@ impl Device {
         }))
     }
 
-    pub unsafe fn device(&self) -> &vulkanalia::Device {
+    pub fn device(&self) -> &vulkanalia::Device {
         &self.device
     }
 }

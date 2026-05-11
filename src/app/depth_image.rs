@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{Vertex, device::{self, Device}, image::{Image, ImageOpts}, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{Vertex, device::{self, Device}, image::{Image, ImageOpts}, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}};
 
 pub struct DepthImage {
     device:   Rc<device::Device>,

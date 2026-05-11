@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::instance::{self, Instance}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::instance::{self, Instance}};
 
 
 pub struct Surface {
@@ -36,9 +36,7 @@ impl Surface {
         })
     }
 
-    /// # safety
-    /// the caller must ensure the surface isn't dropped while this handle is valid
-    pub unsafe fn surface(&self) -> vk::SurfaceKHR {
+    pub fn surface(&self) -> vk::SurfaceKHR {
         self.surface
     }
 }

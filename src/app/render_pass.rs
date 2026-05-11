@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, surface::{self, Surface}, swapchain}};
 
 // TODO: dynamic rendering
 // https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/02_Graphics_pipeline_basics/03_Render_passes.html
@@ -114,7 +114,7 @@ impl RenderPass {
     }
 
 
-    pub unsafe fn render_pass(&self) -> vk::RenderPass {
+    pub fn render_pass(&self) -> vk::RenderPass {
         self.render_pass
     }
 

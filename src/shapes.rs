@@ -1,6 +1,6 @@
 use cgmath::{vec2, vec3};
 
-use crate::rendering::{Index, Vertex};
+use crate::app::{Index, Vertex};
 
 #[derive(Debug)]
 pub enum Shape {

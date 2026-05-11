@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{device::{self, Device}, instance::{self, Instance}, swapchain::Swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{device::{self, Device}, instance::{self, Instance}, swapchain::Swapchain}};
 
 
 pub struct ImageView {
@@ -20,11 +20,7 @@ pub struct ImageView {
 
 impl ImageView {
 
-    // TODO: wrap the vk::Image and tie the view's lifetime to it
-
-    /// # Safety
-    /// this view must not outlive the image it was created on
-    pub unsafe fn new(
+    pub fn new(
         device:  Rc<Device>,
         image:   vk::Image,
         format:  vk::Format,
@@ -58,7 +54,7 @@ impl ImageView {
         })
     }
 
-    pub unsafe fn view(&self) -> vk::ImageView {
+    pub fn view(&self) -> vk::ImageView {
         self.view
     }
 

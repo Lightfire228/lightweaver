@@ -8,12 +8,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{device::SuitabilityError, instance, surface::{self, Surface}}, rendering::DEVICE_EXTENSIONS};
-
-const PORTABILITY_MACOS_VERSION: Version           = Version::new(1, 3, 216);
-const VALIDATION_ENABLED:        bool              = cfg!(debug_assertions);
-const VALIDATION_LAYER:          vk::ExtensionName = vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
-
+use crate::app::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER, device::SuitabilityError, instance, surface::{self, Surface}};
 
 
 pub struct Instance {
@@ -139,9 +134,7 @@ impl Instance {
         }))
     }
 
-    /// # safety
-    /// caller must ensure all invariants of `vulkanalia::Instance` are upheld
-    pub unsafe fn instance(&self) -> &VkInstance {
+    pub fn instance(&self) -> &VkInstance {
         &self.instance
     }
 

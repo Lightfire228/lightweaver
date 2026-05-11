@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{Vertex, device::{self, Device}, get_memory_type_index, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{Vertex, device::{self, Device}, get_memory_type_index, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}};
 
 
 pub struct Image {
@@ -41,9 +41,7 @@ impl Image {
         -> Result<Self>
     {
 
-        let d = unsafe {
-            device.device()
-        };
+        let d = device.device();
 
         let ImageOpts { width, height, format, tiling, usage, properties } = opts;
 
@@ -91,11 +89,11 @@ impl Image {
         })
     }
 
-    pub unsafe fn image (&self) -> vk::Image {
+    pub fn image (&self) -> vk::Image {
         self.image
     }
 
-    pub unsafe fn memory(&self) -> vk::DeviceMemory {
+    pub fn memory(&self) -> vk::DeviceMemory {
         self.memory
     }
 

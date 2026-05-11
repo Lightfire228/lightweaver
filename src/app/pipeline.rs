@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{Vertex, descriptor_set_layout::DescriptorSetLayout, device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{Vertex, descriptor_set_layout::DescriptorSetLayout, device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}};
 
 
 pub struct Pipeline {
@@ -118,7 +118,7 @@ impl Pipeline {
         ;
 
 
-        let set_layouts = unsafe { &[descriptor_set_layout.layout()] };
+        let set_layouts = &[descriptor_set_layout.layout()];
         let layout_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(set_layouts)
         ;
@@ -147,7 +147,7 @@ impl Pipeline {
             .depth_stencil_state (&depth_stencil_state)
             .color_blend_state   (&color_blend_state)
             .layout              (pipeline_layout)
-            .render_pass         (unsafe { render_pass.render_pass() })
+            .render_pass         (render_pass.render_pass())
             .subpass             (0)
             .base_pipeline_handle(vk::Pipeline::null())
             .base_pipeline_index (-1)
@@ -169,6 +169,14 @@ impl Pipeline {
             pipeline,
             layout: pipeline_layout,
         })
+    }
+
+    pub fn pipeline(&self) -> vk::Pipeline {
+        self.pipeline
+    }
+
+    pub fn layout(&self) -> vk::PipelineLayout {
+        self.layout
     }
 
 }

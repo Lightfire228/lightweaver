@@ -1,50 +1,64 @@
-use std::{collections::HashSet, ffi::{CStr, c_void}, rc::Rc};
+use std::{collections::HashSet, ffi::{CStr, c_void}, mem, rc::Rc};
 use anyhow::{Ok, Result, anyhow};
 
 use log::*;
 use thiserror::Error;
-use vulkanalia::{Entry, vk::{self, DeviceV1_0, EntryV1_0, Handle, HasBuilder, InstanceV1_0, KhrSurfaceExtensionInstanceCommands, KhrSwapchainExtensionDeviceCommands}, window as vk_window};
+use vulkanalia::{Entry, vk::{self, DescriptorPool, DeviceV1_0, EntryV1_0, Handle, HasBuilder, InstanceV1_0, KhrSurfaceExtensionInstanceCommands, KhrSwapchainExtensionDeviceCommands}, window as vk_window};
 use winit::window::{self, Window};
 use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{depth_image::{self, DepthImage}, descriptor_set_layout::{self, DescriptorSetLayout}, device::{self, Device}, framebuffers::{self, Framebuffers}, image_view::{self, ImageView}, instance::{self, Instance}, pipeline::Pipeline, render_pass::{self, RenderPass}, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{Index, buffer::Buffer, command_buffers::{self, CommandBuffers}, command_pool::{self, CommandPool}, depth_image::{self, DepthImage}, descriptor_set_layout::{self, DescriptorSetLayout}, descriptor_sets::DescriptorSets, device::{self, Device}, framebuffers::{self, Framebuffers}, image_view::{self, ImageView}, instance::{self, Instance, SwapchainSupport}, pipeline::Pipeline, render_pass::{self, RenderPass}, surface::{self, Surface}, swapchain, texture_image::TextureImage, uniform_buffer::{self, UniformBuffers}}};
 
-// TODO: do we need to store an instance ref?
 pub struct Swapchain {
-    instance:      Rc<Instance>,
-    device:        Rc<Device>,
-    surface:       Surface,
-    extent:        vk::Extent2D,
-    format:        vk::Format,
-    swapchain:     vk::SwapchainKHR,
+    device:          Rc<Device>,
+    extent:          vk::Extent2D,
+    format:          vk::Format,
+    support:         SwapchainSupport,
+    swapchain:       vk::SwapchainKHR,
 
-    images:        Vec<vk::Image>,
-    views:         Vec<ImageView>,
+    images:          Vec<vk::Image>,
+    views:           Vec<ImageView>,
 
-    pipeline:      Pipeline,
-    depth_image:   DepthImage,
-    frame_buffers: Framebuffers,
+    descriptor_sets: DescriptorSets,
+    render_pass:     RenderPass,
+    pipeline:        Pipeline,
+    depth_image:     DepthImage,
+    frame_buffers:   Framebuffers,
+    command_buffers: CommandBuffers,
+    uniform_buffers: UniformBuffers,
+}
+
+pub struct SwapchainOpts<'a> {
+    pub window:                &'a Window,
+    pub instance:              &'a Instance,
+    pub surface:               &'a Surface,
+    pub texture_image:         &'a TextureImage,
+    pub descriptor_set_layout: &'a DescriptorSetLayout,
+    pub vertex_buffer:         &'a Buffer,
+    pub index_buffer:          &'a Buffer,
+    pub indices:               &'a [Index],
 }
 
 
 impl Swapchain {
     pub fn new(
-        instance:              Rc<Instance>,
-        device:                Rc<Device>,
-        window:                &Window,
-        surface:               Surface,
-        descriptor_set_layout: &DescriptorSetLayout,
+        device:       Rc<Device>,
+        command_pool: Rc<CommandPool>,
+        opts:         SwapchainOpts,
 
     )
-        -> Result<(Self, RenderPass)>
+        -> Result<Self>
     {
-        let support = instance.get_swapchain_support   (&surface, device.physical_device)?;
-        let indices = instance.get_queue_family_indices(&surface, device.physical_device)?;
-        let extent  = get_swapchain_extent             (&window, &support.capabilities);
-        let format  = get_swapchain_surface_format     (&support.formats);
-        let present = get_swapchain_present_mode       (&support.present_modes);
+
+        let SwapchainOpts { window, instance, surface, texture_image, descriptor_set_layout, vertex_buffer, index_buffer, indices } = opts;
+
+        let support    = instance.get_swapchain_support   (&surface, device.physical_device)?;
+        let qf_indices = instance.get_queue_family_indices(&surface, device.physical_device)?;
+        let extent     = get_swapchain_extent             (&window, &support.capabilities);
+        let format     = get_swapchain_surface_format     (&support.formats);
+        let present    = get_swapchain_present_mode       (&support.present_modes);
 
         let mut image_count = support.capabilities.min_image_count +1;
         if
@@ -57,9 +71,9 @@ impl Swapchain {
 
         let mut queue_family_indices = vec![];
 
-        let image_sharing_mode = if indices.graphics != indices.present {
-            queue_family_indices.push(indices.graphics);
-            queue_family_indices.push(indices.present);
+        let image_sharing_mode = if qf_indices.graphics != qf_indices.present {
+            queue_family_indices.push(qf_indices.graphics);
+            queue_family_indices.push(qf_indices.present);
 
             vk::SharingMode::CONCURRENT
         }
@@ -69,7 +83,7 @@ impl Swapchain {
 
 
         let info = vk::SwapchainCreateInfoKHR::builder()
-            .surface             (unsafe { surface.surface() })
+            .surface             (surface.surface())
             .min_image_count     (image_count)
             .image_format        (format.format)
             .image_color_space   (format.color_space)
@@ -93,44 +107,66 @@ impl Swapchain {
             device.device().get_swapchain_images_khr(swapchain)?
         };
 
-        let views = unsafe {
-            images
-                .iter()
-                .map (|i| ImageView::new(device.clone(), *i, format.format, vk::ImageAspectFlags::COLOR))
-                .collect
-                    ::<Result<Vec<_>, _>>
-                ()?
-        };
+        let views = images
+            .iter()
+            .map (|i| ImageView::new(device.clone(), *i, format.format, vk::ImageAspectFlags::COLOR))
+            .collect
+                ::<Result<Vec<_>, _>>
+            ()?
+        ;
 
-        let render_pass   = RenderPass  ::new(device.clone(), &instance, format.format)?;
-        let pipeline      = Pipeline    ::new(device.clone(), extent, descriptor_set_layout, &render_pass)?;
+        let render_pass     = RenderPass    ::new(device.clone(), &instance, format.format)?;
+        let pipeline        = Pipeline      ::new(device.clone(), extent, descriptor_set_layout, &render_pass)?;
 
-        let depth_image   = DepthImage  ::new(device.clone(), &instance, extent)?;
-        let frame_buffers = Framebuffers::new(device.clone(), &depth_image, &views, &render_pass, extent)?;
+        let uniform_buffers = UniformBuffers::new(device.clone(), &instance, &images)?;
+        let descriptor_sets = DescriptorSets::new(device.clone(), &images, descriptor_set_layout, &uniform_buffers, texture_image)?;
 
+        let depth_image     = DepthImage    ::new(device.clone(), &instance, extent)?;
+        let frame_buffers   = Framebuffers  ::new(device.clone(), &depth_image, &views, &render_pass, extent)?;
+        let command_buffers = CommandBuffers::new(device.clone(), command_pool, &render_pass, &pipeline, &descriptor_sets, extent, vertex_buffer, index_buffer, indices, &frame_buffers)?;
 
-        Ok((
-            Self {
-                device,
-                instance,
-                surface,
-                extent,
-                format: format.format,
-                swapchain,
+        Ok(Self {
+            device,
+            extent,
+            format: format.format,
+            support,
+            swapchain,
 
-                images,
-                views,
+            images,
+            views,
 
-                pipeline,
-                depth_image,
-                frame_buffers,
-            },
-            render_pass
-        ))
+            render_pass,
+            pipeline,
+            depth_image,
+            frame_buffers,
+            command_buffers,
+            uniform_buffers,
+            descriptor_sets,
+        })
+    }
+
+    pub fn images(&self) -> &[vk::Image] {
+        &self.images
     }
 
     pub fn extent(&self) -> vk::Extent2D {
         self.extent
+    }
+
+    pub fn swapchain(&self) -> vk::SwapchainKHR {
+        self.swapchain
+    }
+
+    pub fn command_buffers(&self) -> &CommandBuffers {
+        &self.command_buffers
+    }
+
+    pub fn uniform_buffers(&self) -> &UniformBuffers {
+        &self.uniform_buffers
+    }
+
+    pub fn take_support(&mut self) -> SwapchainSupport {
+        mem::take(&mut self.support)
     }
 
 }
@@ -157,9 +193,9 @@ fn get_swapchain_surface_format(
     -> vk::SurfaceFormatKHR
 {
     formats
-        .iter          ()
-        .cloned        ()
-        .find          (|f| {
+        .iter  ()
+        .cloned()
+        .find  (|f| {
                   f.format      == vk::Format       ::B8G8R8A8_SRGB
                && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
         })

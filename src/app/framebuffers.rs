@@ -9,7 +9,7 @@ use vulkanalia::Version;
 use vulkanalia::Instance as VkInstance;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 
-use crate::{app::{Vertex, depth_image::DepthImage, device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}, rendering::{DEVICE_EXTENSIONS, PORTABILITY_MACOS_VERSION, VALIDATION_ENABLED, VALIDATION_LAYER}};
+use crate::{app::{Vertex, depth_image::DepthImage, device::{self, Device}, image_view::{self, ImageView}, instance::{self, Instance}, render_pass::RenderPass, surface::{self, Surface}, swapchain}};
 
 
 pub struct Framebuffers {
@@ -33,12 +33,10 @@ impl Framebuffers {
     {
         let frame_buffers = image_views
             .iter()
-            .map (|i| unsafe { i.view()} )
+            .map (|i| i.view() )
             .map (|i| {
 
-                let view = unsafe {
-                    depth_image.view().view()
-                };
+                let view = depth_image.view().view();
 
                 // The color attachment differs for every swapchain image, but the same depth image can be
                 // used by all of them because only a single subpass is running at the same time due to
@@ -46,7 +44,7 @@ impl Framebuffers {
                 let attachments = &[i, view];
 
                 let create_info = vk::FramebufferCreateInfo::builder()
-                    .render_pass(unsafe { render_pass.render_pass() })
+                    .render_pass(render_pass.render_pass())
                     .attachments(attachments)
                     .width      (extent.width)
                     .height     (extent.height)
@@ -70,7 +68,7 @@ impl Framebuffers {
     }
 
 
-    pub unsafe fn frame_buffers(&self) -> &[vk::Framebuffer] {
+    pub fn frame_buffers(&self) -> &[vk::Framebuffer] {
         &self.frame_buffers
     }
 
