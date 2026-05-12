@@ -380,6 +380,8 @@ impl Drop for AppState {
         debug!("Dropping App State");
 
         unsafe {
+            self.device.device().device_wait_idle().unwrap();
+
             ManuallyDrop::drop(&mut self.swapchain);
         }
 

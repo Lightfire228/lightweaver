@@ -8,6 +8,7 @@ mod get_expr;
 mod grouping_expr;
 mod literal_expr;
 mod logical_expr;
+mod rect_expr;
 mod set_expr;
 mod super_expr;
 mod this_expr;
@@ -21,6 +22,7 @@ pub use get_expr      ::*;
 pub use grouping_expr ::*;
 pub use literal_expr  ::*;
 pub use logical_expr  ::*;
+pub use rect_expr     ::*;
 pub use set_expr      ::*;
 pub use super_expr    ::*;
 pub use this_expr     ::*;
@@ -37,6 +39,7 @@ pub enum Expr {
     Call     (Call),
     Get      (Get),
     Grouping (Grouping),
+    Rect     (Rect),
     Literal  (Literal),
     Logical  (Logical),
     Set      (Set),
@@ -70,6 +73,7 @@ impl Expr {
             Expr::Grouping (expr) => Box::new(expr),
             Expr::Literal  (expr) => Box::new(expr),
             Expr::Logical  (expr) => Box::new(expr),
+            Expr::Rect     (expr) => Box::new(expr),
             Expr::Set      (expr) => Box::new(expr),
             Expr::Super    (expr) => Box::new(expr),
             Expr::This     (expr) => Box::new(expr),

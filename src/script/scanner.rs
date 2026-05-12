@@ -1,5 +1,5 @@
 
-use super::tokens::{Token, TokenType::{self, *}};
+use super::tokens::{Token, TokenType};
 use std::{collections::HashMap, string::String};
 
 type Keywords   = HashMap<String, TokenType>;
@@ -98,22 +98,22 @@ impl Scanner {
 
         match ch {
 
-            '(' => self.add_token(LeftParen),
-            ')' => self.add_token(RightParen),
-            '{' => self.add_token(LeftBrace),
-            '}' => self.add_token(RightBrace),
-            ';' => self.add_token(Semicolon),
-            ',' => self.add_token(Comma),
-            '.' => self.add_token(Dot),
-            '-' => self.add_token(Minus),
-            '+' => self.add_token(Plus),
-            '/' => self.add_token(Slash),
-            '*' => self.add_token(Star),
+            '(' => self.add_token(Tt::LeftParen),
+            ')' => self.add_token(Tt::RightParen),
+            '{' => self.add_token(Tt::LeftBrace),
+            '}' => self.add_token(Tt::RightBrace),
+            ';' => self.add_token(Tt::Semicolon),
+            ',' => self.add_token(Tt::Comma),
+            '.' => self.add_token(Tt::Dot),
+            '-' => self.add_token(Tt::Minus),
+            '+' => self.add_token(Tt::Plus),
+            '/' => self.add_token(Tt::Slash),
+            '*' => self.add_token(Tt::Star),
 
-            '!' => self.add_token_match('=', Bang,    BangEqual),
-            '=' => self.add_token_match('=', Equal,   EqualEqual),
-            '<' => self.add_token_match('=', Less,    LessEqual),
-            '>' => self.add_token_match('=', Greater, GreaterEqual),
+            '!' => self.add_token_match('=', Tt::Bang,    Tt::BangEqual),
+            '=' => self.add_token_match('=', Tt::Equal,   Tt::EqualEqual),
+            '<' => self.add_token_match('=', Tt::Less,    Tt::LessEqual),
+            '>' => self.add_token_match('=', Tt::Greater, Tt::GreaterEqual),
 
             '"' => self.parse_string(),
 
@@ -325,30 +325,28 @@ fn chars_to_str(chars: &[char]) -> String {
 }
 
 pub fn get_keywords() -> HashMap<String, TokenType> {
-    let mut dict = HashMap::new();
-
-    let mut add = |k: &str, v: TokenType| {
-        dict.insert(String::from(k), v);
-    };
-
-    add("and",     Tt::And);
-    add("class",   Tt::Class);
-    add("else",    Tt::Else);
-    add("false",   Tt::False);
-    add("for",     Tt::For);
-    add("fun",     Tt::Fun);
-    add("if",      Tt::If);
-    add("nil",     Tt::Nil);
-    add("or",      Tt::Or);
-    add("print",   Tt::Print);
-    add("return",  Tt::Return);
-    add("super",   Tt::Super);
-    add("this",    Tt::This);
-    add("true",    Tt::True);
-    add("var",     Tt::Var);
-    add("while",   Tt::While);
-
-    dict
+    [
+        ("and",     Tt::And),
+        ("class",   Tt::Class),
+        ("else",    Tt::Else),
+        ("false",   Tt::False),
+        ("for",     Tt::For),
+        ("fun",     Tt::Fun),
+        ("if",      Tt::If),
+        ("nil",     Tt::Nil),
+        ("or",      Tt::Or),
+        ("print",   Tt::Print),
+        ("Rect",    Tt::Rect),
+        ("return",  Tt::Return),
+        ("super",   Tt::Super),
+        ("this",    Tt::This),
+        ("true",    Tt::True),
+        ("var",     Tt::Var),
+        ("while",   Tt::While),
+    ]
+        .iter   ()
+        .map    (|(s, t)| (String::from(*s), *t))
+        .collect()
 }
 
 fn format_ch(ch: char) -> String {
