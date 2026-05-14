@@ -47,7 +47,7 @@ use crate::app::swapchain::{Swapchain, SwapchainOpts};
 use crate::app::descriptor_set_layout::DescriptorSetLayout;
 use crate::app::sync_objects::{SyncObjects};
 use crate::app::texture_image::TextureImage;
-use crate::shapes::Shape;
+use crate::shapes::{Cube, Mesh, Shape};
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -330,15 +330,19 @@ impl AppState {
 
         let time = self.start.elapsed().as_secs_f32();
 
+        // from model space to world space
         let model = Mat4::from_axis_angle(
-            vec3(0.0, 0.0, 1.0),
+            vec3(1.0, 1.0, 1.0),
             Deg(90.0) * time,
         );
 
+        // world space to view space (camera)
+        // TODO: setting the eye.Y to 0 causes the image to dissapear
         let view = Mat4::look_at_rh(
-            point3(2.0, 2.0, 1.0),
-            point3(0.0, 0.0, 0.0),
-            vec3  (0.0, 0.0, 1.0),
+            point3(2.0, 2.0, 10.0),
+            // point3(0.0, 0.01, 10.0),
+            point3(0.0, 0.0,  0.0),
+            vec3  (0.0, 0.0,  1.0),
         );
 
         // correct cgmath's output from openGL to vulkan
@@ -349,13 +353,20 @@ impl AppState {
             0.0,  0.0, 1.0 / 2.0, 1.0,
         );
 
-        let proj = correction * cgmath::perspective(
-            Deg(45.0),
-            self.swapchain.extent().width as f32 / self.swapchain.extent().height as f32,
-            1.0,
-            10.0,
-        );
+        // let proj = correction * cgmath::perspective(
+        // // let proj = cgmath::perspective(
+        //     Deg(45.0),
+        //     self.swapchain.extent().width as f32 / self.swapchain.extent().height as f32,
+        //     1.0,
+        //     100.0,
+        // );
 
+
+        let proj = correction * cgmath::ortho(
+            - 10.0,  10.0,
+            - 10.0,  10.0,
+            -100.0, 100.0,
+        );
 
         let ubo = UniformBufferObject { model, view, proj };
 
@@ -510,7 +521,7 @@ fn load_shapes(shapes: &[Shape]) -> Result<(Vec<Vertex>, Vec<u32>)> {
     let mut indices         = Vec::new();
 
     for (i, shape) in shapes.iter().enumerate() {
-        let quad = shape.as_quad(i);
+        let mesh: Mesh = Cube {}.into();
 
         // quad
         //     .vertices
@@ -518,9 +529,11 @@ fn load_shapes(shapes: &[Shape]) -> Result<(Vec<Vertex>, Vec<u32>)> {
         //     .for_each(|v| v.pos.z -= i as f32 * 0.1)
         // ;
 
-        vertices.extend(quad.vertices.iter());
+        vertices.extend(mesh.vertices.iter());
         // indices .extend(quad.indices .iter().map(|x| (i * quad.indices.len()) as u32 + x));
-        indices .extend(quad.indices .iter());
+        indices .extend(mesh.indices .iter());
+
+        break;
     }
 
     println!("count {}", indices.len());

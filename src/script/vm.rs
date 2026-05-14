@@ -840,10 +840,15 @@ fn clock_native<'gc>(_state: &mut State, _: &[Value<'gc>]) -> Value<'gc> {
 
 
 fn rect_native<'gc>(state: &mut State, _: &[Value<'gc>]) -> Value<'gc> {
+
+
+
+
     state.shapes.push(VmShape::Rect);
 
     Value::Nil
 }
+
 
 #[cfg(test)]
 mod tests {
