@@ -28,9 +28,7 @@ impl AstNode for ReturnStmt {
         }
     }
 
-    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
-        todo!()
-    }
+
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         match &self.value {

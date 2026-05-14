@@ -26,9 +26,7 @@ impl AstNode for Block {
         }
     }
 
-    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
-        todo!()
-    }
+
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         self.stmts.iter().map(Stmt::as_ast).collect()

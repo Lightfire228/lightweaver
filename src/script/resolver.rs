@@ -201,6 +201,7 @@ impl<'a> Resolver<'a> {
             Expr::This     (expr) => self.resolve_this_expr   (expr),
             Expr::Unary    (expr) => self.resolve_unary_expr  (expr),
             Expr::Variable (expr) => self.resolve_var_expr    (expr),
+            Expr::Rect     (_)    => todo!(),
         };
     }
 

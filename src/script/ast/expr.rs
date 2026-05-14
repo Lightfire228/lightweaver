@@ -54,10 +54,6 @@ impl AstNode for Expr {
         self.as_ast().display(args)
     }
 
-    fn compile(&self, args: CompileArgs) -> crate::script::ast::ByteCode {
-        self.as_ast().compile(args)
-    }
-
     fn walk   (&self, args: WalkArgs)    -> AstNodeList<'_> {
         self.as_ast().walk(args)
     }

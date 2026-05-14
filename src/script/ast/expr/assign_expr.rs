@@ -31,9 +31,7 @@ impl AstNode for Assign {
         }
     }
 
-    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
-        todo!()
-    }
+
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         vec![self.value.as_ast()]

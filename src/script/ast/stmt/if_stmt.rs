@@ -44,9 +44,7 @@ impl AstNode for IfStmt {
         }
     }
 
-    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
-        todo!()
-    }
+
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         let mut results = vec![

@@ -340,6 +340,7 @@ impl<'gc> Compiler<'gc> {
             Expr::This     (expr) => self.compile_this_expr   (expr),
             Expr::Unary    (expr) => self.compile_unary_expr  (expr),
             Expr::Variable (expr) => self.compile_var_expr    (expr),
+            Expr::Rect     (_)    => todo!(),
         };
 
         // sdlfkjsdflkjsdf

@@ -39,9 +39,7 @@ impl AstNode for Class {
         }
     }
 
-    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
-        todo!()
-    }
+
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         let mut results: AstNodeList = vec![];

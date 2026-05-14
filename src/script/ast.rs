@@ -42,8 +42,6 @@ pub trait AstNode {
 
     fn display(&self, args: DisplayArgs) -> AstDisplay;
 
-    fn compile(&self, args: CompileArgs) -> ByteCode;
-
     fn walk   (&self, args: WalkArgs)    -> AstNodeList<'_>;
 
     // fn display_spaces(&self, msg: &str, args: DisplayArgs) {
@@ -59,10 +57,6 @@ impl AstNode for Ast {
             primary: "Ast".to_owned(),
             labels:  None,
         }
-    }
-
-    fn compile(&self, _: CompileArgs) -> ByteCode {
-        todo!()
     }
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {

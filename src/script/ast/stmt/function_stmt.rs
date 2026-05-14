@@ -54,9 +54,7 @@ impl AstNode for FunctionStmt {
         }
     }
 
-    fn compile(&self, _: CompileArgs) -> crate::script::ast::ByteCode {
-        todo!()
-    }
+
 
     fn walk   (&self, _: WalkArgs)    -> AstNodeList<'_> {
         self.body.iter().map(Stmt::as_ast).collect()
