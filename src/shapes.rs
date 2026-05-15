@@ -61,27 +61,15 @@ impl From<Rect> for Mesh {
 impl From<&Cube> for Mesh {
     fn from(_: &Cube) -> Self {
 
-        let left   =  1.0;
-        let right  = -1.0;
+        let right   = 1.0;
         let bottom = -1.0;
-        let top    =  1.0;
         let back   = -1.0;
+        let left  = -1.0;
+        let top    =  1.0;
         let front  =  1.0;
 
-        let mut i = 0;
-        let mut inc = || {i += 1; i-1};
-
-        let left_bottom_back   = inc();
-        let left_bottom_front  = inc();
-        let left_top_back      = inc();
-        let left_top_front     = inc();
-        let right_bottom_back  = inc();
-        let right_bottom_front = inc();
-        let right_top_back     = inc();
-        let right_top_front    = inc();
-
         // rubiks cube colors
-        let red    = vec3(0.0,  0.0,  0.0);
+        let red    = vec3(1.0,  0.0,  0.0);
         let white  = vec3(1.0,  1.0,  1.0);
         let blue   = vec3(0.0,  0.0,  1.0);
         let orange = vec3(1.0, 0.25, 0.06);
@@ -91,49 +79,49 @@ impl From<&Cube> for Mesh {
         Mesh {
             vertices: vec![
                 // left face
-                Vertex::new(vec3(left,  bottom, back),  red, vec2(0.0, 1.0)),
-                Vertex::new(vec3(left,  bottom, front), red, vec2(0.0, 1.0)),
-                Vertex::new(vec3(left,  top,    back),  red, vec2(0.0, 0.0)),
-                Vertex::new(vec3(left,  top,    front), red, vec2(0.0, 0.0)),
+                Vertex::new(vec3(left, bottom, back),  red, vec2(0.0, 1.0)),
+                Vertex::new(vec3(left, bottom, front), red, vec2(0.0, 1.0)),
+                Vertex::new(vec3(left, top,    back),  red, vec2(0.0, 0.0)),
+                Vertex::new(vec3(left, top,    front), red, vec2(0.0, 0.0)),
 
                 // right face
-                Vertex::new(vec3(right, bottom, back),  orange, vec2(0.0, 1.0)),
-                Vertex::new(vec3(right, bottom, front), orange, vec2(0.0, 1.0)),
-                Vertex::new(vec3(right, top,    back),  orange, vec2(0.0, 0.0)),
-                Vertex::new(vec3(right, top,    front), orange, vec2(0.0, 0.0)),
+                Vertex::new(vec3(right,  bottom, back),  orange, vec2(0.0, 1.0)),
+                Vertex::new(vec3(right,  top,    front), orange, vec2(0.0, 0.0)),
+                Vertex::new(vec3(right,  bottom, front), orange, vec2(0.0, 1.0)),
+                Vertex::new(vec3(right,  top,    back),  orange, vec2(0.0, 0.0)),
 
                 // top face
-                Vertex::new(vec3(left,  top, back),     white, vec2(1.0, 1.0)),
-                Vertex::new(vec3(left,  top, front),    white, vec2(1.0, 1.0)),
-                Vertex::new(vec3(right, top, front),    white, vec2(1.0, 0.0)),
-                Vertex::new(vec3(right, top, back),     white, vec2(1.0, 0.0)),
+                Vertex::new(vec3(right,  top, back),     white, vec2(1.0, 1.0)),
+                Vertex::new(vec3(right,  top, front),    white, vec2(1.0, 1.0)),
+                Vertex::new(vec3(left,   top, front),    white, vec2(1.0, 0.0)),
+                Vertex::new(vec3(left,   top, back),     white, vec2(1.0, 0.0)),
 
                 // bottom face
-                Vertex::new(vec3(left,  bottom, back),  yellow, vec2(1.0, 1.0)),
-                Vertex::new(vec3(left,  bottom, front), yellow, vec2(1.0, 1.0)),
-                Vertex::new(vec3(right, bottom, front), yellow, vec2(1.0, 0.0)),
-                Vertex::new(vec3(right, bottom, back),  yellow, vec2(1.0, 0.0)),
+                Vertex::new(vec3(right,  bottom, back),  yellow, vec2(1.0, 1.0)),
+                Vertex::new(vec3(right,  bottom, front), yellow, vec2(1.0, 1.0)),
+                Vertex::new(vec3(left,   bottom, front), yellow, vec2(1.0, 0.0)),
+                Vertex::new(vec3(left,   bottom, back),  yellow, vec2(1.0, 0.0)),
 
                 // front face
-                Vertex::new(vec3(right, top,    front), blue, vec2(1.0, 0.0)),
-                Vertex::new(vec3(left,  top,    front), blue, vec2(1.0, 1.0)),
-                Vertex::new(vec3(right, bottom, front), blue, vec2(1.0, 0.0)),
-                Vertex::new(vec3(left,  bottom, front), blue, vec2(1.0, 1.0)),
+                Vertex::new(vec3(left,   top,    front), blue, vec2(1.0, 0.0)),
+                Vertex::new(vec3(right,  top,    front), blue, vec2(1.0, 1.0)),
+                Vertex::new(vec3(left,   bottom, front), blue, vec2(1.0, 0.0)),
+                Vertex::new(vec3(right,  bottom, front), blue, vec2(1.0, 1.0)),
 
                 // back face
-                Vertex::new(vec3(left,  top,    back),  green, vec2(1.0, 1.0)),
-                Vertex::new(vec3(left,  bottom, back),  green, vec2(1.0, 1.0)),
-                Vertex::new(vec3(right, bottom, back),  green, vec2(1.0, 0.0)),
-                Vertex::new(vec3(right, top,    back),  green, vec2(1.0, 0.0)),
+                Vertex::new(vec3(right,  top,    back),  green, vec2(1.0, 1.0)),
+                Vertex::new(vec3(right,  bottom, back),  green, vec2(1.0, 1.0)),
+                Vertex::new(vec3(left,   bottom, back),  green, vec2(1.0, 0.0)),
+                Vertex::new(vec3(left,   top,    back),  green, vec2(1.0, 0.0)),
             ],
             // pipeline culls backside, front face set in pipeline
             // vk::FrontFace::COUNTER_CLOCKWISE
             indices: vec![
                 // left face
-                0, 1, 2, 2, 0, 3,
+                0, 1, 2, 1, 3, 2,
 
                 // right face
-                4, 5, 6, 6, 4, 7,
+                4, 7, 6, 6, 7, 5,
 
                 // top face
                 9, 8, 10, 10, 8, 11,
@@ -146,11 +134,6 @@ impl From<&Cube> for Mesh {
 
                 // back face
                 20, 21, 22, 22, 23, 20,
-
-
-
-                // // back face
-                // left_bottom_back, left_top_back, right_bottom_back
 
             ],
         }

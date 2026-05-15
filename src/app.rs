@@ -332,7 +332,7 @@ impl AppState {
 
         // from model space to world space
         let model = Mat4::from_axis_angle(
-            vec3(1.0, 1.0, 1.0).normalize(),
+            vec3(time.sin(), 1.0, 1.0).normalize(),
             Deg(90.0) * time,
         );
 
