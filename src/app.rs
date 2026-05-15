@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use anyhow::{Result, anyhow};
-use cgmath::{Deg, point3, vec3};
+use cgmath::{Deg, InnerSpace, point3, vec3};
 use log::debug;
 use vulkanalia::vk::{DeviceV1_0, Handle, HasBuilder, InstanceV1_0, KhrSurfaceExtensionInstanceCommands, KhrSwapchainExtensionDeviceCommands};
 use vulkanalia::{Entry, Instance as VkInstance, Version, vk};
@@ -332,7 +332,7 @@ impl AppState {
 
         // from model space to world space
         let model = Mat4::from_axis_angle(
-            vec3(1.0, 1.0, 1.0),
+            vec3(1.0, 1.0, 1.0).normalize(),
             Deg(90.0) * time,
         );
 
@@ -353,20 +353,20 @@ impl AppState {
             0.0,  0.0, 1.0 / 2.0, 1.0,
         );
 
-        // let proj = correction * cgmath::perspective(
-        // // let proj = cgmath::perspective(
-        //     Deg(45.0),
-        //     self.swapchain.extent().width as f32 / self.swapchain.extent().height as f32,
-        //     1.0,
-        //     100.0,
-        // );
-
-
-        let proj = correction * cgmath::ortho(
-            - 10.0,  10.0,
-            - 10.0,  10.0,
-            -100.0, 100.0,
+        let proj = correction * cgmath::perspective(
+        // let proj = cgmath::perspective(
+            Deg(45.0),
+            self.swapchain.extent().width as f32 / self.swapchain.extent().height as f32,
+            1.0,
+            100.0,
         );
+
+
+        // let proj = correction * cgmath::ortho(
+        //     - 10.0,  10.0,
+        //     - 10.0,  10.0,
+        //     -100.0, 100.0,
+        // );
 
         let ubo = UniformBufferObject { model, view, proj };
 
