@@ -38,10 +38,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ScannerError> {
     let mut tokens  = Vec::new();
 
     while scanner.has_next() {
-        scanner.scan_token(&mut tokens).map_err(|err| {
-            dbg!("err {}", &tokens);
-            err
-        })?;
+        scanner.scan_token(&mut tokens)?;
     }
 
     tokens.push(Token {
@@ -50,8 +47,6 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ScannerError> {
         line:   scanner.cursor.line,
         col:    scanner.cursor.col,
     });
-
-    dbg!("{}", &tokens);
 
     Ok(tokens)
 }
@@ -229,7 +224,6 @@ impl Scanner {
                 self.skip_to_eol();
             }
 
-
             match self.cursor.next {
                   ' '
                 | '\r'
@@ -240,7 +234,6 @@ impl Scanner {
             }
 
             self.next();
-
         }
     }
 
@@ -251,8 +244,6 @@ impl Scanner {
     fn has_next(&self) -> bool {
         self.index < self.chars.len()
     }
-
-
 }
 
 

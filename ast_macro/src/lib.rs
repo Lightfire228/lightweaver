@@ -4,6 +4,7 @@ use quote::quote;
 
 mod ast_try_from;
 mod obj_try_from;
+mod parser_logger;
 
 #[proc_macro_derive(AstTryFrom)]
 pub fn ast_try_from(input: TokenStream) -> TokenStream {
@@ -29,4 +30,12 @@ pub fn derive_all(_attr: TokenStream, input: TokenStream) -> TokenStream {
         #[collect(no_drop)]
         #input
     }.into()
+}
+
+#[proc_macro_attribute]
+pub fn parser_logger(_attr: TokenStream, input: TokenStream) -> TokenStream {
+
+    let func = syn::parse(input).unwrap();
+
+    parser_logger::parser_logger(&func).into()
 }
