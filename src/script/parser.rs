@@ -6,7 +6,7 @@ use super::tokens::{Token, TokenType};
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-static DEBUG_LOG: bool = false;
+static DEBUG_LOG: bool = true;
 
 pub fn parse_ast(tokens: Vec<Token>) -> Result<Ast, Vec<ParseError>> {
     let mut parser = Parser::new(tokens);

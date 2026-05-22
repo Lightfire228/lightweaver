@@ -5,6 +5,7 @@ use crate::{multi_line, script::tokens::TokenType};
 
 use super::tokens::Token;
 
+
 type Tt = TokenType;
 
 pub struct Example {
@@ -27,7 +28,8 @@ pub fn get_example_001() -> Example {
             "}",
             "",
             "var circle = Circle(4);",
-            "print circle.area; // Prints roughly \"50.2655\".",
+            "print circle.area(); // Prints roughly \"50.2655\".",
+            "\"test\";"
         ),
         tokens: vec![
             Token::new(Tt::Class,      "class",        1, 0,),
@@ -74,8 +76,12 @@ pub fn get_example_001() -> Example {
             Token::new(Tt::Identifier, "circle",      12, 0,),
             Token::new(Tt::Dot,        ".",           12, 0,),
             Token::new(Tt::Identifier, "area",        12, 0,),
+            Token::new(Tt::LeftParen,  "(",           12, 0,),
+            Token::new(Tt::RightParen, ")",           12, 0,),
             Token::new(Tt::Semicolon,  ";",           12, 0,),
-            Token::new(Tt::EOF,        "",            12, 0,),
+            Token::new(Tt::String,     "test",        13, 0,),
+            Token::new(Tt::Semicolon,  ";",           13, 0,),
+            Token::new(Tt::EOF,        "",            13, 0,),
         ],
     }
 }

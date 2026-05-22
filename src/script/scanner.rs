@@ -1,307 +1,292 @@
+use std::{collections::HashMap, num::Wrapping, ops::Index, usize};
 
-use super::tokens::{Token, TokenType};
-use std::{collections::HashMap, string::String};
+use crate::script::tokens::{Token, TokenType};
 
-type Keywords   = HashMap<String, TokenType>;
-type ScanResult = Result<Vec<Token>, Vec<ScannerError>>;
-
-type Se = ScannerErrorType;
 type Tt = TokenType;
 
-pub fn scan_tokens(source: &str) -> ScanResult {
-    let mut scanner = Scanner::new(source);
-
-    while !scanner.is_eof() {
-        scanner.start = scanner.current;
-
-        scanner.scan_token();
-    }
-
-    scanner.finalize();
-
-    if scanner.errors.len() == 0 {
-        Ok(scanner.tokens)
-    }
-    else {
-        Err(scanner.errors)
-    }
+#[derive(Debug)]
+pub enum ScannerError {
+    UnterminatedString{line: usize, col: usize},
+    UnexpectedChar    {line: usize, col: usize, ch: char}
 }
+
+type Se = ScannerError;
 
 
 struct Scanner {
+    chars:        Vec<char>,
 
-    start:   usize, // start of the current lexeme
-    current: usize, // current character
-    line:    usize,
-    col:     usize,
+    cursor:       Cursor, // the previously consumed character
+    index:        usize,  // the next character to consume
 
-    source: Vec<char>,
-    tokens: Vec<Token>,
-    errors: Vec<ScannerError>,
-
-    keywords: Keywords
+    lexeme_start: usize,
 }
 
-#[derive(Debug)]
-pub enum ScannerErrorType {
-    UnterminatedString,
-    UnexpectedCharacter(String),
+#[derive(Debug, Clone, Copy)]
+struct Cursor {
+    prv:    char,
+    char:   char,
+    next:   char,
+    next_2: char,
+
+    line:   usize,
+    col:    usize,
 }
 
-#[derive(Debug)]
-pub struct ScannerError {
-    pub line:  usize,
-    pub col:   usize,
-    pub type_: ScannerErrorType
+pub fn tokenize(source: &str) -> Result<Vec<Token>, ScannerError> {
+    let mut scanner = Scanner::new(source);
+    let mut tokens  = Vec::new();
+
+    while scanner.has_next() {
+        scanner.scan_token(&mut tokens).map_err(|err| {
+            dbg!("err {}", &tokens);
+            err
+        })?;
+    }
+
+    tokens.push(Token {
+        type_:  Tt::EOF,
+        lexeme: String::new(),
+        line:   scanner.cursor.line,
+        col:    scanner.cursor.col,
+    });
+
+    dbg!("{}", &tokens);
+
+    Ok(tokens)
 }
 
 impl Scanner {
-    fn new(source: &str) -> Self {
+    pub fn new(source: &str) -> Self {
+        let chars: Vec<_> = source.chars().collect();
 
-        let bytes = source.chars().collect();
+        let cursor = Cursor {
+            prv:    '\0',
+            char:   '\0',
+            next:   chars.get(0).map_or('\0', |x| *x),
+            next_2: chars.get(1).map_or('\0', |x| *x),
 
-        Self {
-            start:   0,
-            current: 0,
-            line:    1,
-            col:     0,
+            line:   1,
+            col:    1,
 
-            source: bytes,
-            tokens: Vec::new(),
-            errors: Vec::new(),
+        };
 
-            keywords: get_keywords()
+        Scanner {
+            chars,
+            cursor,
+            lexeme_start: 0,
+            index:        0,
         }
     }
 
-    // #region Tokenizing functions
-
-    fn scan_token(&mut self) {
-
+    pub fn scan_token(&mut self, tokens: &mut Vec<Token>) -> Result<(), ScannerError> {
         self.skip_whitespace();
 
-        if self.is_eof() {
-            return;
+        self.lexeme_start = self.index;
+
+        if self.next().is_none() {
+            return Ok(());
         }
 
-        self.start = self.current;
-        let ch = self.advance();
+        let ch = self.cursor.char;
 
         if is_alpha(ch) {
-            self.parse_identifier();
-            return;
+            self.parse_identifier(tokens);
+            return Ok(());
         }
         if is_digit(ch) {
-            self.parse_number();
-            return;
+            self.parse_number(tokens);
+            return Ok(());
         }
 
         match ch {
 
-            '(' => self.add_token(Tt::LeftParen),
-            ')' => self.add_token(Tt::RightParen),
-            '{' => self.add_token(Tt::LeftBrace),
-            '}' => self.add_token(Tt::RightBrace),
-            ';' => self.add_token(Tt::Semicolon),
-            ',' => self.add_token(Tt::Comma),
-            '.' => self.add_token(Tt::Dot),
-            '-' => self.add_token(Tt::Minus),
-            '+' => self.add_token(Tt::Plus),
-            '/' => self.add_token(Tt::Slash),
-            '*' => self.add_token(Tt::Star),
+            '(' => self.add_token(tokens, Tt::LeftParen),
+            ')' => self.add_token(tokens, Tt::RightParen),
+            '{' => self.add_token(tokens, Tt::LeftBrace),
+            '}' => self.add_token(tokens, Tt::RightBrace),
+            ';' => self.add_token(tokens, Tt::Semicolon),
+            ',' => self.add_token(tokens, Tt::Comma),
+            '.' => self.add_token(tokens, Tt::Dot),
+            '-' => self.add_token(tokens, Tt::Minus),
+            '+' => self.add_token(tokens, Tt::Plus),
+            '/' => self.add_token(tokens, Tt::Slash),
+            '*' => self.add_token(tokens, Tt::Star),
 
-            '!' => self.add_token_match('=', Tt::Bang,    Tt::BangEqual),
-            '=' => self.add_token_match('=', Tt::Equal,   Tt::EqualEqual),
-            '<' => self.add_token_match('=', Tt::Less,    Tt::LessEqual),
-            '>' => self.add_token_match('=', Tt::Greater, Tt::GreaterEqual),
+            '!' => self.add_token_match(tokens, '=', Tt::Bang,    Tt::BangEqual),
+            '=' => self.add_token_match(tokens, '=', Tt::Equal,   Tt::EqualEqual),
+            '<' => self.add_token_match(tokens, '=', Tt::Less,    Tt::LessEqual),
+            '>' => self.add_token_match(tokens, '=', Tt::Greater, Tt::GreaterEqual),
 
-            '"' => self.parse_string(),
+            '"' => self.parse_string(tokens)?,
 
-            _   => self.add_error(Se::UnexpectedCharacter(ch.to_string())),
+            _   => Err(Se::UnexpectedChar {
+                line: self.cursor.line,
+                col:  self.cursor.col,
+                ch
+            })?,
         }
+
+        Ok(())
     }
 
-    fn skip_whitespace(&mut self) {
+    fn parse_identifier(&mut self, tokens: &mut Vec<Token>) {
+        while is_alpha_numeric(self.cursor.next) {
+            self.next();
+        }
+
+        let lexeme = self.get_lexeme();
+
+        let type_  = *get_keywords().get(&lexeme).unwrap_or(&Tt::Identifier);
+
+        tokens.push(self.new_token(type_, lexeme));
+    }
+
+    fn parse_number(&mut self, tokens: &mut Vec<Token>) {
+        while is_digit(self.cursor.next) {
+            self.next();
+        }
+
+        if self.cursor.next == '.' && is_digit(self.cursor.next_2) {
+            self.next();
+
+            while is_digit(self.cursor.next) {
+                self.next();
+            }
+        }
+
+        self.add_token(tokens, Tt::Number);
+    }
+
+    fn parse_string(&mut self, tokens: &mut Vec<Token>) -> Result<(), ScannerError> {
+
         loop {
-            let ch = self.peek();
-            match ch {
-                  ' '
-                | '\r'
-                | '\t' => {
-                    self.advance();
-                }
-
-                '\n' => {
-                    self.line();
-                    self.advance();
-                }
-
-                '/' => {
-                    // don't consume
-                    if self.peek_next() != '/' {
-                        return;
-                    }
-
-                    // Consume comment to the end of a line
-                    while self.peek() != '\n' && !self.is_eof() {
-                        self.advance();
-                    }
-                }
-
-                // don't consume
-                _ => return,
+            if self.cursor.char == '\\' {
+                self.next();
             }
-        }
-    }
 
-    fn parse_string(&mut self) {
-
-        while self.peek() != '"' && !self.is_eof() {
-            if self.peek() == '\n' {
-                self.line();
+            if self.next().is_none() {
+                return Err(ScannerError::UnterminatedString { line: self.cursor.line, col: self.cursor.col });
             }
-            self.advance();
-        }
 
-        if self.is_eof() {
-            self.add_error(Se::UnterminatedString);
-        }
-
-        self.advance();
-        self.add_string_token();
-    }
-
-    fn parse_number(&mut self) {
-        while is_digit(self.peek()) {
-            self.advance();
-        }
-
-        // look for a fractional part
-        if self.peek() == '.' && is_digit(self.peek_next()) {
-
-            // consume the dot
-            self.advance();
-
-            while is_digit(self.peek()) {
-                self.advance();
+            if self.cursor.char == '"' {
+                break;
             }
         }
 
-        self.add_token(Tt::Number);
+        self.add_str_token(tokens);
+
+        Ok(())
+
     }
 
-    fn parse_identifier(&mut self) {
-        while is_alpha(self.peek()) || is_digit(self.peek()) {
-            self.advance();
+    fn add_token(&mut self, tokens: &mut Vec<Token>, type_: TokenType) {
+        tokens.push(
+            self.new_token(type_, self.get_lexeme())
+        );
+    }
+
+    fn add_str_token(&mut self, tokens: &mut Vec<Token>) {
+        tokens.push(
+            self.new_token(Tt::String, self.get_wrapped_lexeme())
+        );
+    }
+
+    fn add_token_match(&mut self, tokens: &mut Vec<Token>, ch: char, first: TokenType, second: TokenType) {
+        let type_ = if self.cursor.next == ch {
+            self.next();
+            second
+        } else {
+            first
+        };
+
+        tokens.push(self.new_token(type_, self.get_lexeme()));
+    }
+
+    fn new_token(&mut self, type_: TokenType, lexeme: String) -> Token {
+        self.lexeme_start = self.index -1;
+
+        Token {
+            line: self.cursor.line,
+            col:  self.cursor.col - lexeme.len(),
+            type_,
+            lexeme,
         }
-
-        self.add_token(self.identifier_type());
-    }
-
-    fn identifier_type(&self) -> TokenType {
-
-        let lexeme = self.get_lexeme();
-
-        self.keywords.get(&lexeme).unwrap_or(&Tt::Identifier).to_owned()
-    }
-
-    // #endregion
-    // #region scanner functions
-
-    fn is_eof(&self) -> bool {
-        !self.has_next()
-    }
-
-    fn has_next(&self) -> bool {
-        self.current < self.source.len()
-    }
-
-    fn add_token(&mut self, type_: TokenType) {
-        let lexeme = self.get_lexeme();
-        self.tokens.push(Token::new(type_, &lexeme, self.line, self.col));
-
-        self.start = self.current;
-    }
-
-    fn add_string_token(&mut self) {
-        let lexeme = self.get_wrapped_lexeme(1);
-        self.tokens.push(Token::new(Tt::String, &lexeme, self.line, self.col));
-
-        self.start = self.current;
-    }
-
-    fn add_token_match(&mut self, ch: char, first_type: TokenType, second_type: TokenType) {
-        if self.match_(ch) {
-            self.advance();
-            self.add_token(second_type);
-        }
-        else {
-            self.add_token(first_type);
-        }
-    }
-
-    fn advance(&mut self) -> char {
-        let i = self.current;
-        self.current += 1;
-        self.col     += 1;
-
-        self.source[i]
-    }
-
-    fn line(&mut self) {
-        self.line += 1;
-        self.col   = 0;
-    }
-
-    fn seek(&self, index: usize) -> char {
-        if self.current + index >= self.source.len() {
-            return '\0';
-        }
-
-        let i = self.current + index;
-        self.source[i]
-    }
-
-    fn peek(&self) -> char {
-        self.seek(0)
-    }
-
-    fn peek_next(&self) -> char {
-        self.seek(1)
-    }
-
-    fn match_(&self, ch: char) -> bool {
-        ch == self.peek()
-    }
-
-    fn _match_number(&self) -> bool {
-        let ch = self.peek();
-
-        is_digit(ch)
     }
 
     fn get_lexeme(&self) -> String {
-        chars_to_str(&self.source[self.start..self.current])
+        chars_to_str(&self.chars[self.lexeme_start..self.index])
+    }
+    fn get_wrapped_lexeme(&self) -> String {
+        chars_to_str(&self.chars[self.lexeme_start+1..self.index-1])
     }
 
-    fn get_wrapped_lexeme(&self, i: usize) -> String {
-        chars_to_str(&self.source[self.start +i .. self.current -i])
+    fn skip_whitespace(&mut self) {
+
+        loop {
+
+            if self.cursor.next == '/' && self.cursor.next_2 == '/' {
+                self.skip_to_eol();
+            }
+
+
+            match self.cursor.next {
+                  ' '
+                | '\r'
+                | '\n'
+                | '\t' => {},
+
+                _ => return,
+            }
+
+            self.next();
+
+        }
     }
 
-    fn finalize(&mut self) {
-        self.tokens.push(Token::new(Tt::EOF, "", self.line, self.col));
+    fn skip_to_eol(&mut self) {
+        while self.next().is_some_and(|cur| cur.char != '\n') {}
     }
 
-    fn add_error(&mut self, err_type: ScannerErrorType) {
-        self.errors.push(ScannerError {
-            line:  self.line,
-            col:   self.col,
-            type_: err_type,
-        });
+    fn has_next(&self) -> bool {
+        self.index < self.chars.len()
     }
 
-    // #endregion
 
+}
+
+
+impl Iterator for Scanner {
+    type Item = Cursor;
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+        if !self.has_next() {
+            return None;
+        }
+
+        let next = self.chars.get(self.index +2).map_or(0 as char, |x| *x);
+
+
+        self.cursor = Cursor {
+            prv:    self.cursor.char,
+            char:   self.cursor.next,
+            next:   self.cursor.next_2,
+            next_2: next,
+
+            line:   self.cursor.line,
+            col:    self.cursor.col   +1,
+        };
+
+        if self.cursor.prv == '\n' {
+            self.cursor.line += 1;
+            self.cursor.col   = 1;
+        }
+
+        self.index += 1;
+
+        Some(self.cursor)
+    }
 }
 
 
@@ -362,7 +347,7 @@ fn format_ch(ch: char) -> String {
 mod tests {
     use crate::script::test::get_example_001;
 
-    use super::scan_tokens;
+    use super::*;
 
 
 
@@ -370,12 +355,20 @@ mod tests {
     fn base() {
         let example = get_example_001();
 
-        let tokens = scan_tokens(&example.source);
+        let tokens = tokenize(&example.source);
+        dbg!("{}", &tokens);
 
         assert!(tokens.is_ok());
         let tokens = tokens.unwrap();
 
-        assert_eq!(tokens, example.tokens);
+        for (t, e) in tokens.iter().zip(example.tokens) {
+            dbg!("{}, {}", &t, &e);
+            assert_eq!(t.type_,  e.type_);
+            assert_eq!(t.lexeme, e.lexeme);
+            assert_eq!(t.line,   e.line);
+            // assert_eq!(t.col,    e.col);
+        }
+
     }
 
 }

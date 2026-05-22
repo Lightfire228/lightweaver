@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use parser::{parse_ast, ParseErrorType};
-use scanner::{scan_tokens, ScannerErrorType};
+use scanner::{tokenize, ScannerError};
 
 
 pub mod tokens;
@@ -11,7 +11,7 @@ pub mod parser;
 pub mod vm;
 pub mod resolver;
 
-mod test;
+pub mod test;
 
 use vm::{compiler::compile, RuntimeError};
 
@@ -23,14 +23,13 @@ use crate::{script::{
     }
 }, shapes::Shape};
 
-type ScanErrorList  = Vec<scanner::ScannerError>;
 type ParseErrorList = Vec<parser ::ParseError>;
 type RunResult      = Result<(), RunError>;
 
 #[derive(Debug)]
 pub enum RunError {
     IOError,
-    ScannerError(ScanErrorList),
+    ScannerError(ScannerError),
     ParserError (ParseErrorList),
     RuntimeError(RuntimeError)
 }
@@ -43,7 +42,7 @@ pub fn run_file(path: &Path) -> Result<Vec<Shape>, RunError> {
 
     let source  = fs::read_to_string(path).map_err(|_|   Re::IOError)?;
 
-    let tokens  = scan_tokens(&source)    .map_err(|err| Re::ScannerError(err))?;
+    let tokens  = tokenize (&source)      .map_err(|err| Re::ScannerError(err))?;
 
     let mut ast = parse_ast(tokens)       .map_err(|err| Re::ParserError(err))?;
     resolve(&mut ast);
@@ -73,16 +72,12 @@ fn display_error(err: RunError) -> ! {
     }
 }
 
-fn display_scanner_err(err: ScanErrorList) -> ! {
-    type Se = ScannerErrorType;
+fn display_scanner_err(err: ScannerError) -> ! {
+    type Se = ScannerError;
 
-    for e in err.iter() {
-        eprint!("Compile Error: Line {} - Col {} - \n> ", e.line, e.col);
-
-        match &e.type_ {
-            Se::UnterminatedString      => eprintln!("Unterminated String"),
-            Se::UnexpectedCharacter(ch) => eprintln!("Unexpected character: '{}'", ch),
-        }
+    match &err {
+        Se::UnterminatedString { line, col }     => eprintln!("Compile Error: Line {} - Col {} - \n> Unterminated String",        line, col),
+        Se::UnexpectedChar     { line, col, ch } => eprintln!("Compile Error: Line {} - Col {} - \n> Unexpected character: '{}'", line, col, ch),
     }
 
     panic!()

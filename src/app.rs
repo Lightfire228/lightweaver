@@ -47,7 +47,7 @@ use crate::app::swapchain::{Swapchain, SwapchainOpts};
 use crate::app::descriptor_set_layout::DescriptorSetLayout;
 use crate::app::sync_objects::{SyncObjects};
 use crate::app::texture_image::TextureImage;
-use crate::shapes::{Cube, Mesh, Shape};
+use crate::shapes::{Cube, Mesh, Rect, Shape};
 
 pub type Vec2 = cgmath::Vector2<f32>;
 pub type Vec3 = cgmath::Vector3<f32>;
@@ -514,34 +514,46 @@ unsafe fn get_memory_type_index(
 }
 
 fn load_shapes(shapes: &[Shape]) -> Result<(Vec<Vertex>, Vec<u32>)> {
+    load_quads(shapes)
+    // load_cube(shapes)
+}
 
-    // let mut unique_vertices = HashMap::new();
+fn load_cube(_: &[Shape]) -> Result<(Vec<Vertex>, Vec<u32>)> {
 
     let mut vertices        = Vec::new();
     let mut indices         = Vec::new();
 
-    for (i, shape) in shapes.iter().enumerate() {
-        let mesh: Mesh = Cube {}.into();
+    let mesh: Mesh = Cube {}.into();
 
-        // quad
-        //     .vertices
-        //     .iter_mut()
-        //     .for_each(|v| v.pos.z -= i as f32 * 0.1)
-        // ;
-
-        vertices.extend(mesh.vertices.iter());
-        // indices .extend(quad.indices .iter().map(|x| (i * quad.indices.len()) as u32 + x));
-        indices .extend(mesh.indices .iter());
-
-        break;
-    }
-
-    println!("count {}", indices.len());
-
-
+    vertices.extend(mesh.vertices.iter());
+    indices .extend(mesh.indices .iter());
 
     Ok((vertices, indices))
 }
+
+fn load_quads(shapes: &[Shape]) -> Result<(Vec<Vertex>, Vec<u32>)> {
+
+    let mut vertices        = Vec::new();
+    let mut indices         = Vec::new();
+
+    for (i, _) in shapes.iter().enumerate() {
+        let mut mesh: Mesh = Rect {}.into();
+
+        mesh
+            .vertices
+            .iter_mut()
+            .for_each(|v| v.pos.z -= i as f32 * 0.5)
+        ;
+        mesh.indices.iter_mut().for_each(|x| *x = *x + (i*4) as u32);
+
+        vertices.extend(mesh.vertices.iter());
+        indices .extend(mesh.indices .iter());
+
+    }
+
+    Ok((vertices, indices))
+}
+
 
 
 // TODO:
