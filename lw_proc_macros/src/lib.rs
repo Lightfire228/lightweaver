@@ -39,3 +39,11 @@ pub fn parser_logger(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
     parser_logger::parser_logger(&func).into()
 }
+
+#[proc_macro_attribute]
+pub fn parser_logger_no_children(_attr: TokenStream, input: TokenStream) -> TokenStream {
+
+    let func = syn::parse(input).unwrap();
+
+    parser_logger::parser_logger_no_children(&func).into()
+}

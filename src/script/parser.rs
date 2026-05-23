@@ -1,6 +1,6 @@
 use std::{cell::Cell, collections::HashMap};
 
-use lw_proc_macros::parser_logger;
+use lw_proc_macros::{parser_logger, parser_logger_no_children};
 
 use crate::script::ast::*;
 
@@ -35,9 +35,11 @@ pub fn parse_ast(tokens: Vec<Token>) -> Result<Ast, Vec<ParseError>> {
 pub struct Parser {
     tokens:  Vec<Token>,
     current: usize,
-    logger:  Logger,
 
     parse_table: HashMap<TokenType, ParseRule>,
+
+    // debug
+    call_depth: usize
 }
 
 
@@ -189,7 +191,7 @@ impl Parser {
             tokens,
             current:     0,
             parse_table: Self::parse_table(),
-            logger:      Logger::new(),
+            call_depth:  0,
         }
     }
 
@@ -629,8 +631,8 @@ impl Parser {
         }
     }
 
+    #[parser_logger_no_children]
     fn parse_literal_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.logger.log_no_children("parse_literal_expr", self.peek());
 
         Ok(Literal::new(self.previous()))
     }
@@ -656,8 +658,8 @@ impl Parser {
         Ok(Logical::new(left, operator, right))
     }
 
+    #[parser_logger_no_children]
     fn parse_super_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.logger.log_no_children("parse_super_expr", self.peek());
 
         let keyword = self.previous();
         self.consume(Tt::Dot, Pe::MissingSuperDot)?;
@@ -666,8 +668,8 @@ impl Parser {
         Ok(Super::new(keyword, method))
     }
 
+    #[parser_logger_no_children]
     fn parse_this_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
-        self.logger.log_no_children("parse_this_expr", self.peek());
 
         Ok(This::new(self.previous()))
     }
@@ -774,40 +776,4 @@ impl Parser {
 
     }
 
-}
-
-
-fn print_ind(ind: usize, msg: &str) {
-    println!("{}{}", " ".repeat(ind * 4), msg);
-}
-
-struct Logger {
-    depth: Cell<usize>,
-}
-
-impl Logger {
-    pub fn new() -> Self {
-        Self {
-            depth: Cell::new(0),
-        }
-    }
-
-    fn enter(&self) {
-        self.depth.set(self.depth.get() +1)
-    }
-
-    fn exit(&self, depth: usize) {
-        self.depth.set(depth)
-    }
-
-    fn log_no_children(&self, name: &str, token: &Token){
-        if !DEBUG_LOG {
-            return;
-        }
-
-        let depth = self.depth.get();
-        let ind   = "| ".repeat(depth);
-
-        println!("{ind}{name} ({token});");
-    }
 }
