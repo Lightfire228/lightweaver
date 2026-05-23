@@ -1,6 +1,6 @@
 use std::{cell::Cell, collections::HashMap};
 
-use lw_proc_macros::{parser_logger, parser_logger_no_children};
+use lw_proc_macros::{parser_logger};
 
 use crate::script::ast::*;
 
@@ -631,7 +631,7 @@ impl Parser {
         }
     }
 
-    #[parser_logger_no_children]
+    #[parser_logger(no_children)]
     fn parse_literal_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
 
         Ok(Literal::new(self.previous()))
@@ -658,7 +658,7 @@ impl Parser {
         Ok(Logical::new(left, operator, right))
     }
 
-    #[parser_logger_no_children]
+    #[parser_logger(no_children)]
     fn parse_super_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
 
         let keyword = self.previous();
@@ -668,7 +668,7 @@ impl Parser {
         Ok(Super::new(keyword, method))
     }
 
-    #[parser_logger_no_children]
+    #[parser_logger(no_children)]
     fn parse_this_expr(&mut self, _: RuleArgs) -> ParseResult<Expr> {
 
         Ok(This::new(self.previous()))

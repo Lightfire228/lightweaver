@@ -1,6 +1,7 @@
 use proc_macro ::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
+use syn::{Meta, parse_macro_input, punctuated::Punctuated};
 
 mod ast_try_from;
 mod obj_try_from;
@@ -32,18 +33,30 @@ pub fn derive_all(_attr: TokenStream, input: TokenStream) -> TokenStream {
     }.into()
 }
 
+/// This is highly coupled to the implementation details of Parser
+/// and should only be used in its impl block with access to its private members
 #[proc_macro_attribute]
-pub fn parser_logger(_attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn parser_logger(args: TokenStream, input: TokenStream) -> TokenStream {
+
+    let args = parse_macro_input!(args with Punctuated::<Meta, syn::Token![,]>::parse_terminated);
 
     let func = syn::parse(input).unwrap();
 
-    parser_logger::parser_logger(&func).into()
-}
+    let no_children = args
+        .first()
+        .map  (|a| a
+            .path       ()
+            .get_ident  ()
+            .map_or_else(|| String::new(), |i| i.to_string())
+        )
+        .is_some_and(|a| a == "no_children")
+    ;
 
-#[proc_macro_attribute]
-pub fn parser_logger_no_children(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    if no_children {
+        parser_logger::parser_logger_no_children(&func).into()
+    }
+    else {
+        parser_logger::parser_logger(&func).into()
+    }
 
-    let func = syn::parse(input).unwrap();
-
-    parser_logger::parser_logger_no_children(&func).into()
 }
