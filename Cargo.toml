@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 png = "0.17.16"
 
-ast_macro = { path = "./ast_macro" }
+lw_proc_macros = { path = "./lw_proc_macros" }
 gc-arena = "0.5.3"
 anyhow = "1.0.102"
 thiserror = "2.0.18"

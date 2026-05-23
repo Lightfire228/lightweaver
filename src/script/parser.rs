@@ -1,6 +1,6 @@
 use std::{cell::Cell, collections::HashMap};
 
-use ast_macro::parser_logger;
+use lw_proc_macros::parser_logger;
 
 use crate::script::ast::*;
 

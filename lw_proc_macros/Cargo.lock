@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "ast_macro"
+name = "lw_proc_macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",

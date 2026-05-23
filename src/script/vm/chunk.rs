@@ -1,6 +1,6 @@
 use std::{fmt::Display, ops::{Deref, DerefMut}};
 
-use ast_macro::derive_all;
+use lw_proc_macros::derive_all;
 use gc_arena::{Collect, Gc, Mutation, lock::{GcRefLock, RefLock}};
 
 use crate::script::vm::object::{ObjFunction};

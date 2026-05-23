@@ -11,7 +11,7 @@ mod return_stmt;
 mod var_stmt;
 mod while_stmt;
 
-use ast_macro::AstTryFrom;
+use lw_proc_macros::AstTryFrom;
 pub use expr_stmt     ::*;
 pub use function_stmt ::*;
 pub use block_stmt    ::*;

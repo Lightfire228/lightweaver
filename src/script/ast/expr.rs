@@ -1,5 +1,5 @@
 use crate::script::{ast::{AstNode, AstNodeList, CompileArgs, DisplayArgs, WalkArgs}};
-use ast_macro::AstTryFrom;
+use lw_proc_macros::AstTryFrom;
 
 mod assign_expr;
 mod binary_expr;
